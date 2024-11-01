@@ -1,7 +1,9 @@
 //! Based on POSIX.1-2024
 
+use std::collections::HashSet;
+
 type Pathname = String;
-type FileDescriptor = i32;
+type FileDescriptor = usize;
 
 /// Flags for `open(path, flags, mode)` syscall.
 ///
@@ -109,12 +111,12 @@ enum Mode {
 enum Operation {
     MKDIR {
         path: Pathname,
-        mode: Mode,
+        mode: HashSet<Mode>,
     },
     OPEN {
         path: Pathname,
-        flags: OpenFlag,
-        mode: Mode,
+        flags: HashSet<OpenFlag>,
+        mode: HashSet<Mode>,
         // return value
         fd: FileDescriptor,
     },
@@ -129,3 +131,5 @@ enum Operation {
         fd: FileDescriptor,
     },
 }
+
+
