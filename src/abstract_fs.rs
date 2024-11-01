@@ -1,5 +1,7 @@
 //! Based on POSIX.1-2024
 
+#![allow(dead_code)]
+
 use std::collections::HashSet;
 
 type Pathname = String;
@@ -8,6 +10,7 @@ type FileDescriptor = usize;
 /// Flags for `open(path, flags, mode)` syscall.
 ///
 /// Applications *shall* specify __exactly one__ of the __first 5__ values.
+#[derive(PartialEq, Eq, Hash)]
 #[allow(nonstandard_style)]
 enum OpenFlag {
     /// Open for execute only (non-directory files).
@@ -72,7 +75,7 @@ enum OpenFlag {
 
     O_TTY_INIT,
 }
-
+#[derive(PartialEq, Eq, Hash)]
 #[allow(nonstandard_style)]
 enum Mode {
     /// Read, write, execute/search by owner.
@@ -108,7 +111,7 @@ enum Mode {
     S_ISVTX = 0o1000,
 }
 
-enum Operation {
+enum FileOperation {
     MKDIR {
         path: Pathname,
         mode: HashSet<Mode>,
@@ -117,8 +120,6 @@ enum Operation {
         path: Pathname,
         flags: HashSet<OpenFlag>,
         mode: HashSet<Mode>,
-        // return value
-        fd: FileDescriptor,
     },
     RENAME {
         old: Pathname,
@@ -132,4 +133,58 @@ enum Operation {
     },
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum FileError {
+    EEXIST,
+    Unknown,
+}
 
+struct AbstractExecutor {
+    files: HashSet<Pathname>,
+}
+
+impl AbstractExecutor {
+    fn new() -> Self {
+        AbstractExecutor {
+            files: HashSet::new(),
+        }
+    }
+
+    fn try_apply(&mut self, op: FileOperation) -> Result<FileDescriptor, FileError> {
+        match op {
+            FileOperation::MKDIR { path, mode } => todo!(),
+            FileOperation::OPEN { path, flags, mode } => {
+                if self.files.insert(path) {
+                    Ok(1)
+                } else {
+                    Err(FileError::EEXIST)
+                }
+            },
+            FileOperation::RENAME { old, new } => todo!(),
+            FileOperation::REMOVE { path } => todo!(),
+            FileOperation::CLOSE { fd } => todo!(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_creat_excl() {
+        let mut exec = AbstractExecutor::new();
+        let res = exec.try_apply(FileOperation::OPEN {
+            path: String::from("/foobar"),
+            flags: HashSet::from([OpenFlag::O_CREAT, OpenFlag::O_EXCL]),
+            mode: HashSet::from([]),
+        });
+        assert_eq!(Ok(1), res);
+        let res = exec.try_apply(FileOperation::OPEN {
+            path: String::from("/foobar"),
+            flags: HashSet::from([OpenFlag::O_CREAT, OpenFlag::O_EXCL]),
+            mode: HashSet::from([]),
+        });
+        assert_eq!(Err(FileError::EEXIST), res);
+    }
+}
