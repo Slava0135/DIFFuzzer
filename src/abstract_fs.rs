@@ -328,4 +328,18 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    #[should_panic]
+    fn test_create_same_name() {
+        let mut exec = AbstractExecutor::new();
+        exec.apply(Operation::CREATE {
+            parent: DirIndex(0),
+            name: String::from("foobar"),
+        });
+        exec.apply(Operation::CREATE {
+            parent: DirIndex(0),
+            name: String::from("foobar"),
+        });
+    }
 }
