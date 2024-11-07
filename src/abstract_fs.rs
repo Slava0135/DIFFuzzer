@@ -158,7 +158,7 @@ impl AbstractExecutor {
     fn remove(&mut self, node: &Node) {
         match node {
             Node::DIR(to_remove) => {
-                if *to_remove == DirIndex(0) {
+                if *to_remove == AbstractExecutor::root_index() {
                     panic!("removing root is prohibited")
                 }
                 let dir = self.get_dir(&to_remove).clone();
@@ -240,6 +240,10 @@ impl AbstractExecutor {
     fn root(&self) -> &Dir {
         self.dirs.get(0).unwrap()
     }
+
+    fn root_index() -> DirIndex {
+        DirIndex(0)
+    }
 }
 
 #[cfg(test)]
@@ -256,13 +260,17 @@ mod tests {
     #[should_panic]
     fn test_remove_root() {
         let mut exec = AbstractExecutor::new();
-        exec.remove(&Node::DIR(DirIndex(0)));
+        exec.remove(&Node::DIR(AbstractExecutor::root_index()));
     }
 
     #[test]
     fn test_mkdir() {
         let mut exec = AbstractExecutor::new();
-        exec.mkdir(&DirIndex(0), String::from("foobar"), HashSet::new());
+        exec.mkdir(
+            &AbstractExecutor::root_index(),
+            String::from("foobar"),
+            HashSet::new(),
+        );
         match exec.root().children[0] {
             Node::DIR(idx) => {
                 assert_eq!("foobar", exec.get_dir(&idx).name)
@@ -277,14 +285,22 @@ mod tests {
     #[should_panic]
     fn test_mkdir_same_name() {
         let mut exec = AbstractExecutor::new();
-        exec.mkdir(&DirIndex(0), String::from("foobar"), HashSet::new());
-        exec.mkdir(&DirIndex(0), String::from("foobar"), HashSet::new());
+        exec.mkdir(
+            &AbstractExecutor::root_index(),
+            String::from("foobar"),
+            HashSet::new(),
+        );
+        exec.mkdir(
+            &AbstractExecutor::root_index(),
+            String::from("foobar"),
+            HashSet::new(),
+        );
     }
 
     #[test]
     fn test_create() {
         let mut exec = AbstractExecutor::new();
-        exec.create(&DirIndex(0), String::from("foobar"));
+        exec.create(&AbstractExecutor::root_index(), String::from("foobar"));
         match exec.root().children[0] {
             Node::FILE(idx) => {
                 assert_eq!("foobar", exec.get_file(&idx).name)
@@ -299,15 +315,15 @@ mod tests {
     #[should_panic]
     fn test_create_same_name() {
         let mut exec = AbstractExecutor::new();
-        exec.create(&DirIndex(0), String::from("foobar"));
-        exec.create(&DirIndex(0), String::from("foobar"));
+        exec.create(&AbstractExecutor::root_index(), String::from("foobar"));
+        exec.create(&AbstractExecutor::root_index(), String::from("foobar"));
     }
 
     #[test]
     fn test_remove_file() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.create(&DirIndex(0), String::from("foobar"));
-        exec.create(&DirIndex(0), String::from("boo"));
+        let foo = exec.create(&AbstractExecutor::root_index(), String::from("foobar"));
+        exec.create(&AbstractExecutor::root_index(), String::from("boo"));
         exec.remove(&Node::FILE(foo));
         assert_eq!(1, exec.root().children.len());
         match exec.root().children[0] {
@@ -323,8 +339,16 @@ mod tests {
     #[test]
     fn test_remove_dir() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.mkdir(&DirIndex(0), String::from("foobar"), HashSet::new());
-        exec.mkdir(&DirIndex(0), String::from("boo"), HashSet::new());
+        let foo = exec.mkdir(
+            &AbstractExecutor::root_index(),
+            String::from("foobar"),
+            HashSet::new(),
+        );
+        exec.mkdir(
+            &AbstractExecutor::root_index(),
+            String::from("boo"),
+            HashSet::new(),
+        );
         exec.remove(&Node::DIR(foo));
         assert_eq!(1, exec.root().children.len());
         match exec.root().children[0] {
