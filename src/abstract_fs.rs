@@ -138,33 +138,6 @@ enum Node {
     DIR(DirIndex),
 }
 
-enum Operation {
-    MKDIR {
-        parent: DirIndex,
-        name: Name,
-        mode: HashSet<Mode>,
-    },
-    CREATE {
-        parent: DirIndex,
-        name: Name,
-    },
-    OPEN {
-        node: Node,
-        flags: HashSet<OpenFlag>,
-        mode: HashSet<Mode>,
-    },
-    RENAME {
-        old_parent: DirIndex,
-        new_parent: DirIndex,
-    },
-    REMOVE {
-        node: Node,
-    },
-    CLOSE {
-        fd: FileDescriptor,
-    },
-}
-
 struct AbstractExecutor {
     dirs: Vec<Dir>,
     files: Vec<File>,
@@ -182,49 +155,46 @@ impl AbstractExecutor {
         }
     }
 
-    fn apply(&mut self, op: Operation) {
-        match op {
-            Operation::REMOVE { node } => match node {
-                Node::DIR(DirIndex(idx)) => {
-                    if idx == 0 {
-                        panic!("removing root is prohibited")
-                    }
+    fn remove(&mut self, node: Node) {
+        match node {
+            Node::DIR(DirIndex(idx)) => {
+                if idx == 0 {
+                    panic!("removing root is prohibited")
                 }
-                _ => panic!("unsupported node type"),
-            },
-            Operation::MKDIR {
-                parent,
-                name,
-                mode: _,
-            } => {
-                if self.name_exists(&parent, &name) {
-                    panic!("parent directory already has a file with this name")
-                }
-                let dir = Dir {
-                    name: name,
-                    parent: Some(parent),
-                    children: vec![],
-                };
-                let dir_idx = DirIndex(self.dirs.len());
-                self.dirs.push(dir);
-                self.get_dir_mut(&parent).children.push(Node::DIR(dir_idx));
             }
-            Operation::CREATE { parent, name } => {
-                if self.name_exists(&parent, &name) {
-                    panic!("parent directory already has a file with this name")
-                }
-                let file = File {
-                    name: name,
-                    parent: parent,
-                };
-                let file_idx = FileIndex(self.files.len());
-                self.files.push(file);
-                self.get_dir_mut(&parent)
-                    .children
-                    .push(Node::FILE(file_idx));
-            }
-            _ => panic!("unsupported operation"),
+            _ => panic!("unsupported node type"),
         }
+    }
+
+    fn mkdir(&mut self, parent: &DirIndex, name: Name, _mode: HashSet<Mode>) -> DirIndex {
+        if self.name_exists(&parent, &name) {
+            panic!("parent directory already has a file with this name")
+        }
+        let dir = Dir {
+            name: name,
+            parent: Some(parent.clone()),
+            children: vec![],
+        };
+        let dir_idx = DirIndex(self.dirs.len());
+        self.dirs.push(dir);
+        self.get_dir_mut(&parent).children.push(Node::DIR(dir_idx));
+        dir_idx
+    }
+
+    fn create(&mut self, parent: &DirIndex, name: Name) -> FileIndex {
+        if self.name_exists(&parent, &name) {
+            panic!("parent directory already has a file with this name")
+        }
+        let file = File {
+            name: name,
+            parent: parent.clone(),
+        };
+        let file_idx = FileIndex(self.files.len());
+        self.files.push(file);
+        self.get_dir_mut(&parent)
+            .children
+            .push(Node::FILE(file_idx));
+        file_idx
     }
 
     fn name_exists(&self, idx: &DirIndex, name: &Name) -> bool {
@@ -273,19 +243,13 @@ mod tests {
     #[should_panic]
     fn test_remove_root() {
         let mut exec = AbstractExecutor::new();
-        exec.apply(Operation::REMOVE {
-            node: Node::DIR(DirIndex(0)),
-        });
+        exec.remove(Node::DIR(DirIndex(0)));
     }
 
     #[test]
     fn test_mkdir() {
         let mut exec = AbstractExecutor::new();
-        exec.apply(Operation::MKDIR {
-            parent: DirIndex(0),
-            name: String::from("foobar"),
-            mode: HashSet::new(),
-        });
+        exec.mkdir(&DirIndex(0), String::from("foobar"), HashSet::new());
         match exec.root().children[0] {
             Node::DIR(idx) => {
                 assert_eq!("foobar", exec.get_dir(&idx).name)
@@ -300,25 +264,14 @@ mod tests {
     #[should_panic]
     fn test_mkdir_same_name() {
         let mut exec = AbstractExecutor::new();
-        exec.apply(Operation::MKDIR {
-            parent: DirIndex(0),
-            name: String::from("foobar"),
-            mode: HashSet::new(),
-        });
-        exec.apply(Operation::MKDIR {
-            parent: DirIndex(0),
-            name: String::from("foobar"),
-            mode: HashSet::new(),
-        });
+        exec.mkdir(&DirIndex(0), String::from("foobar"), HashSet::new());
+        exec.mkdir(&DirIndex(0), String::from("foobar"), HashSet::new());
     }
 
     #[test]
     fn test_create() {
         let mut exec = AbstractExecutor::new();
-        exec.apply(Operation::CREATE {
-            parent: DirIndex(0),
-            name: String::from("foobar"),
-        });
+        exec.create(&DirIndex(0), String::from("foobar"));
         match exec.root().children[0] {
             Node::FILE(idx) => {
                 assert_eq!("foobar", exec.get_file(&idx).name)
@@ -333,13 +286,7 @@ mod tests {
     #[should_panic]
     fn test_create_same_name() {
         let mut exec = AbstractExecutor::new();
-        exec.apply(Operation::CREATE {
-            parent: DirIndex(0),
-            name: String::from("foobar"),
-        });
-        exec.apply(Operation::CREATE {
-            parent: DirIndex(0),
-            name: String::from("foobar"),
-        });
+        exec.create(&DirIndex(0), String::from("foobar"));
+        exec.create(&DirIndex(0), String::from("foobar"));
     }
 }
