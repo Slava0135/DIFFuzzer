@@ -157,13 +157,19 @@ impl AbstractExecutor {
 
     fn remove(&mut self, node: &Node) {
         match node {
-            Node::DIR(DirIndex(idx)) => {
-                if *idx == 0 {
+            Node::DIR(to_remove) => {
+                if *to_remove == DirIndex(0) {
                     panic!("removing root is prohibited")
                 }
+                let dir = self.get_dir(&to_remove).clone();
+                let parent = self.get_dir_mut(&dir.parent.unwrap());
+                parent.children.retain(|n| match n {
+                    Node::FILE(_) => true,
+                    Node::DIR(idx) => idx != to_remove,
+                });
             }
             Node::FILE(to_remove) => {
-                let file: File = self.get_file(&to_remove).clone();
+                let file = self.get_file(&to_remove).clone();
                 let parent = self.get_dir_mut(&file.parent);
                 parent.children.retain(|n| match n {
                     Node::FILE(idx) => idx != to_remove,
@@ -310,6 +316,23 @@ mod tests {
             }
             _ => {
                 assert!(false, "not a file")
+            }
+        }
+    }
+
+    #[test]
+    fn test_remove_dir() {
+        let mut exec = AbstractExecutor::new();
+        let foo = exec.mkdir(&DirIndex(0), String::from("foobar"), HashSet::new());
+        exec.mkdir(&DirIndex(0), String::from("boo"), HashSet::new());
+        exec.remove(&Node::DIR(foo));
+        assert_eq!(1, exec.root().children.len());
+        match exec.root().children[0] {
+            Node::DIR(idx) => {
+                assert_eq!("boo", exec.get_dir(&idx).name)
+            }
+            _ => {
+                assert!(false, "not a dir")
             }
         }
     }
