@@ -2,7 +2,7 @@
 
 #![allow(dead_code)]
 
-use std::{cell::RefCell, collections::HashSet, rc::Rc, vec};
+use std::{cell::RefCell, collections::HashSet, rc::{Rc, Weak}, vec};
 
 type FileName = String;
 type FileDescriptor = usize;
@@ -114,25 +114,32 @@ enum Mode {
 #[derive(Debug)]
 struct File {
     name: FileName,
-    parent: Rc<RefCell<Dir>>,
+    parent: Weak<RefCell<Dir>>,
 }
 
 #[derive(Debug)]
 struct Dir {
     name: FileName,
-    parent: Option<Rc<RefCell<Dir>>>,
+    parent: Option<Weak<RefCell<Dir>>>,
     children: Vec<Node>,
 }
 
 impl PartialEq for File {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.parent == other.parent
+        self.name == other.name && self.parent.upgrade() == other.parent.upgrade()
     }
 }
 
 impl PartialEq for Dir {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.parent == other.parent
+        if self.name != other.name {
+            return false;
+        }
+        match (self.parent.clone(), other.parent.clone()) {
+            (Some(p1), Some(p2)) => p1.upgrade() == p2.upgrade(),
+            (None, None) => true,   
+            _ => false,
+        }
     }
 }
 
@@ -201,7 +208,7 @@ impl AbstractExecutor {
             } => {
                 let new_dir = Rc::new(RefCell::new(Dir {
                     name: name,
-                    parent: Some(parent.clone()),
+                    parent: Some(Rc::downgrade(&parent)),
                     children: vec![],
                 }));
                 parent.borrow_mut().children.push(Node::DIR(new_dir));
@@ -209,7 +216,7 @@ impl AbstractExecutor {
             Operation::CREATE { parent, name } => {
                 let new_file = File {
                     name: name,
-                    parent: parent.clone(),
+                    parent: Rc::downgrade(&parent),
                 };
                 parent.borrow_mut().children.push(Node::FILE(new_file));
             }
@@ -242,7 +249,8 @@ mod tests {
         match exec.root.borrow().children.first() {
             Some(Node::DIR(dir)) => {
                 assert_eq!("foobar", dir.borrow().name);
-                assert_eq!(Some(exec.root.clone()), dir.borrow().parent);
+                let parent = &dir.borrow().parent;
+                assert_eq!(Some(exec.root.clone()), parent.as_ref().unwrap().upgrade());
             }
             _ => assert!(false, "not a dir"),
         };
@@ -258,7 +266,7 @@ mod tests {
         match exec.root.borrow().children.first() {
             Some(Node::FILE(File { name, parent })) => {
                 assert_eq!("foobar", name);
-                assert_eq!(&exec.root, parent);
+                assert_eq!(&exec.root, &parent.upgrade().unwrap());
             }
             _ => assert!(false, "not a file"),
         };
