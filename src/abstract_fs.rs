@@ -2,7 +2,7 @@
 
 #![allow(dead_code)]
 
-use std::{collections::HashSet, vec};
+use std::{collections::HashSet, rc::Rc, vec};
 
 type FileName = String;
 type FileDescriptor = usize;
@@ -111,33 +111,54 @@ enum Mode {
     S_ISVTX = 0o1000,
 }
 
-enum FileNode {
-    FILE {
-        name: FileName
-    },
-    DIR {
-        name: FileName,
-        children: Vec<FileNode>
+struct File {
+    name: FileName,
+    parent: Rc<Dir>,
+}
+
+struct Dir {
+    name: FileName,
+    parent: Option<Rc<Dir>>,
+    children: Vec<Node>,
+}
+
+impl PartialEq for File {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.parent == other.parent
     }
 }
 
-enum FileOperation {
+impl PartialEq for Dir {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.parent == other.parent
+    }
+}
+
+enum Node {
+    FILE(File),
+    DIR(Rc<Dir>),
+}
+
+enum Operation {
     MKDIR {
-        node: FileNode,
+        parent: Dir,
         name: FileName,
         mode: HashSet<Mode>,
     },
+    CREATE {
+        parent: Dir,
+    },
     OPEN {
-        node: FileNode,
+        node: Node,
         flags: HashSet<OpenFlag>,
         mode: HashSet<Mode>,
     },
     RENAME {
-        old_node: FileNode,
-        new_node: FileNode,
+        old_parent: Dir,
+        new_parent: Dir,
     },
     REMOVE {
-        node: FileNode,
+        node: Node,
     },
     CLOSE {
         fd: FileDescriptor,
@@ -145,13 +166,31 @@ enum FileOperation {
 }
 
 struct AbstractExecutor {
-    root: FileNode,
+    root: Rc<Dir>,
 }
 
 impl AbstractExecutor {
     fn new() -> Self {
         AbstractExecutor {
-            root: FileNode::DIR { name: String::from("/"), children: vec!() },
+            root: Rc::new(Dir {
+                name: String::from("/"),
+                parent: None,
+                children: vec![],
+            }),
+        }
+    }
+
+    fn apply(&mut self, op: Operation) {
+        match op {
+            Operation::REMOVE { node } => match node {
+                Node::DIR(dir) => {
+                    if dir == self.root {
+                        panic!("removing root is prohibited");
+                    }
+                }
+                _ => panic!("unsupported node type"),
+            },
+            _ => panic!("unsupported opperation"),
         }
     }
 }
@@ -159,4 +198,11 @@ impl AbstractExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[should_panic]
+    fn test_remove_root() {
+        let mut exec = AbstractExecutor::new();
+        exec.apply(Operation::REMOVE { node: Node::DIR(exec.root.clone()) });
+    }
 }
