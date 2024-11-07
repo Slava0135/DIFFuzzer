@@ -2,7 +2,10 @@
 
 #![allow(dead_code)]
 
-use std::{collections::HashSet, vec};
+use std::{
+    collections::{HashSet, VecDeque},
+    vec,
+};
 
 /// Flags for `open(path, flags, mode)` syscall.
 ///
@@ -111,10 +114,10 @@ enum Mode {
 type PathName = String;
 type Name = String;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct FileIndex(usize);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct DirIndex(usize);
 
 #[derive(Debug)]
@@ -293,6 +296,25 @@ impl AbstractExecutor {
         segments.reverse();
         String::from("/") + segments.join("/").as_str()
     }
+
+    fn alive_dirs(&self) -> Vec<DirIndex> {
+        let root = AbstractExecutor::root_index();
+        let mut visited = vec![];
+        let mut queue = VecDeque::new();
+        queue.push_back(&root);
+        while !queue.is_empty() {
+            let next = queue.pop_front().unwrap();
+            visited.push(next.clone());
+            let dir = self.dir(&next);
+            for node in dir.children.iter() {
+                match node {
+                    Node::DIR(idx) => queue.push_back(idx),
+                    _ => {}
+                }
+            }
+        }
+        visited
+    }
 }
 
 #[cfg(test)]
@@ -303,6 +325,7 @@ mod tests {
     fn test_init_root() {
         let exec = AbstractExecutor::new();
         assert_eq!("", exec.root().name);
+        assert_eq!(vec![AbstractExecutor::root_index()], exec.alive_dirs())
     }
 
     #[test]
@@ -315,7 +338,7 @@ mod tests {
     #[test]
     fn test_mkdir() {
         let mut exec = AbstractExecutor::new();
-        exec.mkdir(
+        let foo = exec.mkdir(
             &AbstractExecutor::root_index(),
             String::from("foobar"),
             HashSet::new(),
@@ -334,7 +357,8 @@ mod tests {
                 mode: HashSet::new()
             }],
             exec.recording
-        )
+        );
+        assert_eq!(vec![AbstractExecutor::root_index(), foo], exec.alive_dirs())
     }
 
     #[test]
@@ -443,11 +467,17 @@ mod tests {
             String::from("foobar"),
             HashSet::new(),
         );
-        exec.mkdir(
+        let boo = exec.mkdir(
             &AbstractExecutor::root_index(),
             String::from("boo"),
             HashSet::new(),
         );
+        let mut expected = vec![AbstractExecutor::root_index(), foo, boo];
+        let mut actual = exec.alive_dirs();
+        expected.sort();
+        actual.sort();
+        assert_eq!(expected, actual);
+
         exec.remove(&Node::DIR(foo));
         assert_eq!(1, exec.root().children.len());
         match exec.root().children[0] {
