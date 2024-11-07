@@ -197,15 +197,7 @@ impl AbstractExecutor {
                 name,
                 mode: _,
             } => {
-                if self
-                    .get_dir(&parent)
-                    .children
-                    .iter()
-                    .any(|node| match node {
-                        Node::DIR(idx) => self.get_dir(idx).name == name,
-                        Node::FILE(idx) => self.get_file(idx).name == name,
-                    })
-                {
+                if self.name_exists(&parent, &name) {
                     panic!("parent directory already has a file with this name")
                 }
                 let dir = Dir {
@@ -217,8 +209,29 @@ impl AbstractExecutor {
                 self.dirs.push(dir);
                 self.get_dir_mut(&parent).children.push(Node::DIR(dir_idx));
             }
+            Operation::CREATE { parent, name } => {
+                if self.name_exists(&parent, &name) {
+                    panic!("parent directory already has a file with this name")
+                }
+                let file = File {
+                    name: name,
+                    parent: parent,
+                };
+                let file_idx = FileIndex(self.files.len());
+                self.files.push(file);
+                self.get_dir_mut(&parent)
+                    .children
+                    .push(Node::FILE(file_idx));
+            }
             _ => panic!("unsupported operation"),
         }
+    }
+
+    fn name_exists(&self, idx: &DirIndex, name: &Name) -> bool {
+        self.get_dir(idx).children.iter().any(|node| match node {
+            Node::DIR(idx) => &self.get_dir(idx).name == name,
+            Node::FILE(idx) => &self.get_file(idx).name == name,
+        })
     }
 
     fn get_dir(&self, idx: &DirIndex) -> &Dir {
@@ -297,5 +310,22 @@ mod tests {
             name: String::from("foobar"),
             mode: HashSet::new(),
         });
+    }
+
+    #[test]
+    fn test_create() {
+        let mut exec = AbstractExecutor::new();
+        exec.apply(Operation::CREATE {
+            parent: DirIndex(0),
+            name: String::from("foobar"),
+        });
+        match exec.root().children[0] {
+            Node::FILE(idx) => {
+                assert_eq!("foobar", exec.get_file(&idx).name)
+            }
+            _ => {
+                assert!(false, "not a file")
+            }
+        }
     }
 }
