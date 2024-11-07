@@ -136,7 +136,7 @@ struct Dir {
     children: Vec<Node>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum Node {
     FILE(FileIndex),
     DIR(DirIndex),
@@ -297,19 +297,24 @@ impl AbstractExecutor {
         String::from("/") + segments.join("/").as_str()
     }
 
-    fn alive_dirs(&self) -> Vec<DirIndex> {
+    fn alive(&self) -> Vec<Node> {
         let root = AbstractExecutor::root_index();
         let mut visited = vec![];
         let mut queue = VecDeque::new();
         queue.push_back(&root);
+        visited.push(Node::DIR(root));
         while !queue.is_empty() {
             let next = queue.pop_front().unwrap();
-            visited.push(next.clone());
             let dir = self.dir(&next);
             for node in dir.children.iter() {
                 match node {
-                    Node::DIR(idx) => queue.push_back(idx),
-                    _ => {}
+                    Node::DIR(idx) => {
+                        queue.push_back(idx);
+                        visited.push(Node::DIR(idx.clone()));
+                    }
+                    Node::FILE(idx) => {
+                        visited.push(Node::FILE(idx.clone()));
+                    }
                 }
             }
         }
@@ -325,7 +330,10 @@ mod tests {
     fn test_init_root() {
         let exec = AbstractExecutor::new();
         assert_eq!("", exec.root().name);
-        assert_eq!(vec![AbstractExecutor::root_index()], exec.alive_dirs())
+        assert_eq!(
+            vec![Node::DIR(AbstractExecutor::root_index())],
+            exec.alive()
+        )
     }
 
     #[test]
@@ -358,7 +366,10 @@ mod tests {
             }],
             exec.recording
         );
-        assert_eq!(vec![AbstractExecutor::root_index(), foo], exec.alive_dirs())
+        assert_eq!(
+            vec![Node::DIR(AbstractExecutor::root_index()), Node::DIR(foo)],
+            exec.alive()
+        )
     }
 
     #[test]
@@ -380,7 +391,7 @@ mod tests {
     #[test]
     fn test_create() {
         let mut exec = AbstractExecutor::new();
-        exec.create(
+        let foo = exec.create(
             &AbstractExecutor::root_index(),
             String::from("foobar"),
             HashSet::new(),
@@ -393,6 +404,10 @@ mod tests {
                 assert!(false, "not a file")
             }
         }
+        assert_eq!(
+            vec![Node::DIR(AbstractExecutor::root_index()), Node::FILE(foo)],
+            exec.alive()
+        );
         assert_eq!(
             vec![Operation::CREATE {
                 path: String::from("/foobar"),
@@ -426,12 +441,23 @@ mod tests {
             String::from("foobar"),
             HashSet::new(),
         );
-        exec.create(
+        let boo = exec.create(
             &AbstractExecutor::root_index(),
             String::from("boo"),
             HashSet::new(),
         );
+        let mut expected = vec![
+            Node::DIR(AbstractExecutor::root_index()),
+            Node::FILE(foo),
+            Node::FILE(boo),
+        ];
+        let mut actual = exec.alive();
+        expected.sort();
+        actual.sort();
+        assert_eq!(expected, actual);
+
         exec.remove(&Node::FILE(foo));
+
         assert_eq!(1, exec.root().children.len());
         match exec.root().children[0] {
             Node::FILE(idx) => {
@@ -441,6 +467,14 @@ mod tests {
                 assert!(false, "not a file")
             }
         }
+        let mut expected = vec![
+            Node::DIR(AbstractExecutor::root_index()),
+            Node::FILE(boo),
+        ];
+        let mut actual = exec.alive();
+        expected.sort();
+        actual.sort();
+        assert_eq!(expected, actual);
         assert_eq!(
             vec![
                 Operation::CREATE {
@@ -472,13 +506,18 @@ mod tests {
             String::from("boo"),
             HashSet::new(),
         );
-        let mut expected = vec![AbstractExecutor::root_index(), foo, boo];
-        let mut actual = exec.alive_dirs();
+        let mut expected = vec![
+            Node::DIR(AbstractExecutor::root_index()),
+            Node::DIR(foo),
+            Node::DIR(boo),
+        ];
+        let mut actual = exec.alive();
         expected.sort();
         actual.sort();
         assert_eq!(expected, actual);
 
         exec.remove(&Node::DIR(foo));
+
         assert_eq!(1, exec.root().children.len());
         match exec.root().children[0] {
             Node::DIR(idx) => {
@@ -488,6 +527,14 @@ mod tests {
                 assert!(false, "not a dir")
             }
         }
+        let mut expected = vec![
+            Node::DIR(AbstractExecutor::root_index()),
+            Node::DIR(boo),
+        ];
+        let mut actual = exec.alive();
+        expected.sort();
+        actual.sort();
+        assert_eq!(expected, actual);
         assert_eq!(
             vec![
                 Operation::MKDIR {
