@@ -2,7 +2,7 @@
 
 #![allow(dead_code)]
 
-use std::{collections::HashSet, rc::Rc, vec};
+use std::{cell::RefCell, collections::HashSet, rc::Rc, vec};
 
 type FileName = String;
 type FileDescriptor = usize;
@@ -111,14 +111,16 @@ enum Mode {
     S_ISVTX = 0o1000,
 }
 
+#[derive(Debug)]
 struct File {
     name: FileName,
-    parent: Rc<Dir>,
+    parent: Rc<RefCell<Dir>>,
 }
 
+#[derive(Debug)]
 struct Dir {
     name: FileName,
-    parent: Option<Rc<Dir>>,
+    parent: Option<Rc<RefCell<Dir>>>,
     children: Vec<Node>,
 }
 
@@ -134,19 +136,21 @@ impl PartialEq for Dir {
     }
 }
 
+#[derive(Debug)]
 enum Node {
     FILE(File),
-    DIR(Rc<Dir>),
+    DIR(Rc<RefCell<Dir>>),
 }
 
 enum Operation {
     MKDIR {
-        parent: Dir,
+        parent: Rc<RefCell<Dir>>,
         name: FileName,
         mode: HashSet<Mode>,
     },
     CREATE {
-        parent: Dir,
+        parent: Rc<RefCell<Dir>>,
+        name: FileName,
     },
     OPEN {
         node: Node,
@@ -154,8 +158,8 @@ enum Operation {
         mode: HashSet<Mode>,
     },
     RENAME {
-        old_parent: Dir,
-        new_parent: Dir,
+        old_parent: Rc<RefCell<Dir>>,
+        new_parent: Rc<RefCell<Dir>>,
     },
     REMOVE {
         node: Node,
@@ -166,17 +170,17 @@ enum Operation {
 }
 
 struct AbstractExecutor {
-    root: Rc<Dir>,
+    root: Rc<RefCell<Dir>>,
 }
 
 impl AbstractExecutor {
     fn new() -> Self {
         AbstractExecutor {
-            root: Rc::new(Dir {
+            root: Rc::new(RefCell::new(Dir {
                 name: String::from("/"),
                 parent: None,
                 children: vec![],
-            }),
+            })),
         }
     }
 
@@ -190,6 +194,14 @@ impl AbstractExecutor {
                 }
                 _ => panic!("unsupported node type"),
             },
+            Operation::MKDIR { parent, name, mode: _ } => {
+                let new_dir = Rc::new(RefCell::new(Dir {
+                    name: name,
+                    parent: Some(parent.clone()),
+                    children: vec![],
+                }));
+                parent.borrow_mut().children.push(Node::DIR(new_dir));
+            }
             _ => panic!("unsupported opperation"),
         }
     }
@@ -203,6 +215,25 @@ mod tests {
     #[should_panic]
     fn test_remove_root() {
         let mut exec = AbstractExecutor::new();
-        exec.apply(Operation::REMOVE { node: Node::DIR(exec.root.clone()) });
+        exec.apply(Operation::REMOVE {
+            node: Node::DIR(exec.root.clone()),
+        });
+    }
+
+    #[test]
+    fn test_mkdir() {
+        let mut exec = AbstractExecutor::new();
+        exec.apply(Operation::MKDIR {
+            parent: exec.root.clone(),
+            name: String::from("foobar"),
+            mode: HashSet::new(),
+        });
+        match exec.root.borrow().children.first() {
+            Some(Node::DIR(dir)) => {
+                assert_eq!("foobar", dir.borrow().name);
+                assert_eq!(Some(exec.root.clone()), dir.borrow().parent);
+            }
+            _ => assert!(false, "not a dir"),
+        };
     }
 }
