@@ -194,13 +194,24 @@ impl AbstractExecutor {
                 }
                 _ => panic!("unsupported node type"),
             },
-            Operation::MKDIR { parent, name, mode: _ } => {
+            Operation::MKDIR {
+                parent,
+                name,
+                mode: _,
+            } => {
                 let new_dir = Rc::new(RefCell::new(Dir {
                     name: name,
                     parent: Some(parent.clone()),
                     children: vec![],
                 }));
                 parent.borrow_mut().children.push(Node::DIR(new_dir));
+            }
+            Operation::CREATE { parent, name } => {
+                let new_file = File {
+                    name: name,
+                    parent: parent.clone(),
+                };
+                parent.borrow_mut().children.push(Node::FILE(new_file));
             }
             _ => panic!("unsupported opperation"),
         }
@@ -234,6 +245,22 @@ mod tests {
                 assert_eq!(Some(exec.root.clone()), dir.borrow().parent);
             }
             _ => assert!(false, "not a dir"),
+        };
+    }
+
+    #[test]
+    fn test_create() {
+        let mut exec = AbstractExecutor::new();
+        exec.apply(Operation::CREATE {
+            parent: exec.root.clone(),
+            name: String::from("foobar"),
+        });
+        match exec.root.borrow().children.first() {
+            Some(Node::FILE(File { name, parent })) => {
+                assert_eq!("foobar", name);
+                assert_eq!(&exec.root, parent);
+            }
+            _ => assert!(false, "not a file"),
         };
     }
 }
