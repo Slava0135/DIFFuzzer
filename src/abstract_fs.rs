@@ -2,7 +2,7 @@
 
 #![allow(dead_code)]
 
-use std::{collections::HashSet, vec};
+use std::{collections::HashSet, ops::Index, vec};
 
 /// Flags for `open(path, flags, mode)` syscall.
 ///
@@ -110,29 +110,29 @@ enum Mode {
 
 type Name = String;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct FileIndex(usize);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct DirIndex(usize);
 
 #[derive(Debug)]
 struct FileDescriptor(usize);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct File {
     name: Name,
     parent: DirIndex,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Dir {
     name: Name,
     parent: Option<DirIndex>,
     children: Vec<Node>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Node {
     FILE(FileIndex),
     DIR(DirIndex),
@@ -155,14 +155,21 @@ impl AbstractExecutor {
         }
     }
 
-    fn remove(&mut self, node: Node) {
+    fn remove(&mut self, node: &Node) {
         match node {
             Node::DIR(DirIndex(idx)) => {
-                if idx == 0 {
+                if *idx == 0 {
                     panic!("removing root is prohibited")
                 }
             }
-            _ => panic!("unsupported node type"),
+            Node::FILE(to_remove) => {
+                let file: File = self.get_file(&to_remove).clone();
+                let parent = self.get_dir_mut(&file.parent);
+                parent.children.retain(|n| match n {
+                    Node::FILE(idx) => idx != to_remove,
+                    Node::DIR(_) => true,
+                });
+            }
         }
     }
 
@@ -243,7 +250,7 @@ mod tests {
     #[should_panic]
     fn test_remove_root() {
         let mut exec = AbstractExecutor::new();
-        exec.remove(Node::DIR(DirIndex(0)));
+        exec.remove(&Node::DIR(DirIndex(0)));
     }
 
     #[test]
@@ -288,5 +295,22 @@ mod tests {
         let mut exec = AbstractExecutor::new();
         exec.create(&DirIndex(0), String::from("foobar"));
         exec.create(&DirIndex(0), String::from("foobar"));
+    }
+
+    #[test]
+    fn test_remove_file() {
+        let mut exec = AbstractExecutor::new();
+        let foo = exec.create(&DirIndex(0), String::from("foobar"));
+        exec.create(&DirIndex(0), String::from("boo"));
+        exec.remove(&Node::FILE(foo));
+        assert_eq!(1, exec.root().children.len());
+        match exec.root().children[0] {
+            Node::FILE(idx) => {
+                assert_eq!("boo", exec.get_file(&idx).name)
+            }
+            _ => {
+                assert!(false, "not a file")
+            }
+        }
     }
 }
