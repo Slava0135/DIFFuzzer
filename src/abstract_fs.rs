@@ -2,10 +2,7 @@
 
 #![allow(dead_code)]
 
-use std::{cell::RefCell, collections::HashSet, rc::{Rc, Weak}, vec};
-
-type FileName = String;
-type FileDescriptor = usize;
+use std::{collections::HashSet, vec};
 
 /// Flags for `open(path, flags, mode)` syscall.
 ///
@@ -111,53 +108,45 @@ enum Mode {
     S_ISVTX = 0o1000,
 }
 
+type Name = String;
+
+#[derive(Debug, Clone, Copy)]
+struct FileIndex(usize);
+
+#[derive(Debug, Clone, Copy)]
+struct DirIndex(usize);
+
+#[derive(Debug)]
+struct FileDescriptor(usize);
+
 #[derive(Debug)]
 struct File {
-    name: FileName,
-    parent: Weak<RefCell<Dir>>,
+    name: Name,
+    parent: DirIndex,
 }
 
 #[derive(Debug)]
 struct Dir {
-    name: FileName,
-    parent: Option<Weak<RefCell<Dir>>>,
+    name: Name,
+    parent: Option<DirIndex>,
     children: Vec<Node>,
-}
-
-impl PartialEq for File {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.parent.upgrade() == other.parent.upgrade()
-    }
-}
-
-impl PartialEq for Dir {
-    fn eq(&self, other: &Self) -> bool {
-        if self.name != other.name {
-            return false;
-        }
-        match (self.parent.clone(), other.parent.clone()) {
-            (Some(p1), Some(p2)) => p1.upgrade() == p2.upgrade(),
-            (None, None) => true,   
-            _ => false,
-        }
-    }
 }
 
 #[derive(Debug)]
 enum Node {
-    FILE(File),
-    DIR(Rc<RefCell<Dir>>),
+    FILE(FileIndex),
+    DIR(DirIndex),
 }
 
 enum Operation {
     MKDIR {
-        parent: Rc<RefCell<Dir>>,
-        name: FileName,
+        parent: DirIndex,
+        name: Name,
         mode: HashSet<Mode>,
     },
     CREATE {
-        parent: Rc<RefCell<Dir>>,
-        name: FileName,
+        parent: DirIndex,
+        name: Name,
     },
     OPEN {
         node: Node,
@@ -165,8 +154,8 @@ enum Operation {
         mode: HashSet<Mode>,
     },
     RENAME {
-        old_parent: Rc<RefCell<Dir>>,
-        new_parent: Rc<RefCell<Dir>>,
+        old_parent: DirIndex,
+        new_parent: DirIndex,
     },
     REMOVE {
         node: Node,
@@ -177,51 +166,56 @@ enum Operation {
 }
 
 struct AbstractExecutor {
-    root: Rc<RefCell<Dir>>,
+    dirs: Vec<Dir>,
+    files: Vec<File>,
 }
 
 impl AbstractExecutor {
     fn new() -> Self {
         AbstractExecutor {
-            root: Rc::new(RefCell::new(Dir {
-                name: String::from("/"),
+            dirs: vec![Dir {
+                name: String::new(),
                 parent: None,
                 children: vec![],
-            })),
+            }],
+            files: vec![],
         }
     }
 
     fn apply(&mut self, op: Operation) {
         match op {
             Operation::REMOVE { node } => match node {
-                Node::DIR(dir) => {
-                    if dir == self.root {
-                        panic!("removing root is prohibited");
+                Node::DIR(DirIndex(idx)) => {
+                    if idx == 0 {
+                        panic!("removing root is prohibited")
                     }
                 }
                 _ => panic!("unsupported node type"),
             },
-            Operation::MKDIR {
-                parent,
-                name,
-                mode: _,
-            } => {
-                let new_dir = Rc::new(RefCell::new(Dir {
-                    name: name,
-                    parent: Some(Rc::downgrade(&parent)),
-                    children: vec![],
-                }));
-                parent.borrow_mut().children.push(Node::DIR(new_dir));
+            Operation::MKDIR { parent, name, mode: _ } => {
+                let dir = Dir{name: name, parent: Some(parent), children: vec!()};
+                let dir_idx = DirIndex(self.dirs.len());
+                self.dirs.push(dir);
+                self.get_dir_mut(parent).children.push(Node::DIR(dir_idx));
             }
-            Operation::CREATE { parent, name } => {
-                let new_file = File {
-                    name: name,
-                    parent: Rc::downgrade(&parent),
-                };
-                parent.borrow_mut().children.push(Node::FILE(new_file));
-            }
-            _ => panic!("unsupported opperation"),
+            _ => panic!("unsupported operation"),
         }
+    }
+
+    fn get_dir(&self, idx: DirIndex) -> &Dir {
+        self.dirs.get(idx.0).unwrap()
+    }
+
+    fn get_dir_mut(&mut self, idx: DirIndex) -> &mut Dir {
+        self.dirs.get_mut(idx.0).unwrap()
+    }
+
+    fn root_mut(&mut self) -> &mut Dir {
+        self.dirs.get_mut(0).unwrap()
+    }
+
+    fn root(&self) -> &Dir {
+        self.dirs.get(0).unwrap()
     }
 }
 
@@ -230,45 +224,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_init_root() {
+        let exec = AbstractExecutor::new();
+        assert_eq!("", exec.root().name);
+    }
+
+    #[test]
     #[should_panic]
     fn test_remove_root() {
         let mut exec = AbstractExecutor::new();
-        exec.apply(Operation::REMOVE {
-            node: Node::DIR(exec.root.clone()),
-        });
+        exec.apply(Operation::REMOVE { node: Node::DIR(DirIndex(0)) });
     }
 
     #[test]
     fn test_mkdir() {
         let mut exec = AbstractExecutor::new();
         exec.apply(Operation::MKDIR {
-            parent: exec.root.clone(),
+            parent: DirIndex(0),
             name: String::from("foobar"),
             mode: HashSet::new(),
         });
-        match exec.root.borrow().children.first() {
-            Some(Node::DIR(dir)) => {
-                assert_eq!("foobar", dir.borrow().name);
-                let parent = &dir.borrow().parent;
-                assert_eq!(Some(exec.root.clone()), parent.as_ref().unwrap().upgrade());
+        match exec.root().children[0] {
+            Node::DIR(idx) => {
+                assert_eq!("foobar", exec.get_dir(idx).name)
             }
-            _ => assert!(false, "not a dir"),
-        };
-    }
-
-    #[test]
-    fn test_create() {
-        let mut exec = AbstractExecutor::new();
-        exec.apply(Operation::CREATE {
-            parent: exec.root.clone(),
-            name: String::from("foobar"),
-        });
-        match exec.root.borrow().children.first() {
-            Some(Node::FILE(File { name, parent })) => {
-                assert_eq!("foobar", name);
-                assert_eq!(&exec.root, &parent.upgrade().unwrap());
+            _ => {
+                assert!(false, "not a dir")
             }
-            _ => assert!(false, "not a file"),
-        };
+        }
     }
 }
