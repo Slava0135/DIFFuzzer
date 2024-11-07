@@ -2,12 +2,12 @@
 
 #![allow(dead_code)]
 
-use std::{collections::HashSet, ops::Index, vec};
+use std::{collections::HashSet, vec};
 
 /// Flags for `open(path, flags, mode)` syscall.
 ///
 /// Applications *shall* specify __exactly one__ of the __first 5__ values.
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 #[allow(nonstandard_style)]
 enum OpenFlag {
     /// Open for execute only (non-directory files).
@@ -72,7 +72,7 @@ enum OpenFlag {
 
     O_TTY_INIT,
 }
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 #[allow(nonstandard_style)]
 enum Mode {
     /// Read, write, execute/search by owner.
@@ -108,6 +108,7 @@ enum Mode {
     S_ISVTX = 0o1000,
 }
 
+type PathName = String;
 type Name = String;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -138,9 +139,18 @@ enum Node {
     DIR(DirIndex),
 }
 
+#[derive(Debug, PartialEq)]
+enum Operation {
+    MKDIR { path: PathName, mode: HashSet<Mode> },
+    CREATE { path: PathName, mode: HashSet<Mode> },
+    REMOVE { path: PathName },
+}
+
 struct AbstractExecutor {
     dirs: Vec<Dir>,
     files: Vec<File>,
+
+    recording: Vec<Operation>,
 }
 
 impl AbstractExecutor {
@@ -152,6 +162,7 @@ impl AbstractExecutor {
                 children: vec![],
             }],
             files: vec![],
+            recording: vec![],
         }
     }
 
@@ -161,6 +172,9 @@ impl AbstractExecutor {
                 if *to_remove == AbstractExecutor::root_index() {
                     panic!("removing root is prohibited")
                 }
+                self.recording.push(Operation::REMOVE {
+                    path: self.resolve_path(node),
+                });
                 let dir = self.get_dir(&to_remove).clone();
                 let parent = self.get_dir_mut(&dir.parent.unwrap());
                 parent.children.retain(|n| match n {
@@ -169,6 +183,9 @@ impl AbstractExecutor {
                 });
             }
             Node::FILE(to_remove) => {
+                self.recording.push(Operation::REMOVE {
+                    path: self.resolve_path(node),
+                });
                 let file = self.get_file(&to_remove).clone();
                 let parent = self.get_dir_mut(&file.parent);
                 parent.children.retain(|n| match n {
@@ -179,7 +196,7 @@ impl AbstractExecutor {
         }
     }
 
-    fn mkdir(&mut self, parent: &DirIndex, name: Name, _mode: HashSet<Mode>) -> DirIndex {
+    fn mkdir(&mut self, parent: &DirIndex, name: Name, mode: HashSet<Mode>) -> DirIndex {
         if self.name_exists(&parent, &name) {
             panic!("parent directory already has a file with this name")
         }
@@ -191,10 +208,14 @@ impl AbstractExecutor {
         let dir_idx = DirIndex(self.dirs.len());
         self.dirs.push(dir);
         self.get_dir_mut(&parent).children.push(Node::DIR(dir_idx));
+        self.recording.push(Operation::MKDIR {
+            path: self.resolve_path(&Node::DIR(dir_idx)),
+            mode: mode,
+        });
         dir_idx
     }
 
-    fn create(&mut self, parent: &DirIndex, name: Name) -> FileIndex {
+    fn create(&mut self, parent: &DirIndex, name: Name, mode: HashSet<Mode>) -> FileIndex {
         if self.name_exists(&parent, &name) {
             panic!("parent directory already has a file with this name")
         }
@@ -207,6 +228,10 @@ impl AbstractExecutor {
         self.get_dir_mut(&parent)
             .children
             .push(Node::FILE(file_idx));
+        self.recording.push(Operation::CREATE {
+            path: self.resolve_path(&Node::FILE(file_idx)),
+            mode: mode,
+        });
         file_idx
     }
 
@@ -244,6 +269,32 @@ impl AbstractExecutor {
     fn root_index() -> DirIndex {
         DirIndex(0)
     }
+
+    fn resolve_path(&self, node: &Node) -> PathName {
+        let mut segments: Vec<String> = vec![];
+        let mut next = node.clone();
+        loop {
+            match next {
+                Node::DIR(idx) => {
+                    let dir = self.get_dir(&idx);
+                    match dir.parent {
+                        Some(parent) => {
+                            segments.push(dir.name.clone());
+                            next = Node::DIR(parent.clone());
+                        }
+                        None => break,
+                    }
+                }
+                Node::FILE(idx) => {
+                    let file = self.get_file(&idx);
+                    segments.push(file.name.clone());
+                    next = Node::DIR(file.parent.clone()).clone();
+                }
+            }
+        }
+        segments.reverse();
+        String::from("/") + segments.join("/").as_str()
+    }
 }
 
 #[cfg(test)]
@@ -279,6 +330,13 @@ mod tests {
                 assert!(false, "not a dir")
             }
         }
+        assert_eq!(
+            vec![Operation::MKDIR {
+                path: String::from("/foobar"),
+                mode: HashSet::new()
+            }],
+            exec.recording
+        )
     }
 
     #[test]
@@ -300,7 +358,11 @@ mod tests {
     #[test]
     fn test_create() {
         let mut exec = AbstractExecutor::new();
-        exec.create(&AbstractExecutor::root_index(), String::from("foobar"));
+        exec.create(
+            &AbstractExecutor::root_index(),
+            String::from("foobar"),
+            HashSet::new(),
+        );
         match exec.root().children[0] {
             Node::FILE(idx) => {
                 assert_eq!("foobar", exec.get_file(&idx).name)
@@ -309,21 +371,44 @@ mod tests {
                 assert!(false, "not a file")
             }
         }
+        assert_eq!(
+            vec![Operation::CREATE {
+                path: String::from("/foobar"),
+                mode: HashSet::new()
+            }],
+            exec.recording
+        )
     }
 
     #[test]
     #[should_panic]
     fn test_create_same_name() {
         let mut exec = AbstractExecutor::new();
-        exec.create(&AbstractExecutor::root_index(), String::from("foobar"));
-        exec.create(&AbstractExecutor::root_index(), String::from("foobar"));
+        exec.create(
+            &AbstractExecutor::root_index(),
+            String::from("foobar"),
+            HashSet::new(),
+        );
+        exec.create(
+            &AbstractExecutor::root_index(),
+            String::from("foobar"),
+            HashSet::new(),
+        );
     }
 
     #[test]
     fn test_remove_file() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.create(&AbstractExecutor::root_index(), String::from("foobar"));
-        exec.create(&AbstractExecutor::root_index(), String::from("boo"));
+        let foo = exec.create(
+            &AbstractExecutor::root_index(),
+            String::from("foobar"),
+            HashSet::new(),
+        );
+        exec.create(
+            &AbstractExecutor::root_index(),
+            String::from("boo"),
+            HashSet::new(),
+        );
         exec.remove(&Node::FILE(foo));
         assert_eq!(1, exec.root().children.len());
         match exec.root().children[0] {
@@ -334,6 +419,22 @@ mod tests {
                 assert!(false, "not a file")
             }
         }
+        assert_eq!(
+            vec![
+                Operation::CREATE {
+                    path: String::from("/foobar"),
+                    mode: HashSet::new()
+                },
+                Operation::CREATE {
+                    path: String::from("/boo"),
+                    mode: HashSet::new()
+                },
+                Operation::REMOVE {
+                    path: String::from("/foobar")
+                }
+            ],
+            exec.recording
+        )
     }
 
     #[test]
@@ -359,5 +460,21 @@ mod tests {
                 assert!(false, "not a dir")
             }
         }
+        assert_eq!(
+            vec![
+                Operation::MKDIR {
+                    path: String::from("/foobar"),
+                    mode: HashSet::new()
+                },
+                Operation::MKDIR {
+                    path: String::from("/boo"),
+                    mode: HashSet::new()
+                },
+                Operation::REMOVE {
+                    path: String::from("/foobar")
+                }
+            ],
+            exec.recording
+        )
     }
 }
