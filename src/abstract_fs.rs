@@ -2,9 +2,9 @@
 
 #![allow(dead_code)]
 
-use std::collections::HashSet;
+use std::{collections::HashSet, vec};
 
-type Pathname = String;
+type FileName = String;
 type FileDescriptor = usize;
 
 /// Flags for `open(path, flags, mode)` syscall.
@@ -111,58 +111,47 @@ enum Mode {
     S_ISVTX = 0o1000,
 }
 
+enum FileNode {
+    FILE {
+        name: FileName
+    },
+    DIR {
+        name: FileName,
+        children: Vec<FileNode>
+    }
+}
+
 enum FileOperation {
     MKDIR {
-        path: Pathname,
+        node: FileNode,
+        name: FileName,
         mode: HashSet<Mode>,
     },
     OPEN {
-        path: Pathname,
+        node: FileNode,
         flags: HashSet<OpenFlag>,
         mode: HashSet<Mode>,
     },
     RENAME {
-        old: Pathname,
-        new: Pathname,
+        old_node: FileNode,
+        new_node: FileNode,
     },
     REMOVE {
-        path: Pathname,
+        node: FileNode,
     },
     CLOSE {
         fd: FileDescriptor,
     },
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum FileError {
-    EEXIST,
-    Unknown,
-}
-
 struct AbstractExecutor {
-    files: HashSet<Pathname>,
+    root: FileNode,
 }
 
 impl AbstractExecutor {
     fn new() -> Self {
         AbstractExecutor {
-            files: HashSet::new(),
-        }
-    }
-
-    fn try_apply(&mut self, op: FileOperation) -> Result<FileDescriptor, FileError> {
-        match op {
-            FileOperation::MKDIR { path, mode } => todo!(),
-            FileOperation::OPEN { path, flags, mode } => {
-                if self.files.insert(path) {
-                    Ok(1)
-                } else {
-                    Err(FileError::EEXIST)
-                }
-            },
-            FileOperation::RENAME { old, new } => todo!(),
-            FileOperation::REMOVE { path } => todo!(),
-            FileOperation::CLOSE { fd } => todo!(),
+            root: FileNode::DIR { name: String::from("/"), children: vec!() },
         }
     }
 }
@@ -170,21 +159,4 @@ impl AbstractExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_creat_excl() {
-        let mut exec = AbstractExecutor::new();
-        let res = exec.try_apply(FileOperation::OPEN {
-            path: String::from("/foobar"),
-            flags: HashSet::from([OpenFlag::O_CREAT, OpenFlag::O_EXCL]),
-            mode: HashSet::from([]),
-        });
-        assert_eq!(Ok(1), res);
-        let res = exec.try_apply(FileOperation::OPEN {
-            path: String::from("/foobar"),
-            flags: HashSet::from([OpenFlag::O_CREAT, OpenFlag::O_EXCL]),
-            mode: HashSet::from([]),
-        });
-        assert_eq!(Err(FileError::EEXIST), res);
-    }
 }
