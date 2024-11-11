@@ -317,7 +317,7 @@ impl AbstractExecutor {
             }
         }
         segments.reverse();
-        String::from("/") + segments.join("/").as_str()
+        "/".to_owned() + segments.join("/").as_str()
     }
 
     pub fn alive(&self) -> Vec<Node> {
@@ -369,11 +369,7 @@ mod tests {
     #[test]
     fn test_mkdir() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.mkdir(
-            &AbstractExecutor::root_index(),
-            String::from("foobar"),
-            vec![],
-        );
+        let foo = exec.mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![]);
         match exec.root().children[0] {
             Node::DIR(idx) => {
                 assert_eq!("foobar", exec.dir(&idx).name)
@@ -384,7 +380,7 @@ mod tests {
         }
         assert_eq!(
             vec![Operation::MKDIR {
-                path: String::from("/foobar"),
+                path: "/foobar".to_owned(),
                 mode: vec![],
             }],
             exec.recording
@@ -399,26 +395,14 @@ mod tests {
     #[should_panic]
     fn test_mkdir_same_name() {
         let mut exec = AbstractExecutor::new();
-        exec.mkdir(
-            &AbstractExecutor::root_index(),
-            String::from("foobar"),
-            vec![],
-        );
-        exec.mkdir(
-            &AbstractExecutor::root_index(),
-            String::from("foobar"),
-            vec![],
-        );
+        exec.mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![]);
+        exec.mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![]);
     }
 
     #[test]
     fn test_create() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.create(
-            &AbstractExecutor::root_index(),
-            String::from("foobar"),
-            vec![],
-        );
+        let foo = exec.create(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![]);
         match exec.root().children[0] {
             Node::FILE(idx) => {
                 assert_eq!("foobar", exec.file(&idx).name)
@@ -433,7 +417,7 @@ mod tests {
         );
         assert_eq!(
             vec![Operation::CREATE {
-                path: String::from("/foobar"),
+                path: "/foobar".to_owned(),
                 mode: vec![],
             }],
             exec.recording
@@ -444,27 +428,15 @@ mod tests {
     #[should_panic]
     fn test_create_same_name() {
         let mut exec = AbstractExecutor::new();
-        exec.create(
-            &AbstractExecutor::root_index(),
-            String::from("foobar"),
-            vec![],
-        );
-        exec.create(
-            &AbstractExecutor::root_index(),
-            String::from("foobar"),
-            vec![],
-        );
+        exec.create(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![]);
+        exec.create(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![]);
     }
 
     #[test]
     fn test_remove_file() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.create(
-            &AbstractExecutor::root_index(),
-            String::from("foobar"),
-            vec![],
-        );
-        let boo = exec.create(&AbstractExecutor::root_index(), String::from("boo"), vec![]);
+        let foo = exec.create(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![]);
+        let boo = exec.create(&AbstractExecutor::root_index(), "boo".to_owned(), vec![]);
         let mut expected = vec![
             Node::DIR(AbstractExecutor::root_index()),
             Node::FILE(foo),
@@ -494,15 +466,15 @@ mod tests {
         assert_eq!(
             vec![
                 Operation::CREATE {
-                    path: String::from("/foobar"),
+                    path: "/foobar".to_owned(),
                     mode: vec![],
                 },
                 Operation::CREATE {
-                    path: String::from("/boo"),
+                    path: "/boo".to_owned(),
                     mode: vec![],
                 },
                 Operation::REMOVE {
-                    path: String::from("/foobar")
+                    path: "/foobar".to_owned(),
                 }
             ],
             exec.recording
@@ -514,10 +486,10 @@ mod tests {
         let mut exec = AbstractExecutor::new();
         let foo = exec.mkdir(
             &AbstractExecutor::root_index(),
-            String::from("foobar"),
+            "foobar".to_owned(),
             vec![],
         );
-        let boo = exec.mkdir(&AbstractExecutor::root_index(), String::from("boo"), vec![]);
+        let boo = exec.mkdir(&AbstractExecutor::root_index(), "boo".to_owned(), vec![]);
         let mut expected = vec![
             Node::DIR(AbstractExecutor::root_index()),
             Node::DIR(foo),
@@ -547,15 +519,15 @@ mod tests {
         assert_eq!(
             vec![
                 Operation::MKDIR {
-                    path: String::from("/foobar"),
+                    path: "/foobar".to_owned(),
                     mode: vec![],
                 },
                 Operation::MKDIR {
-                    path: String::from("/boo"),
+                    path: "/boo".to_owned(),
                     mode: vec![],
                 },
                 Operation::REMOVE {
-                    path: String::from("/foobar")
+                    path: "/foobar".to_owned(),
                 }
             ],
             exec.recording

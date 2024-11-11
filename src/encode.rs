@@ -58,15 +58,15 @@ do_remove("/foo");
         ];
         let actual = encode_c(vec![
             abstract_fs::Operation::MKDIR {
-                path: String::from("/foo"),
+                path: "/foo".to_owned(),
                 mode: vec![],
             },
             abstract_fs::Operation::CREATE {
-                path: String::from("/foo/bar"),
+                path: "/foo/bar".to_owned(),
                 mode: mode.clone(),
             },
             abstract_fs::Operation::REMOVE {
-                path: String::from("/foo"),
+                path: "/foo".to_owned(),
             },
         ]);
         assert_eq!(expected, actual);
