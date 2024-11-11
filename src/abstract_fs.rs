@@ -12,7 +12,7 @@ use std::{
 /// Applications *shall* specify __exactly one__ of the __first 5__ values.
 #[derive(Debug, PartialEq, Eq, Hash)]
 #[allow(nonstandard_style)]
-enum OpenFlag {
+pub enum OpenFlag {
     /// Open for execute only (non-directory files).
     /// If path names a directory and `O_EXEC` is not the same value as `O_SEARCH`, `open()` shall fail.
     O_EXEC,
@@ -77,7 +77,7 @@ enum OpenFlag {
 }
 #[derive(Debug, PartialEq, Eq, Hash)]
 #[allow(nonstandard_style)]
-enum Mode {
+pub enum Mode {
     /// Read, write, execute/search by owner.
     S_IRWXU = 0o700,
     /// Read permission, owner.
@@ -111,53 +111,53 @@ enum Mode {
     S_ISVTX = 0o1000,
 }
 
-type PathName = String;
-type Name = String;
+pub type PathName = String;
+pub type Name = String;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct FileIndex(usize);
+pub struct FileIndex(usize);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct DirIndex(usize);
+pub struct DirIndex(usize);
 
 #[derive(Debug)]
-struct FileDescriptor(usize);
+pub struct FileDescriptor(usize);
 
 #[derive(Debug, Clone)]
-struct File {
-    name: Name,
-    parent: DirIndex,
+pub struct File {
+    pub name: Name,
+    pub parent: DirIndex,
 }
 
 #[derive(Debug, Clone)]
-struct Dir {
-    name: Name,
-    parent: Option<DirIndex>,
-    children: Vec<Node>,
+pub struct Dir {
+    pub name: Name,
+    pub parent: Option<DirIndex>,
+    pub children: Vec<Node>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-enum Node {
+pub enum Node {
     FILE(FileIndex),
     DIR(DirIndex),
 }
 
 #[derive(Debug, PartialEq)]
-enum Operation {
+pub enum Operation {
     MKDIR { path: PathName, mode: HashSet<Mode> },
     CREATE { path: PathName, mode: HashSet<Mode> },
     REMOVE { path: PathName },
 }
 
-struct AbstractExecutor {
+pub struct AbstractExecutor {
     dirs: Vec<Dir>,
     files: Vec<File>,
 
-    recording: Vec<Operation>,
+    pub recording: Vec<Operation>,
 }
 
 impl AbstractExecutor {
-    fn new() -> Self {
+    pub fn new() -> Self {
         AbstractExecutor {
             dirs: vec![Dir {
                 name: String::new(),
@@ -169,7 +169,7 @@ impl AbstractExecutor {
         }
     }
 
-    fn remove(&mut self, node: &Node) {
+    pub fn remove(&mut self, node: &Node) {
         match node {
             Node::DIR(to_remove) => {
                 if *to_remove == AbstractExecutor::root_index() {
@@ -199,7 +199,7 @@ impl AbstractExecutor {
         }
     }
 
-    fn mkdir(&mut self, parent: &DirIndex, name: Name, mode: HashSet<Mode>) -> DirIndex {
+    pub fn mkdir(&mut self, parent: &DirIndex, name: Name, mode: HashSet<Mode>) -> DirIndex {
         if self.name_exists(&parent, &name) {
             panic!("parent directory already has a file with this name")
         }
@@ -218,7 +218,7 @@ impl AbstractExecutor {
         dir_idx
     }
 
-    fn create(&mut self, parent: &DirIndex, name: Name, mode: HashSet<Mode>) -> FileIndex {
+    pub fn create(&mut self, parent: &DirIndex, name: Name, mode: HashSet<Mode>) -> FileIndex {
         if self.name_exists(&parent, &name) {
             panic!("parent directory already has a file with this name")
         }
@@ -267,11 +267,11 @@ impl AbstractExecutor {
         self.dirs.get(0).unwrap()
     }
 
-    fn root_index() -> DirIndex {
+    pub fn root_index() -> DirIndex {
         DirIndex(0)
     }
 
-    fn resolve_path(&self, node: &Node) -> PathName {
+    pub fn resolve_path(&self, node: &Node) -> PathName {
         let mut segments: Vec<String> = vec![];
         let mut next = node.clone();
         loop {
@@ -297,7 +297,7 @@ impl AbstractExecutor {
         String::from("/") + segments.join("/").as_str()
     }
 
-    fn alive(&self) -> Vec<Node> {
+    pub fn alive(&self) -> Vec<Node> {
         let root = AbstractExecutor::root_index();
         let mut visited = vec![];
         let mut queue = VecDeque::new();
