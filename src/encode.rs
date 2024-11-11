@@ -3,7 +3,7 @@ use crate::abstract_fs::{self, Operation};
 pub fn encode_c(workload: abstract_fs::Workload) -> String {
     let mut result = String::new();
     result.push_str("#include \"executor.h\"\n");
-    result.push_str("void test_syscall()\n");
+    result.push_str("void test_workload()\n");
     result.push_str("{\n");
     for op in workload {
         match op {
@@ -36,15 +36,13 @@ fn encode_mode(mode: abstract_fs::Mode) -> String {
 }
 
 mod tests {
-    use std::collections::HashSet;
-
     use super::*;
 
     #[test]
     fn test_encode_c() {
         let expected = r#"
 #include "executor.h"
-void test_syscall()
+void test_workload()
 {
 do_mkdir("/foo", 0);
 do_create("/foo/bar", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
