@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
   fprintf(stdout, "==> done\n");
 
   fprintf(stdout, ":: dumping trace\n");
-  std::filesystem::path trace_p = "./trace.csv";
+  std::filesystem::path trace_p = "trace.csv";
   FILE *trace_dump_fp = fopen(trace_p.c_str(), "w");
   if (!trace_dump_fp) {
     DPRINTF("[ERROR] when opening trace dump file: %s\n", strerror(errno));
