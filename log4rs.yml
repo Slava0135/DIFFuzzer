@@ -1,0 +1,18 @@
+refresh_rate: 30 seconds
+appenders:
+  stderr:
+    kind: console
+    target: stderr
+    encoder:
+      pattern: "{d(%Y-%m-%d %H:%M:%S)} [{l}] {m}{n}"
+  file:
+    kind: file
+    path: "diffuzzer.log"
+    encoder:
+      pattern: "{d(%Y-%m-%d %H:%M:%S)} [{l}] {m}{n}"
+
+root:
+  level: info
+  appenders:
+    - stderr
+    - file
