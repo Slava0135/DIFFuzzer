@@ -2,10 +2,7 @@
 
 #![allow(dead_code)]
 
-use std::{
-    collections::{HashSet, VecDeque},
-    vec,
-};
+use std::{collections::VecDeque, fmt::Display, vec};
 
 /// Flags for `open(path, flags, mode)` syscall.
 ///
@@ -77,7 +74,7 @@ pub enum OpenFlag {
 }
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 #[allow(nonstandard_style)]
-pub enum Mode {
+pub enum ModeFlag {
     /// Read, write, execute/search by owner.
     S_IRWXU = 0o700,
     /// Read permission, owner.
@@ -110,6 +107,30 @@ pub enum Mode {
     /// On directories, restricted deletion flag.
     S_ISVTX = 0o1000,
 }
+
+impl Display for ModeFlag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ModeFlag::S_IRWXU => write!(f, "S_IRWXU"),
+            ModeFlag::S_IRUSR => write!(f, "S_IRUSR"),
+            ModeFlag::S_IWUSR => write!(f, "S_IWUSR"),
+            ModeFlag::S_IXUSR => write!(f, "S_IXUSR"),
+            ModeFlag::S_IRWXG => write!(f, "S_IRWXG"),
+            ModeFlag::S_IRGRP => write!(f, "S_IRGRP"),
+            ModeFlag::S_IWGRP => write!(f, "S_IWGRP"),
+            ModeFlag::S_IXGRP => write!(f, "S_IXGRP"),
+            ModeFlag::S_IRWXO => write!(f, "S_IRWXO"),
+            ModeFlag::S_IROTH => write!(f, "S_IROTH"),
+            ModeFlag::S_IWOTH => write!(f, "S_IWOTH"),
+            ModeFlag::S_IXOTH => write!(f, "S_IXOTH"),
+            ModeFlag::S_ISUID => write!(f, "S_ISUID"),
+            ModeFlag::S_ISGID => write!(f, "S_ISGID"),
+            ModeFlag::S_ISVTX => write!(f, "S_ISVTX"),
+        }
+    }
+}
+
+pub type Mode = Vec<ModeFlag>;
 
 pub type PathName = String;
 pub type Name = String;
@@ -144,8 +165,8 @@ pub enum Node {
 
 #[derive(Debug, PartialEq)]
 pub enum Operation {
-    MKDIR { path: PathName, mode: HashSet<Mode> },
-    CREATE { path: PathName, mode: HashSet<Mode> },
+    MKDIR { path: PathName, mode: Mode },
+    CREATE { path: PathName, mode: Mode },
     REMOVE { path: PathName },
 }
 
@@ -199,7 +220,7 @@ impl AbstractExecutor {
         }
     }
 
-    pub fn mkdir(&mut self, parent: &DirIndex, name: Name, mode: HashSet<Mode>) -> DirIndex {
+    pub fn mkdir(&mut self, parent: &DirIndex, name: Name, mode: Mode) -> DirIndex {
         if self.name_exists(&parent, &name) {
             panic!("parent directory already has a file with this name")
         }
@@ -218,7 +239,7 @@ impl AbstractExecutor {
         dir_idx
     }
 
-    pub fn create(&mut self, parent: &DirIndex, name: Name, mode: HashSet<Mode>) -> FileIndex {
+    pub fn create(&mut self, parent: &DirIndex, name: Name, mode: Mode) -> FileIndex {
         if self.name_exists(&parent, &name) {
             panic!("parent directory already has a file with this name")
         }
@@ -349,7 +370,7 @@ mod tests {
         let foo = exec.mkdir(
             &AbstractExecutor::root_index(),
             String::from("foobar"),
-            HashSet::new(),
+            vec![],
         );
         match exec.root().children[0] {
             Node::DIR(idx) => {
@@ -362,7 +383,7 @@ mod tests {
         assert_eq!(
             vec![Operation::MKDIR {
                 path: String::from("/foobar"),
-                mode: HashSet::new()
+                mode: vec![],
             }],
             exec.recording
         );
@@ -379,12 +400,12 @@ mod tests {
         exec.mkdir(
             &AbstractExecutor::root_index(),
             String::from("foobar"),
-            HashSet::new(),
+            vec![],
         );
         exec.mkdir(
             &AbstractExecutor::root_index(),
             String::from("foobar"),
-            HashSet::new(),
+            vec![],
         );
     }
 
@@ -394,7 +415,7 @@ mod tests {
         let foo = exec.create(
             &AbstractExecutor::root_index(),
             String::from("foobar"),
-            HashSet::new(),
+            vec![],
         );
         match exec.root().children[0] {
             Node::FILE(idx) => {
@@ -411,7 +432,7 @@ mod tests {
         assert_eq!(
             vec![Operation::CREATE {
                 path: String::from("/foobar"),
-                mode: HashSet::new()
+                mode: vec![],
             }],
             exec.recording
         )
@@ -424,12 +445,12 @@ mod tests {
         exec.create(
             &AbstractExecutor::root_index(),
             String::from("foobar"),
-            HashSet::new(),
+            vec![],
         );
         exec.create(
             &AbstractExecutor::root_index(),
             String::from("foobar"),
-            HashSet::new(),
+            vec![],
         );
     }
 
@@ -439,13 +460,9 @@ mod tests {
         let foo = exec.create(
             &AbstractExecutor::root_index(),
             String::from("foobar"),
-            HashSet::new(),
+            vec![],
         );
-        let boo = exec.create(
-            &AbstractExecutor::root_index(),
-            String::from("boo"),
-            HashSet::new(),
-        );
+        let boo = exec.create(&AbstractExecutor::root_index(), String::from("boo"), vec![]);
         let mut expected = vec![
             Node::DIR(AbstractExecutor::root_index()),
             Node::FILE(foo),
@@ -467,10 +484,7 @@ mod tests {
                 assert!(false, "not a file")
             }
         }
-        let mut expected = vec![
-            Node::DIR(AbstractExecutor::root_index()),
-            Node::FILE(boo),
-        ];
+        let mut expected = vec![Node::DIR(AbstractExecutor::root_index()), Node::FILE(boo)];
         let mut actual = exec.alive();
         expected.sort();
         actual.sort();
@@ -479,11 +493,11 @@ mod tests {
             vec![
                 Operation::CREATE {
                     path: String::from("/foobar"),
-                    mode: HashSet::new()
+                    mode: vec![],
                 },
                 Operation::CREATE {
                     path: String::from("/boo"),
-                    mode: HashSet::new()
+                    mode: vec![],
                 },
                 Operation::REMOVE {
                     path: String::from("/foobar")
@@ -499,13 +513,9 @@ mod tests {
         let foo = exec.mkdir(
             &AbstractExecutor::root_index(),
             String::from("foobar"),
-            HashSet::new(),
+            vec![],
         );
-        let boo = exec.mkdir(
-            &AbstractExecutor::root_index(),
-            String::from("boo"),
-            HashSet::new(),
-        );
+        let boo = exec.mkdir(&AbstractExecutor::root_index(), String::from("boo"), vec![]);
         let mut expected = vec![
             Node::DIR(AbstractExecutor::root_index()),
             Node::DIR(foo),
@@ -527,10 +537,7 @@ mod tests {
                 assert!(false, "not a dir")
             }
         }
-        let mut expected = vec![
-            Node::DIR(AbstractExecutor::root_index()),
-            Node::DIR(boo),
-        ];
+        let mut expected = vec![Node::DIR(AbstractExecutor::root_index()), Node::DIR(boo)];
         let mut actual = exec.alive();
         expected.sort();
         actual.sort();
@@ -539,11 +546,11 @@ mod tests {
             vec![
                 Operation::MKDIR {
                     path: String::from("/foobar"),
-                    mode: HashSet::new()
+                    mode: vec![],
                 },
                 Operation::MKDIR {
                     path: String::from("/boo"),
-                    mode: HashSet::new()
+                    mode: vec![],
                 },
                 Operation::REMOVE {
                     path: String::from("/foobar")

@@ -2,6 +2,7 @@ use rand::{rngs::StdRng, SeedableRng};
 
 mod abstract_fs;
 mod mutator;
+mod encode;
 
 fn main() {
     let mut rng = StdRng::seed_from_u64(123);

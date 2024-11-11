@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use rand::{
     seq::{IteratorRandom, SliceRandom},
     Rng,
@@ -16,12 +14,12 @@ enum Operation {
 pub fn generate_new(rng: &mut impl Rng, size: usize) -> Vec<abstract_fs::Operation> {
     let mut executor = AbstractExecutor::new();
     let mut name_idx = 1;
-    let mode = HashSet::from([
-        abstract_fs::Mode::S_IRWXU,
-        abstract_fs::Mode::S_IRWXG,
-        abstract_fs::Mode::S_IROTH,
-        abstract_fs::Mode::S_IXOTH,
-    ]);
+    let mode = vec![
+        abstract_fs::ModeFlag::S_IRWXU,
+        abstract_fs::ModeFlag::S_IRWXG,
+        abstract_fs::ModeFlag::S_IROTH,
+        abstract_fs::ModeFlag::S_IXOTH,
+    ];
     for _ in 0..size {
         let alive = executor.alive();
         let alive_dirs: Vec<abstract_fs::DirIndex> = alive
