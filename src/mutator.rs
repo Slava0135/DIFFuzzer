@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use rand::{seq::{IteratorRandom, SliceRandom}, Rng};
+use rand::{
+    seq::{IteratorRandom, SliceRandom},
+    Rng,
+};
 
 use crate::abstract_fs::{self, AbstractExecutor};
 
@@ -22,10 +25,16 @@ pub fn generate_new(rng: &mut impl Rng, size: usize) -> Vec<abstract_fs::Operati
                 abstract_fs::Node::FILE(_) => None,
             })
             .collect();
-        match [Operation::MKDIR, Operation::CREATE, Operation::REMOVE]
-            .choose(rng)
-            .unwrap()
-        {
+        let alive_dirs_except_root: Vec<abstract_fs::DirIndex> = alive_dirs
+            .iter()
+            .filter(|&&d| d != AbstractExecutor::root_index())
+            .map(|d| d.clone())
+            .collect();
+        let mut possible_ops = vec![Operation::MKDIR, Operation::CREATE];
+        if !alive_dirs_except_root.is_empty() {
+            possible_ops.push(Operation::REMOVE);
+        }
+        match possible_ops.choose(rng).unwrap() {
             Operation::MKDIR => {
                 executor.mkdir(
                     alive_dirs.choose(rng).unwrap(),
@@ -43,13 +52,32 @@ pub fn generate_new(rng: &mut impl Rng, size: usize) -> Vec<abstract_fs::Operati
                 name_idx += 1;
             }
             Operation::REMOVE => {
-                let node = alive.iter().filter(|n| match n {
-                    abstract_fs::Node::FILE(_) => true,
-                    abstract_fs::Node::DIR(dir) => *dir != AbstractExecutor::root_index(),
-                }).choose(rng).unwrap();
+                let node = alive
+                    .iter()
+                    .filter(|n| match n {
+                        abstract_fs::Node::FILE(_) => true,
+                        abstract_fs::Node::DIR(dir) => *dir != AbstractExecutor::root_index(),
+                    })
+                    .choose(rng)
+                    .unwrap();
                 executor.remove(node);
             }
         }
     }
     executor.recording
+}
+
+#[cfg(test)]
+mod tests {
+    use rand::{rngs::StdRng, SeedableRng};
+
+    use super::*;
+
+    #[test]
+    fn test_generate_new() {
+        for i in 0..1000 {
+            let mut rng = StdRng::seed_from_u64(i);
+            generate_new(&mut rng, 1000);
+        }
+    }
 }
