@@ -1,11 +1,11 @@
 use crate::abstract_fs::{self, Operation};
 
-pub fn encode_c(seq: Vec<abstract_fs::Operation>) -> String {
+pub fn encode_c(workload: abstract_fs::Workload) -> String {
     let mut result = String::new();
     result.push_str("#include \"executor.h\"\n");
     result.push_str("void test_syscall()\n");
     result.push_str("{\n");
-    for op in seq {
+    for op in workload {
         match op {
             Operation::CREATE { path, mode } => {
                 result.push_str(

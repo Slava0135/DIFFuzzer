@@ -11,7 +11,7 @@ enum Operation {
     REMOVE,
 }
 
-pub fn generate_new(rng: &mut impl Rng, size: usize) -> Vec<abstract_fs::Operation> {
+pub fn generate_new(rng: &mut impl Rng, size: usize) -> abstract_fs::Workload {
     let mut executor = AbstractExecutor::new();
     let mut name_idx = 1;
     let mode = vec![

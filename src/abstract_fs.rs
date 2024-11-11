@@ -170,11 +170,13 @@ pub enum Operation {
     REMOVE { path: PathName },
 }
 
+pub type Workload = Vec<Operation>;
+
 pub struct AbstractExecutor {
     dirs: Vec<Dir>,
     files: Vec<File>,
 
-    pub recording: Vec<Operation>,
+    pub recording: Workload,
 }
 
 impl AbstractExecutor {
