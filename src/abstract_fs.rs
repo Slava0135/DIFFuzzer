@@ -75,7 +75,7 @@ pub enum OpenFlag {
 
     O_TTY_INIT,
 }
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 #[allow(nonstandard_style)]
 pub enum Mode {
     /// Read, write, execute/search by owner.
