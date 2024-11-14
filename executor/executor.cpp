@@ -239,7 +239,11 @@ int do_create(const char *path, mode_t param) {
   if (status == -1) {
     failure(status, "CREATE", path);
   } else {
-    success(status, "CREATE");
+    if (!close(status)) {
+      success(status, "CREATE");
+    } else {
+      DPRINTF("[ERROR] close('%s') failure", path);
+    }
   }
   return status;
 }
