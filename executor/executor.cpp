@@ -218,8 +218,12 @@ static void success(int status, const char *cmd) {
 
 static void failure(int status, const char *cmd, const char *path) {
   append_trace(idx, cmd, status, errno);
-  DPRINTF("[WARNING] %s('%s') FAILED (%s)", cmd, path, strerror(errno));
+  DPRINTF("[WARNING] %s('%s') FAIL(%s)", cmd, path, strerror(errno));
   failure_n += 1;
+}
+
+static void minor_failure(int status, const char *cmd, const char *path) {
+  DPRINTF("[WARNING] %s('%s') FAIL(%s) <minor>", cmd, path, strerror(errno));
 }
 
 int do_mkdir(const char *path, mode_t param) {
@@ -239,10 +243,12 @@ int do_create(const char *path, mode_t param) {
   if (status == -1) {
     failure(status, "CREATE", path);
   } else {
-    if (!close(status)) {
+    int close_status = close(status);
+    if (!close_status) {
       success(status, "CREATE");
     } else {
-      DPRINTF("[ERROR] close('%s') failure", path);
+      minor_failure(close_status, "CLOSE", path);
+      failure(status, "CREATE", path);
     }
   }
   return status;
@@ -272,7 +278,7 @@ static int remove_dir(const char *p) {
         } else {
           status_in_dir = unlink(file_path.c_str());
           if (status_in_dir) {
-            DPRINTF("[ERROR] unlink('%s') failure", file_path.c_str());
+            minor_failure(status_in_dir, "UNLINK", file_path.c_str());
           }
         }
       }
@@ -283,8 +289,10 @@ static int remove_dir(const char *p) {
 
   if (!status) {
     status = rmdir(dir_path.c_str());
-  } else {
-    DPRINTF("[ERROR] rmdir('%s') failure", dir_path.c_str());
+  }
+
+  if (status) {
+    minor_failure(status, "RMDIR", dir_path.c_str());
   }
 
   return status;
