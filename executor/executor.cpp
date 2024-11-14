@@ -38,6 +38,21 @@
   do {                                              \
     fprintf(stderr, "%s:%d: ", __FILE__, __LINE__); \
     fprintf(stderr, __VA_ARGS__);                   \
+    fprintf(stderr, "\n");                          \
+  } while (0)
+
+#define GOAL(...)        \
+  do {                   \
+    printf(":: ");       \
+    printf(__VA_ARGS__); \
+    printf("\n");        \
+  } while (0)
+
+#define SUBGOAL(...)     \
+  do {                   \
+    printf("==> ");      \
+    printf(__VA_ARGS__); \
+    printf("\n");        \
   } while (0)
 
 struct Trace {
@@ -60,40 +75,40 @@ static int success_n = 0;
 
 int main(int argc, char *argv[]) {
   if (argc != 2) {
-    DPRINTF("[USAGE] CMD <workspace>\n");
+    DPRINTF("[USAGE] CMD <workspace>");
     return 1;
   }
 
   workspace = argv[1];
   if (!workspace) {
-    DPRINTF("[ERROR] <workspace> argument is NULL\n");
+    DPRINTF("[ERROR] <workspace> argument is NULL");
     return 1;
   }
 
-  printf(":: preparing workspace '%s'\n", workspace);
-  printf("==> mkdir '%s'\n", workspace);
+  GOAL("prepare workspace '%s'", workspace);
+  SUBGOAL("mkdir '%s'", workspace);
   if (mkdir(workspace, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == -1) {
     if (errno == EEXIST) {
-      DPRINTF("[WARNING] directory '%s' exists\n", workspace);
+      DPRINTF("[WARNING] directory '%s' exists", workspace);
     } else {
-      DPRINTF("[ERROR] %s\n", strerror(errno));
+      DPRINTF("[ERROR] %s", strerror(errno));
       return 1;
     }
   }
 
-  printf(":: setting up kcov\n");
+  GOAL("set up kcov");
   // https://docs.kernel.org/dev-tools/kcov.html
   bool coverage_enabled = true;
   int kcov_filed;
   unsigned long *cover;
   kcov_filed = open("/sys/kernel/debug/kcov", O_RDWR);
   if (kcov_filed == -1) {
-    DPRINTF("[WARNING] failed to open kcov file, coverage disabled\n");
+    DPRINTF("[WARNING] failed to open kcov file, coverage disabled");
     coverage_enabled = false;
   } else {
     // setup trace mode and trace size
     if (ioctl(kcov_filed, KCOV_INIT_TRACE, COVER_SIZE)) {
-      DPRINTF("[ERROR] failed to setup trace mode (ioctl)\n");
+      DPRINTF("[ERROR] failed to setup trace mode (ioctl)");
       return 1;
     }
     // mmap buffer shared between kernel- and user-space
@@ -101,53 +116,53 @@ int main(int argc, char *argv[]) {
                                   PROT_READ | PROT_WRITE, MAP_SHARED,
                                   kcov_filed, 0);
     if ((void *)cover == MAP_FAILED) {
-      DPRINTF("[ERROR] failed to mmap coverage buffer\n");
+      DPRINTF("[ERROR] failed to mmap coverage buffer");
       return 1;
     }
     // enable coverage collection on the current thread
     if (ioctl(kcov_filed, KCOV_ENABLE, KCOV_TRACE_PC)) {
-      DPRINTF("[ERROR] failed to enable coverage collection (ioctl)\n");
+      DPRINTF("[ERROR] failed to enable coverage collection (ioctl)");
       return 1;
     }
     // reset coverage from the tail of the ioctl() call
     __atomic_store_n(&cover[0], 0, __ATOMIC_RELAXED);
-    printf("==> done\n");
+    SUBGOAL("done");
   }
 
-  printf(":: testing workload\n");
+  GOAL("test workload");
   test_workload();
-  printf("==> done\n");
+  SUBGOAL("done");
 
   if (coverage_enabled) {
-    printf(":: getting kcov coverage\n");
+    GOAL("get kcov coverage");
     // read number of PCs collected
     unsigned long n = __atomic_load_n(&cover[0], __ATOMIC_RELAXED);
     for (unsigned long i = 0; i < n; i++) {
       printf("0x%lx\n", cover[i + 1]);
     }
-    printf(":: free kcov resources\n");
+    GOAL("free kcov resources");
     // disable coverage collection for the current thread
     if (ioctl(kcov_filed, KCOV_DISABLE, 0)) {
-      DPRINTF("[ERROR] when disabling coverage collection\n");
+      DPRINTF("[ERROR] when disabling coverage collection");
       return 1;
     }
 
     if (munmap(cover, COVER_SIZE * sizeof(unsigned long))) {
-      DPRINTF("[ERROR] when unmapping shared buffer\n");
+      DPRINTF("[ERROR] when unmapping shared buffer");
       return 1;
     }
     if (close(kcov_filed)) {
-      DPRINTF("[ERROR] when closing kcov file\n");
+      DPRINTF("[ERROR] when closing kcov file");
       return 1;
     }
-    printf("==> done\n");
+    SUBGOAL("done");
   }
 
-  printf(":: dumping trace\n");
+  GOAL("dump trace");
   std::filesystem::path trace_p = "trace.csv";
   FILE *trace_dump_fp = fopen(trace_p.c_str(), "w");
   if (!trace_dump_fp) {
-    DPRINTF("[ERROR] when opening trace dump file: %s\n", strerror(errno));
+    DPRINTF("[ERROR] when opening trace dump file: %s", strerror(errno));
     return 1;
   }
   fprintf(trace_dump_fp, "Index,Command,ReturnCode,Errno\n");
@@ -156,22 +171,21 @@ int main(int argc, char *argv[]) {
             t.ret_code, strerror(t.err), t.err);
   }
   if (!fclose(trace_dump_fp)) {
-    printf("==> trace dump saved at '%s'\n",
-           std::filesystem::absolute(trace_p).c_str());
+    SUBGOAL("trace dump saved at '%s'",
+            std::filesystem::absolute(trace_p).c_str());
   } else {
-    DPRINTF("[ERROR] when closing trace dump file: %s\n", strerror(errno));
+    DPRINTF("[ERROR] when closing trace dump file: %s", strerror(errno));
   }
 
-  printf(":: run summary\n");
+  GOAL("summary");
   printf("#SUCCESS: %d | #FAILURE: %d\n", success_n, failure_n);
   return 1;
 }
 
 static std::string patch_path(const std::string &path) {
   if (path[0] != '/') {
-    DPRINTF(
-        "[ERROR] when patching path '%s', expected path to start with '\\'\n",
-        path.c_str());
+    DPRINTF("[ERROR] when patching path '%s', expected path to start with '\\'",
+            path.c_str());
     exit(1);
   }
   return workspace + path;
@@ -191,7 +205,7 @@ static void success(int status, const char *cmd) {
 
 static void failure(int status, const char *cmd, const char *path) {
   append_trace(idx, cmd, status, errno);
-  DPRINTF("[WARNING] %s('%s') FAILED (%s)\n", cmd, path, strerror(errno));
+  DPRINTF("[WARNING] %s('%s') FAILED (%s)", cmd, path, strerror(errno));
   failure_n += 1;
 }
 
@@ -241,7 +255,7 @@ static int remove_dir(const char *p) {
         } else {
           status_in_dir = unlink(file_path.c_str());
           if (status_in_dir) {
-            DPRINTF("[ERROR] unlink('%s') failure\n", file_path.c_str());
+            DPRINTF("[ERROR] unlink('%s') failure", file_path.c_str());
           }
         }
       }
@@ -253,7 +267,7 @@ static int remove_dir(const char *p) {
   if (!status) {
     status = rmdir(dir_path.c_str());
   } else {
-    DPRINTF("[ERROR] rmdir('%s') failure\n", dir_path.c_str());
+    DPRINTF("[ERROR] rmdir('%s') failure", dir_path.c_str());
   }
 
   return status;
