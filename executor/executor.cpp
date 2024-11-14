@@ -134,11 +134,24 @@ int main(int argc, char *argv[]) {
   SUBGOAL("done");
 
   if (coverage_enabled) {
-    GOAL("get kcov coverage");
+    GOAL("dump kcov coverage");
     // read number of PCs collected
+    std::filesystem::path kcov_p = "kcov.dat";
+    FILE *trace_dump_fp = fopen(kcov_p.c_str(), "w");
+    if (!trace_dump_fp) {
+      DPRINTF("[ERROR] when opening kcov dump file: %s", strerror(errno));
+      return 1;
+    }
     unsigned long n = __atomic_load_n(&cover[0], __ATOMIC_RELAXED);
     for (unsigned long i = 0; i < n; i++) {
-      printf("0x%lx\n", cover[i + 1]);
+      fprintf(trace_dump_fp, "0x%lx\n", cover[i + 1]);
+    }
+    if (!fclose(trace_dump_fp)) {
+      SUBGOAL("kcov dump saved at '%s'",
+              std::filesystem::absolute(kcov_p).c_str());
+    } else {
+      DPRINTF("[ERROR] when closing kcov dump file: %s", strerror(errno));
+      return 1;
     }
     GOAL("free kcov resources");
     // disable coverage collection for the current thread
@@ -175,6 +188,7 @@ int main(int argc, char *argv[]) {
             std::filesystem::absolute(trace_p).c_str());
   } else {
     DPRINTF("[ERROR] when closing trace dump file: %s", strerror(errno));
+    return 1;
   }
 
   GOAL("summary");
