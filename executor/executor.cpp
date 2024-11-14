@@ -134,6 +134,11 @@ int main(int argc, char *argv[]) {
   SUBGOAL("done");
 
   if (coverage_enabled) {
+    GOAL("disable coverage collection");
+    if (ioctl(kcov_filed, KCOV_DISABLE, 0)) {
+      DPRINTF("[ERROR] when disabling coverage collection");
+      return 1;
+    }
     GOAL("dump kcov coverage");
     // read number of PCs collected
     std::filesystem::path kcov_p = "kcov.dat";
@@ -154,12 +159,6 @@ int main(int argc, char *argv[]) {
       return 1;
     }
     GOAL("free kcov resources");
-    // disable coverage collection for the current thread
-    if (ioctl(kcov_filed, KCOV_DISABLE, 0)) {
-      DPRINTF("[ERROR] when disabling coverage collection");
-      return 1;
-    }
-
     if (munmap(cover, COVER_SIZE * sizeof(unsigned long))) {
       DPRINTF("[ERROR] when unmapping shared buffer");
       return 1;
