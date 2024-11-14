@@ -214,7 +214,7 @@ int main(int argc, char *argv[]) {
 
 static std::string patch_path(const std::string &path) {
   if (path[0] != '/') {
-    DPRINTF("[ERROR] when patching path '%s', expected path to start with '\\'",
+    DPRINTF("[ERROR] when patching path '%s', expected path to start with '/'",
             path.c_str());
     exit(ERROR);
   }
