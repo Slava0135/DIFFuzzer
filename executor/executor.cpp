@@ -62,6 +62,13 @@ const char *CLOSE = "CLOSE";
 const char *UNLINK = "UNLINK";
 const char *STAT = "STAT";
 
+enum ExitCode : int {
+  OK = 0,
+  FAIL = 1,
+
+  ERROR = 2,
+};
+
 struct Trace {
   int idx;
   std::string cmd;
@@ -83,13 +90,13 @@ static int success_n = 0;
 int main(int argc, char *argv[]) {
   if (argc != 2) {
     DPRINTF("[USAGE] CMD <workspace>");
-    return 1;
+    return ERROR;
   }
 
   workspace = argv[1];
   if (!workspace) {
     DPRINTF("[ERROR] <workspace> argument is NULL");
-    return 1;
+    return ERROR;
   }
 
   GOAL("prepare workspace '%s'", workspace);
@@ -99,7 +106,7 @@ int main(int argc, char *argv[]) {
       DPRINTF("[WARNING] directory '%s' exists", workspace);
     } else {
       DPRINTF("[ERROR] %s", strerror(errno));
-      return 1;
+      return ERROR;
     }
   }
 
@@ -116,7 +123,7 @@ int main(int argc, char *argv[]) {
     // setup trace mode and trace size
     if (ioctl(kcov_filed, KCOV_INIT_TRACE, COVER_SIZE)) {
       DPRINTF("[ERROR] failed to setup trace mode (ioctl)");
-      return 1;
+      return ERROR;
     }
     // mmap buffer shared between kernel- and user-space
     cover = (unsigned long *)mmap(nullptr, COVER_SIZE * sizeof(unsigned long),
@@ -124,12 +131,12 @@ int main(int argc, char *argv[]) {
                                   kcov_filed, 0);
     if ((void *)cover == MAP_FAILED) {
       DPRINTF("[ERROR] failed to mmap coverage buffer");
-      return 1;
+      return ERROR;
     }
     // enable coverage collection on the current thread
     if (ioctl(kcov_filed, KCOV_ENABLE, KCOV_TRACE_PC)) {
       DPRINTF("[ERROR] failed to enable coverage collection (ioctl)");
-      return 1;
+      return ERROR;
     }
     // reset coverage from the tail of the ioctl() call
     __atomic_store_n(&cover[0], 0, __ATOMIC_RELAXED);
@@ -144,7 +151,7 @@ int main(int argc, char *argv[]) {
     GOAL("disable coverage collection");
     if (ioctl(kcov_filed, KCOV_DISABLE, 0)) {
       DPRINTF("[ERROR] when disabling coverage collection");
-      return 1;
+      return ERROR;
     }
     GOAL("dump kcov coverage");
     // read number of PCs collected
@@ -152,7 +159,7 @@ int main(int argc, char *argv[]) {
     FILE *trace_dump_fp = fopen(kcov_p.c_str(), "w");
     if (!trace_dump_fp) {
       DPRINTF("[ERROR] when opening kcov dump file: %s", strerror(errno));
-      return 1;
+      return ERROR;
     }
     unsigned long n = __atomic_load_n(&cover[0], __ATOMIC_RELAXED);
     for (unsigned long i = 0; i < n; i++) {
@@ -163,16 +170,16 @@ int main(int argc, char *argv[]) {
               std::filesystem::absolute(kcov_p).c_str());
     } else {
       DPRINTF("[ERROR] when closing kcov dump file: %s", strerror(errno));
-      return 1;
+      return ERROR;
     }
     GOAL("free kcov resources");
     if (munmap(cover, COVER_SIZE * sizeof(unsigned long))) {
       DPRINTF("[ERROR] when unmapping shared buffer");
-      return 1;
+      return ERROR;
     }
     if (close(kcov_filed)) {
       DPRINTF("[ERROR] when closing kcov file");
-      return 1;
+      return ERROR;
     }
     SUBGOAL("done");
   }
@@ -182,7 +189,7 @@ int main(int argc, char *argv[]) {
   FILE *trace_dump_fp = fopen(trace_p.c_str(), "w");
   if (!trace_dump_fp) {
     DPRINTF("[ERROR] when opening trace dump file: %s", strerror(errno));
-    return 1;
+    return ERROR;
   }
   fprintf(trace_dump_fp, "Index,Command,ReturnCode,Errno\n");
   for (const Trace &t : traces) {
@@ -194,19 +201,22 @@ int main(int argc, char *argv[]) {
             std::filesystem::absolute(trace_p).c_str());
   } else {
     DPRINTF("[ERROR] when closing trace dump file: %s", strerror(errno));
-    return 1;
+    return ERROR;
   }
 
   GOAL("summary");
   printf("#SUCCESS: %d | #FAILURE: %d\n", success_n, failure_n);
-  return 1;
+  if (failure_n > 0) {
+    return FAIL;
+  }
+  return OK;
 }
 
 static std::string patch_path(const std::string &path) {
   if (path[0] != '/') {
     DPRINTF("[ERROR] when patching path '%s', expected path to start with '\\'",
             path.c_str());
-    exit(1);
+    exit(ERROR);
   }
   return workspace + path;
 }
