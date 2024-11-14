@@ -2,8 +2,13 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <linux/types.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
@@ -20,6 +25,14 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+
+#define KCOV_INIT_TRACE _IOR('c', 1, unsigned long)
+#define KCOV_ENABLE _IO('c', 100)
+#define KCOV_DISABLE _IO('c', 101)
+#define COVER_SIZE (64 << 10)
+
+#define KCOV_TRACE_PC 0
+#define KCOV_TRACE_CMP 1
 
 #define DPRINTF(...)                                \
   do {                                              \
@@ -57,8 +70,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  fprintf(stdout, ":: preparing workspace '%s'\n", workspace);
-  fprintf(stdout, "==> mkdir '%s'\n", workspace);
+  printf(":: preparing workspace '%s'\n", workspace);
+  printf("==> mkdir '%s'\n", workspace);
   if (mkdir(workspace, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == -1) {
     if (errno == EEXIST) {
       DPRINTF("[WARNING] directory '%s' exists\n", workspace);
@@ -68,11 +81,69 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  fprintf(stdout, ":: testing workload\n");
-  test_workload();
-  fprintf(stdout, "==> done\n");
+  printf(":: setting up kcov\n");
+  // https://docs.kernel.org/dev-tools/kcov.html
+  bool coverage_enabled = true;
+  int kcov_filed;
+  unsigned long *cover;
+  kcov_filed = open("/sys/kernel/debug/kcov", O_RDWR);
+  if (kcov_filed == -1) {
+    DPRINTF("[WARNING] failed to open kcov file, coverage disabled\n");
+    coverage_enabled = false;
+  } else {
+    // setup trace mode and trace size
+    if (ioctl(kcov_filed, KCOV_INIT_TRACE, COVER_SIZE)) {
+      DPRINTF("[ERROR] failed to setup trace mode (ioctl)\n");
+      return 1;
+    }
+    // mmap buffer shared between kernel- and user-space
+    cover = (unsigned long *)mmap(nullptr, COVER_SIZE * sizeof(unsigned long),
+                                  PROT_READ | PROT_WRITE, MAP_SHARED,
+                                  kcov_filed, 0);
+    if ((void *)cover == MAP_FAILED) {
+      DPRINTF("[ERROR] failed to mmap coverage buffer\n");
+      return 1;
+    }
+    // enable coverage collection on the current thread
+    if (ioctl(kcov_filed, KCOV_ENABLE, KCOV_TRACE_PC)) {
+      DPRINTF("[ERROR] failed to enable coverage collection (ioctl)\n");
+      return 1;
+    }
+    // reset coverage from the tail of the ioctl() call
+    __atomic_store_n(&cover[0], 0, __ATOMIC_RELAXED);
+    printf("==> done\n");
+  }
 
-  fprintf(stdout, ":: dumping trace\n");
+  printf(":: testing workload\n");
+  test_workload();
+  printf("==> done\n");
+
+  if (coverage_enabled) {
+    printf(":: getting kcov coverage\n");
+    // read number of PCs collected
+    unsigned long n = __atomic_load_n(&cover[0], __ATOMIC_RELAXED);
+    for (unsigned long i = 0; i < n; i++) {
+      printf("0x%lx\n", cover[i + 1]);
+    }
+    printf(":: free kcov resources\n");
+    // disable coverage collection for the current thread
+    if (ioctl(kcov_filed, KCOV_DISABLE, 0)) {
+      DPRINTF("[ERROR] when disabling coverage collection\n");
+      return 1;
+    }
+
+    if (munmap(cover, COVER_SIZE * sizeof(unsigned long))) {
+      DPRINTF("[ERROR] when unmapping shared buffer\n");
+      return 1;
+    }
+    if (close(kcov_filed)) {
+      DPRINTF("[ERROR] when closing kcov file\n");
+      return 1;
+    }
+    printf("==> done\n");
+  }
+
+  printf(":: dumping trace\n");
   std::filesystem::path trace_p = "trace.csv";
   FILE *trace_dump_fp = fopen(trace_p.c_str(), "w");
   if (!trace_dump_fp) {
@@ -85,14 +156,14 @@ int main(int argc, char *argv[]) {
             t.ret_code, strerror(t.err), t.err);
   }
   if (!fclose(trace_dump_fp)) {
-    fprintf(stdout, "==> trace dump saved at '%s'\n",
-            std::filesystem::absolute(trace_p).c_str());
+    printf("==> trace dump saved at '%s'\n",
+           std::filesystem::absolute(trace_p).c_str());
   } else {
     DPRINTF("[ERROR] when closing trace dump file: %s\n", strerror(errno));
   }
 
-  fprintf(stdout, ":: run summary\n");
-  fprintf(stdout, "#SUCCESS: %d | #FAILURE: %d\n", success_n, failure_n);
+  printf(":: run summary\n");
+  printf("#SUCCESS: %d | #FAILURE: %d\n", success_n, failure_n);
   return 1;
 }
 
