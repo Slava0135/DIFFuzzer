@@ -55,7 +55,12 @@
     printf("\n");        \
   } while (0)
 
-
+const char *MKDIR = "MKDIR";
+const char *RMDIR = "RMDIR";
+const char *CREATE = "CREATE";
+const char *CLOSE = "CLOSE";
+const char *UNLINK = "UNLINK";
+const char *STAT = "STAT";
 
 struct Trace {
   int idx;
@@ -232,9 +237,9 @@ int do_mkdir(const char *path, mode_t param) {
   idx++;
   int status = mkdir(patch_path(path).c_str(), param);
   if (status == -1) {
-    failure(status, "MKDIR", path);
+    failure(status, MKDIR, path);
   } else {
-    success(status, "MKDIR");
+    success(status, MKDIR);
   }
   return status;
 }
@@ -243,14 +248,14 @@ int do_create(const char *path, mode_t param) {
   idx++;
   int status = creat(patch_path(path).c_str(), param);
   if (status == -1) {
-    failure(status, "CREATE", path);
+    failure(status, CREATE, path);
   } else {
     int close_status = close(status);
     if (!close_status) {
-      success(status, "CREATE");
+      success(status, CREATE);
     } else {
-      minor_failure("CLOSE", path);
-      failure(status, "CREATE", path);
+      minor_failure(CLOSE, path);
+      failure(status, CREATE, path);
     }
   }
   return status;
@@ -280,7 +285,7 @@ static int remove_dir(const char *p) {
         } else {
           status_in_dir = unlink(file_path.c_str());
           if (status_in_dir) {
-            minor_failure("UNLINK", file_path.c_str());
+            minor_failure(UNLINK, file_path.c_str());
           }
         }
       }
@@ -294,7 +299,7 @@ static int remove_dir(const char *p) {
   }
 
   if (status) {
-    minor_failure("RMDIR", dir_path.c_str());
+    minor_failure(RMDIR, dir_path.c_str());
   }
 
   return status;
@@ -308,23 +313,23 @@ int do_remove(const char *p) {
 
   status = lstat(path.c_str(), &file_stat);
   if (status < 0) {
-    failure(status, "STAT", path.c_str());
+    failure(status, STAT, path.c_str());
     return -1;
   }
 
   if (S_ISDIR(file_stat.st_mode)) {
     status = remove_dir(path.c_str());
     if (status) {
-      failure(status, "RMDIR", path.c_str());
+      failure(status, RMDIR, path.c_str());
     } else {
-      success(status, "RMDIR");
+      success(status, RMDIR);
     }
   } else {
     status = unlink(path.c_str());
     if (status == -1) {
-      failure(status, "UNLINK", path.c_str());
+      failure(status, UNLINK, path.c_str());
     } else {
-      success(status, "UNLINK");
+      success(status, UNLINK);
     }
   }
 
