@@ -55,6 +55,8 @@
     printf("\n");        \
   } while (0)
 
+
+
 struct Trace {
   int idx;
   std::string cmd;
@@ -222,7 +224,7 @@ static void failure(int status, const char *cmd, const char *path) {
   failure_n += 1;
 }
 
-static void minor_failure(int status, const char *cmd, const char *path) {
+static void minor_failure(const char *cmd, const char *path) {
   DPRINTF("[WARNING] %s('%s') FAIL(%s) <minor>", cmd, path, strerror(errno));
 }
 
@@ -247,7 +249,7 @@ int do_create(const char *path, mode_t param) {
     if (!close_status) {
       success(status, "CREATE");
     } else {
-      minor_failure(close_status, "CLOSE", path);
+      minor_failure("CLOSE", path);
       failure(status, "CREATE", path);
     }
   }
@@ -278,7 +280,7 @@ static int remove_dir(const char *p) {
         } else {
           status_in_dir = unlink(file_path.c_str());
           if (status_in_dir) {
-            minor_failure(status_in_dir, "UNLINK", file_path.c_str());
+            minor_failure("UNLINK", file_path.c_str());
           }
         }
       }
@@ -292,7 +294,7 @@ static int remove_dir(const char *p) {
   }
 
   if (status) {
-    minor_failure(status, "RMDIR", dir_path.c_str());
+    minor_failure("RMDIR", dir_path.c_str());
   }
 
   return status;
