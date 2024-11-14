@@ -533,4 +533,19 @@ mod tests {
             exec.recording
         )
     }
+
+    #[test]
+    fn test_resolve_path() {
+        let mut exec = AbstractExecutor::new();
+        let foo = exec.mkdir(
+            &AbstractExecutor::root_index(),
+            "foo".to_owned(),
+            vec![],
+        );
+        let bar = exec.mkdir(&foo, "bar".to_owned(), vec![]);
+        let boo = exec.create(&bar, "boo".to_owned(), vec![]);
+        assert_eq!("/foo", exec.resolve_path(&Node::DIR(foo)));
+        assert_eq!("/foo/bar", exec.resolve_path(&Node::DIR(bar)));
+        assert_eq!("/foo/bar/boo", exec.resolve_path(&Node::FILE(boo)));
+    }
 }
