@@ -40,7 +40,10 @@ pub fn setup(path: &Path, fs: FileSystemType) -> io::Result<()> {
         .arg("brd")
         .arg("rd_nr=1")
         .arg(format!("rd_size={RAM_DISK_SIZE}"));
-    info!("loading block ram device module: {}", format!("{:?}", modprobe));
+    info!(
+        "loading block ram device module: {}",
+        format!("{:?}", modprobe)
+    );
     modprobe.output()?;
 
     let mut mkfs = Command::new(mkfs_cmd);
@@ -66,7 +69,10 @@ pub fn teardown(path: &Path, fs: FileSystemType) -> io::Result<()> {
 
     let mut rmmod = Command::new("rmmod");
     rmmod.arg("brd").output()?;
-    info!("removing block ram device module: {}", format!("{:?}", rmmod));
+    info!(
+        "removing block ram device module: {}",
+        format!("{:?}", rmmod)
+    );
     rmmod.output()?;
 
     info!("removing mountpoint at '{}'", path.display());

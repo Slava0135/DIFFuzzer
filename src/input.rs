@@ -2,7 +2,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use libafl::{corpus::CorpusId, inputs::Input};
 
-use crate::abstract_fs::Workload;
+use crate::abstract_fs::types::Workload;
 
 impl Input for Workload {
     fn generate_name(&self, _id: Option<CorpusId>) -> String {

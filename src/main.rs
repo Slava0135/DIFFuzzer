@@ -7,8 +7,8 @@ use rand::{rngs::StdRng, SeedableRng};
 mod abstract_fs;
 mod encode;
 mod fs_wrap;
-mod mutator;
 mod input;
+mod mutator;
 
 fn main() {
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();

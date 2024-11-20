@@ -3,7 +3,7 @@ use rand::{
     Rng,
 };
 
-use crate::abstract_fs::{self, AbstractExecutor};
+use crate::abstract_fs::types::{AbstractExecutor, DirIndex, ModeFlag, Node, Workload};
 
 enum Operation {
     MKDIR,
@@ -11,25 +11,25 @@ enum Operation {
     REMOVE,
 }
 
-pub fn generate_new(rng: &mut impl Rng, size: usize) -> abstract_fs::Workload {
+pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
     let mut executor = AbstractExecutor::new();
     let mut name_idx = 1;
     let mode = vec![
-        abstract_fs::ModeFlag::S_IRWXU,
-        abstract_fs::ModeFlag::S_IRWXG,
-        abstract_fs::ModeFlag::S_IROTH,
-        abstract_fs::ModeFlag::S_IXOTH,
+        ModeFlag::S_IRWXU,
+        ModeFlag::S_IRWXG,
+        ModeFlag::S_IROTH,
+        ModeFlag::S_IXOTH,
     ];
     for _ in 0..size {
         let alive = executor.alive();
-        let alive_dirs: Vec<abstract_fs::DirIndex> = alive
+        let alive_dirs: Vec<DirIndex> = alive
             .iter()
             .filter_map(|n| match n {
-                abstract_fs::Node::DIR(dir) => Some(dir.clone()),
-                abstract_fs::Node::FILE(_) => None,
+                Node::DIR(dir) => Some(dir.clone()),
+                Node::FILE(_) => None,
             })
             .collect();
-        let alive_dirs_except_root: Vec<abstract_fs::DirIndex> = alive_dirs
+        let alive_dirs_except_root: Vec<DirIndex> = alive_dirs
             .iter()
             .filter(|&&d| d != AbstractExecutor::root_index())
             .map(|d| d.clone())
@@ -59,8 +59,8 @@ pub fn generate_new(rng: &mut impl Rng, size: usize) -> abstract_fs::Workload {
                 let node = alive
                     .iter()
                     .filter(|n| match n {
-                        abstract_fs::Node::FILE(_) => true,
-                        abstract_fs::Node::DIR(dir) => *dir != AbstractExecutor::root_index(),
+                        Node::FILE(_) => true,
+                        Node::DIR(dir) => *dir != AbstractExecutor::root_index(),
                     })
                     .choose(rng)
                     .unwrap();

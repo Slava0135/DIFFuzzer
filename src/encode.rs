@@ -1,6 +1,9 @@
-use crate::abstract_fs::{self, Operation};
+use crate::abstract_fs::{
+    self,
+    types::{Mode, Operation, Workload},
+};
 
-pub fn encode_c(workload: abstract_fs::Workload) -> String {
+pub fn encode_c(workload: Workload) -> String {
     let mut result = String::new();
     result.push_str("#include \"executor.h\"\n");
     result.push_str("void test_workload()\n");
@@ -26,7 +29,7 @@ pub fn encode_c(workload: abstract_fs::Workload) -> String {
     result
 }
 
-fn encode_mode(mode: abstract_fs::Mode) -> String {
+fn encode_mode(mode: Mode) -> String {
     if mode.is_empty() {
         0.to_string()
     } else {
@@ -36,7 +39,7 @@ fn encode_mode(mode: abstract_fs::Mode) -> String {
 }
 
 mod tests {
-    use abstract_fs::Workload;
+    use abstract_fs::types::ModeFlag;
 
     use super::*;
 
@@ -53,22 +56,22 @@ do_remove("/foo");
 "#
         .trim();
         let mode = vec![
-            abstract_fs::ModeFlag::S_IRWXU,
-            abstract_fs::ModeFlag::S_IRWXG,
-            abstract_fs::ModeFlag::S_IROTH,
-            abstract_fs::ModeFlag::S_IXOTH,
+            ModeFlag::S_IRWXU,
+            ModeFlag::S_IRWXG,
+            ModeFlag::S_IROTH,
+            ModeFlag::S_IXOTH,
         ];
         let actual = encode_c(Workload {
             ops: vec![
-                abstract_fs::Operation::MKDIR {
+                Operation::MKDIR {
                     path: "/foo".to_owned(),
                     mode: vec![],
                 },
-                abstract_fs::Operation::CREATE {
+                Operation::CREATE {
                     path: "/foo/bar".to_owned(),
                     mode: mode.clone(),
                 },
-                abstract_fs::Operation::REMOVE {
+                Operation::REMOVE {
                     path: "/foo".to_owned(),
                 },
             ],
