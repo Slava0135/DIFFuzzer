@@ -8,6 +8,7 @@ mod abstract_fs;
 mod encode;
 mod fs_wrap;
 mod mutator;
+mod input;
 
 fn main() {
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();

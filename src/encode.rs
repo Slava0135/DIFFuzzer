@@ -5,7 +5,7 @@ pub fn encode_c(workload: abstract_fs::Workload) -> String {
     result.push_str("#include \"executor.h\"\n");
     result.push_str("void test_workload()\n");
     result.push_str("{\n");
-    for op in workload {
+    for op in workload.ops {
         match op {
             Operation::CREATE { path, mode } => {
                 result.push_str(
@@ -36,6 +36,8 @@ fn encode_mode(mode: abstract_fs::Mode) -> String {
 }
 
 mod tests {
+    use abstract_fs::Workload;
+
     use super::*;
 
     #[test]
@@ -56,19 +58,21 @@ do_remove("/foo");
             abstract_fs::ModeFlag::S_IROTH,
             abstract_fs::ModeFlag::S_IXOTH,
         ];
-        let actual = encode_c(vec![
-            abstract_fs::Operation::MKDIR {
-                path: "/foo".to_owned(),
-                mode: vec![],
-            },
-            abstract_fs::Operation::CREATE {
-                path: "/foo/bar".to_owned(),
-                mode: mode.clone(),
-            },
-            abstract_fs::Operation::REMOVE {
-                path: "/foo".to_owned(),
-            },
-        ]);
+        let actual = encode_c(Workload {
+            ops: vec![
+                abstract_fs::Operation::MKDIR {
+                    path: "/foo".to_owned(),
+                    mode: vec![],
+                },
+                abstract_fs::Operation::CREATE {
+                    path: "/foo/bar".to_owned(),
+                    mode: mode.clone(),
+                },
+                abstract_fs::Operation::REMOVE {
+                    path: "/foo".to_owned(),
+                },
+            ],
+        });
         assert_eq!(expected, actual);
     }
 }

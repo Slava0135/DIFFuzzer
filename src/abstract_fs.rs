@@ -4,6 +4,9 @@
 
 use std::{collections::VecDeque, fmt::Display, vec};
 
+use libafl::SerdeAny;
+use serde::{Deserialize, Serialize};
+
 /// Flags for `open(path, flags, mode)` syscall.
 ///
 /// Applications *shall* specify __exactly one__ of the __first 5__ values.
@@ -72,7 +75,7 @@ pub enum OpenFlag {
 
     O_TTY_INIT,
 }
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize, SerdeAny)]
 #[allow(nonstandard_style)]
 pub enum ModeFlag {
     /// Read, write, execute/search by owner.
@@ -163,14 +166,26 @@ pub enum Node {
     DIR(DirIndex),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize, SerdeAny)]
 pub enum Operation {
     MKDIR { path: PathName, mode: Mode },
     CREATE { path: PathName, mode: Mode },
     REMOVE { path: PathName },
 }
 
-pub type Workload = Vec<Operation>;
+#[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize, SerdeAny)]
+pub struct Workload {
+    pub ops: Vec<Operation>,
+}
+
+impl Workload {
+    pub fn new() -> Workload {
+        Workload { ops: vec![] }
+    }
+    pub fn push(&mut self, op: Operation) {
+        self.ops.push(op);
+    }
+}
 
 pub struct AbstractExecutor {
     dirs: Vec<Dir>,
@@ -188,7 +203,7 @@ impl AbstractExecutor {
                 children: vec![],
             }],
             files: vec![],
-            recording: vec![],
+            recording: Workload::new(),
         }
     }
 
@@ -379,10 +394,12 @@ mod tests {
             }
         }
         assert_eq!(
-            vec![Operation::MKDIR {
-                path: "/foobar".to_owned(),
-                mode: vec![],
-            }],
+            Workload {
+                ops: vec![Operation::MKDIR {
+                    path: "/foobar".to_owned(),
+                    mode: vec![],
+                }],
+            },
             exec.recording
         );
         assert_eq!(
@@ -416,10 +433,12 @@ mod tests {
             exec.alive()
         );
         assert_eq!(
-            vec![Operation::CREATE {
-                path: "/foobar".to_owned(),
-                mode: vec![],
-            }],
+            Workload {
+                ops: vec![Operation::CREATE {
+                    path: "/foobar".to_owned(),
+                    mode: vec![],
+                }]
+            },
             exec.recording
         )
     }
@@ -464,19 +483,21 @@ mod tests {
         actual.sort();
         assert_eq!(expected, actual);
         assert_eq!(
-            vec![
-                Operation::CREATE {
-                    path: "/foobar".to_owned(),
-                    mode: vec![],
-                },
-                Operation::CREATE {
-                    path: "/boo".to_owned(),
-                    mode: vec![],
-                },
-                Operation::REMOVE {
-                    path: "/foobar".to_owned(),
-                }
-            ],
+            Workload {
+                ops: vec![
+                    Operation::CREATE {
+                        path: "/foobar".to_owned(),
+                        mode: vec![],
+                    },
+                    Operation::CREATE {
+                        path: "/boo".to_owned(),
+                        mode: vec![],
+                    },
+                    Operation::REMOVE {
+                        path: "/foobar".to_owned(),
+                    }
+                ],
+            },
             exec.recording
         )
     }
@@ -484,11 +505,7 @@ mod tests {
     #[test]
     fn test_remove_dir() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.mkdir(
-            &AbstractExecutor::root_index(),
-            "foobar".to_owned(),
-            vec![],
-        );
+        let foo = exec.mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![]);
         let boo = exec.mkdir(&AbstractExecutor::root_index(), "boo".to_owned(), vec![]);
         let mut expected = vec![
             Node::DIR(AbstractExecutor::root_index()),
@@ -517,19 +534,21 @@ mod tests {
         actual.sort();
         assert_eq!(expected, actual);
         assert_eq!(
-            vec![
-                Operation::MKDIR {
-                    path: "/foobar".to_owned(),
-                    mode: vec![],
-                },
-                Operation::MKDIR {
-                    path: "/boo".to_owned(),
-                    mode: vec![],
-                },
-                Operation::REMOVE {
-                    path: "/foobar".to_owned(),
-                }
-            ],
+            Workload {
+                ops: vec![
+                    Operation::MKDIR {
+                        path: "/foobar".to_owned(),
+                        mode: vec![],
+                    },
+                    Operation::MKDIR {
+                        path: "/boo".to_owned(),
+                        mode: vec![],
+                    },
+                    Operation::REMOVE {
+                        path: "/foobar".to_owned(),
+                    }
+                ],
+            },
             exec.recording
         )
     }
@@ -537,11 +556,7 @@ mod tests {
     #[test]
     fn test_resolve_path() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.mkdir(
-            &AbstractExecutor::root_index(),
-            "foo".to_owned(),
-            vec![],
-        );
+        let foo = exec.mkdir(&AbstractExecutor::root_index(), "foo".to_owned(), vec![]);
         let bar = exec.mkdir(&foo, "bar".to_owned(), vec![]);
         let boo = exec.create(&bar, "boo".to_owned(), vec![]);
         assert_eq!("/foo", exec.resolve_path(&Node::DIR(foo)));
