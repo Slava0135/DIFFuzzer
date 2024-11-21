@@ -2,7 +2,7 @@
 
 #![allow(dead_code)]
 
-use std::{fmt::Display, vec};
+use std::{collections::HashMap, fmt::Display, vec};
 
 use libafl::SerdeAny;
 use serde::{Deserialize, Serialize};
@@ -149,15 +149,13 @@ pub struct FileDescriptor(usize);
 
 #[derive(Debug, Clone)]
 pub struct File {
-    pub name: Name,
     pub parent: DirIndex,
 }
 
 #[derive(Debug, Clone)]
 pub struct Dir {
-    pub name: Name,
     pub parent: Option<DirIndex>,
-    pub children: Vec<Node>,
+    pub children: HashMap<Name, Node>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

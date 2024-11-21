@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use super::types::*;
 
@@ -16,9 +16,8 @@ impl AbstractExecutor {
     pub fn new() -> Self {
         AbstractExecutor {
             dirs: vec![Dir {
-                name: String::new(),
                 parent: None,
-                children: vec![],
+                children: HashMap::new(),
             }],
             files: vec![],
             recording: Workload::new(),
@@ -36,7 +35,7 @@ impl AbstractExecutor {
                 });
                 let dir = self.dir(&to_remove).clone();
                 let parent = self.dir_mut(&dir.parent.unwrap());
-                parent.children.retain(|n| match n {
+                parent.children.retain(|_, n| match n {
                     Node::FILE(_) => true,
                     Node::DIR(idx) => idx != to_remove,
                 });
@@ -47,7 +46,7 @@ impl AbstractExecutor {
                 });
                 let file = self.file(&to_remove).clone();
                 let parent = self.dir_mut(&file.parent);
-                parent.children.retain(|n| match n {
+                parent.children.retain(|_, n| match n {
                     Node::FILE(idx) => idx != to_remove,
                     Node::DIR(_) => true,
                 });
@@ -61,13 +60,14 @@ impl AbstractExecutor {
             return Err(ExecutorError::SameName);
         }
         let dir = Dir {
-            name: name,
             parent: Some(parent.clone()),
-            children: vec![],
+            children: HashMap::new(),
         };
         let dir_idx = DirIndex(self.dirs.len());
         self.dirs.push(dir);
-        self.dir_mut(&parent).children.push(Node::DIR(dir_idx));
+        self.dir_mut(&parent)
+            .children
+            .insert(name, Node::DIR(dir_idx));
         self.recording.push(Operation::MKDIR {
             path: self.resolve_path(&Node::DIR(dir_idx)),
             mode: mode,
@@ -80,12 +80,13 @@ impl AbstractExecutor {
             return Err(ExecutorError::SameName);
         }
         let file = File {
-            name: name,
             parent: parent.clone(),
         };
         let file_idx = FileIndex(self.files.len());
         self.files.push(file);
-        self.dir_mut(&parent).children.push(Node::FILE(file_idx));
+        self.dir_mut(&parent)
+            .children
+            .insert(name, Node::FILE(file_idx));
         self.recording.push(Operation::CREATE {
             path: self.resolve_path(&Node::FILE(file_idx)),
             mode: mode,
@@ -135,10 +136,7 @@ impl AbstractExecutor {
     }
 
     fn name_exists(&self, idx: &DirIndex, name: &Name) -> bool {
-        self.dir(idx).children.iter().any(|node| match node {
-            Node::DIR(idx) => &self.dir(idx).name == name,
-            Node::FILE(idx) => &self.file(idx).name == name,
-        })
+        self.dir(idx).children.contains_key(name)
     }
 
     fn dir(&self, idx: &DirIndex) -> &Dir {
@@ -175,11 +173,7 @@ impl AbstractExecutor {
             };
             last = dir
                 .children
-                .iter()
-                .find(|&n| match n {
-                    Node::DIR(dir_index) => self.dir(&dir_index).name == segment,
-                    Node::FILE(file_index) => self.file(&file_index).name == segment,
-                })
+                .get(segment)
                 .ok_or(ExecutorError::NotFound)?
                 .clone();
         }
@@ -199,7 +193,13 @@ impl AbstractExecutor {
                     let dir = self.dir(&idx);
                     match dir.parent {
                         Some(parent) => {
-                            segments.push(dir.name.clone());
+                            let parent_dir = self.dir(&parent);
+                            let (name, _) = parent_dir
+                                .children
+                                .iter()
+                                .find(|(_, node)| next == **node)
+                                .unwrap();
+                            segments.push(name.clone());
                             next = Node::DIR(parent.clone());
                         }
                         None => break,
@@ -207,7 +207,13 @@ impl AbstractExecutor {
                 }
                 Node::FILE(idx) => {
                     let file = self.file(&idx);
-                    segments.push(file.name.clone());
+                    let parent = self.dir(&file.parent);
+                    let (name, _) = parent
+                        .children
+                        .iter()
+                        .find(|(_, node)| next == **node)
+                        .unwrap();
+                    segments.push(name.clone());
                     next = Node::DIR(file.parent.clone()).clone();
                 }
             }
@@ -225,7 +231,7 @@ impl AbstractExecutor {
         while !queue.is_empty() {
             let next = queue.pop_front().unwrap();
             let dir = self.dir(&next);
-            for node in dir.children.iter() {
+            for (_, node) in dir.children.iter() {
                 match node {
                     Node::DIR(idx) => {
                         queue.push_back(idx);
@@ -248,7 +254,6 @@ mod tests {
     #[test]
     fn test_init_root() {
         let exec = AbstractExecutor::new();
-        assert_eq!("", exec.root().name);
         assert_eq!(
             vec![Node::DIR(AbstractExecutor::root_index())],
             exec.alive()
@@ -259,7 +264,8 @@ mod tests {
     #[should_panic]
     fn test_remove_root() {
         let mut exec = AbstractExecutor::new();
-        exec.remove(&Node::DIR(AbstractExecutor::root_index())).unwrap();
+        exec.remove(&Node::DIR(AbstractExecutor::root_index()))
+            .unwrap();
     }
 
     #[test]
@@ -268,9 +274,9 @@ mod tests {
         let foo = exec
             .mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
             .unwrap();
-        match exec.root().children[0] {
+        match exec.root().children.get("foobar").unwrap() {
             Node::DIR(idx) => {
-                assert_eq!("foobar", exec.dir(&idx).name)
+                assert_eq!(foo, *idx)
             }
             _ => {
                 assert!(false, "not a dir")
@@ -296,8 +302,10 @@ mod tests {
     #[should_panic]
     fn test_mkdir_same_name() {
         let mut exec = AbstractExecutor::new();
-        exec.mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![]).unwrap();
-        exec.mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![]).unwrap();
+        exec.mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
+            .unwrap();
+        exec.mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
+            .unwrap();
     }
 
     #[test]
@@ -306,9 +314,9 @@ mod tests {
         let foo = exec
             .create(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
             .unwrap();
-        match exec.root().children[0] {
+        match exec.root().children.get("foobar").unwrap() {
             Node::FILE(idx) => {
-                assert_eq!("foobar", exec.file(&idx).name)
+                assert_eq!(foo, *idx)
             }
             _ => {
                 assert!(false, "not a file")
@@ -334,8 +342,10 @@ mod tests {
     #[should_panic]
     fn test_create_same_name() {
         let mut exec = AbstractExecutor::new();
-        exec.create(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![]).unwrap();
-        exec.create(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![]).unwrap();
+        exec.create(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
+            .unwrap();
+        exec.create(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
+            .unwrap();
     }
 
     #[test]
@@ -360,9 +370,9 @@ mod tests {
         exec.remove(&Node::FILE(foo)).unwrap();
 
         assert_eq!(1, exec.root().children.len());
-        match exec.root().children[0] {
+        match exec.root().children.get("boo").unwrap() {
             Node::FILE(idx) => {
-                assert_eq!("boo", exec.file(&idx).name)
+                assert_eq!(boo, *idx);
             }
             _ => {
                 assert!(false, "not a file")
@@ -416,9 +426,9 @@ mod tests {
         exec.remove(&Node::DIR(foo)).unwrap();
 
         assert_eq!(1, exec.root().children.len());
-        match exec.root().children[0] {
+        match exec.root().children.get("boo").unwrap() {
             Node::DIR(idx) => {
-                assert_eq!("boo", exec.dir(&idx).name)
+                assert_eq!(boo, *idx);
             }
             _ => {
                 assert!(false, "not a dir")
