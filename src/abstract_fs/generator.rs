@@ -44,7 +44,7 @@ pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
                     alive_dirs.choose(rng).unwrap(),
                     name_idx.to_string(),
                     mode.clone(),
-                );
+                ).unwrap();
                 name_idx += 1;
             }
             Operation::CREATE => {
@@ -52,7 +52,7 @@ pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
                     alive_dirs.choose(rng).unwrap(),
                     name_idx.to_string(),
                     mode.clone(),
-                );
+                ).unwrap();
                 name_idx += 1;
             }
             Operation::REMOVE => {
@@ -64,7 +64,7 @@ pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
                     })
                     .choose(rng)
                     .unwrap();
-                executor.remove(node);
+                executor.remove(node).unwrap();
             }
         }
     }
