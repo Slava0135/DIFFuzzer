@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use rand::{
     seq::{IteratorRandom, SliceRandom},
     Rng,
@@ -5,7 +7,8 @@ use rand::{
 
 use crate::abstract_fs::types::{AbstractExecutor, DirIndex, ModeFlag, Node, Workload};
 
-enum Operation {
+#[derive(PartialEq, Eq, Hash)]
+pub enum OperationKind {
     MKDIR,
     CREATE,
     REMOVE,
@@ -13,62 +16,79 @@ enum Operation {
 
 pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
     let mut executor = AbstractExecutor::new();
-    let mut name_idx = 1;
+    for _ in 0..size {
+        append_one(
+            rng,
+            &mut executor,
+            HashSet::from([
+                OperationKind::CREATE,
+                OperationKind::MKDIR,
+                OperationKind::REMOVE,
+            ]),
+        );
+    }
+    executor.recording
+}
+
+pub fn append_one(
+    rng: &mut impl Rng,
+    executor: &mut AbstractExecutor,
+    pick_from: HashSet<OperationKind>,
+) {
     let mode = vec![
         ModeFlag::S_IRWXU,
         ModeFlag::S_IRWXG,
         ModeFlag::S_IROTH,
         ModeFlag::S_IXOTH,
     ];
-    for _ in 0..size {
-        let alive = executor.alive();
-        let alive_dirs: Vec<DirIndex> = alive
-            .iter()
-            .filter_map(|n| match n {
-                Node::DIR(dir) => Some(dir.clone()),
-                Node::FILE(_) => None,
-            })
-            .collect();
-        let alive_dirs_except_root: Vec<DirIndex> = alive_dirs
-            .iter()
-            .filter(|&&d| d != AbstractExecutor::root_index())
-            .map(|d| d.clone())
-            .collect();
-        let mut possible_ops = vec![Operation::MKDIR, Operation::CREATE];
-        if !alive_dirs_except_root.is_empty() {
-            possible_ops.push(Operation::REMOVE);
+    let alive = executor.alive();
+    let alive_dirs: Vec<DirIndex> = alive
+        .iter()
+        .filter_map(|n| match n {
+            Node::DIR(dir) => Some(dir.clone()),
+            Node::FILE(_) => None,
+        })
+        .collect();
+    let alive_dirs_except_root: Vec<DirIndex> = alive_dirs
+        .iter()
+        .filter(|&&d| d != AbstractExecutor::root_index())
+        .map(|d| d.clone())
+        .collect();
+    let mut banned_ops = HashSet::new();
+    if alive_dirs_except_root.is_empty() {
+        banned_ops.insert(OperationKind::REMOVE);
+    }
+    match pick_from.difference(&banned_ops).choose(rng).unwrap() {
+        OperationKind::MKDIR => {
+            executor
+                .mkdir(
+                    alive_dirs.choose(rng).unwrap(),
+                    executor.nodes_created.to_string(),
+                    mode.clone(),
+                )
+                .unwrap();
         }
-        match possible_ops.choose(rng).unwrap() {
-            Operation::MKDIR => {
-                executor.mkdir(
+        OperationKind::CREATE => {
+            executor
+                .create(
                     alive_dirs.choose(rng).unwrap(),
-                    name_idx.to_string(),
+                    executor.nodes_created.to_string(),
                     mode.clone(),
-                ).unwrap();
-                name_idx += 1;
-            }
-            Operation::CREATE => {
-                executor.create(
-                    alive_dirs.choose(rng).unwrap(),
-                    name_idx.to_string(),
-                    mode.clone(),
-                ).unwrap();
-                name_idx += 1;
-            }
-            Operation::REMOVE => {
-                let node = alive
-                    .iter()
-                    .filter(|n| match n {
-                        Node::FILE(_) => true,
-                        Node::DIR(dir) => *dir != AbstractExecutor::root_index(),
-                    })
-                    .choose(rng)
-                    .unwrap();
-                executor.remove(node).unwrap();
-            }
+                )
+                .unwrap();
+        }
+        OperationKind::REMOVE => {
+            let node = alive
+                .iter()
+                .filter(|n| match n {
+                    Node::FILE(_) => true,
+                    Node::DIR(dir) => *dir != AbstractExecutor::root_index(),
+                })
+                .choose(rng)
+                .unwrap();
+            executor.remove(node).unwrap();
         }
     }
-    executor.recording
 }
 
 #[cfg(test)]

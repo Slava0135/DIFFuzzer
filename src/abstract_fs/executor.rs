@@ -20,6 +20,7 @@ impl AbstractExecutor {
                 children: HashMap::new(),
             }],
             files: vec![],
+            nodes_created: 0,
             recording: Workload::new(),
         }
     }
@@ -72,6 +73,7 @@ impl AbstractExecutor {
             path: self.resolve_path(&Node::DIR(dir_idx)),
             mode: mode,
         });
+        self.nodes_created += 1;
         Ok(dir_idx)
     }
 
@@ -91,6 +93,7 @@ impl AbstractExecutor {
             path: self.resolve_path(&Node::FILE(file_idx)),
             mode: mode,
         });
+        self.nodes_created += 1;
         Ok(file_idx)
     }
 
@@ -295,6 +298,7 @@ mod tests {
             vec![Node::DIR(AbstractExecutor::root_index()), Node::DIR(foo)],
             exec.alive()
         );
+        assert_eq!(1, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -335,6 +339,7 @@ mod tests {
             },
             exec.recording
         );
+        assert_eq!(1, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -401,6 +406,7 @@ mod tests {
             },
             exec.recording
         );
+        assert_eq!(2, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -457,6 +463,7 @@ mod tests {
             },
             exec.recording
         );
+        assert_eq!(2, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -471,6 +478,7 @@ mod tests {
         assert_eq!("/foo", exec.resolve_path(&Node::DIR(foo)));
         assert_eq!("/foo/bar", exec.resolve_path(&Node::DIR(bar)));
         assert_eq!("/foo/bar/boo", exec.resolve_path(&Node::FILE(boo)));
+        assert_eq!(3, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -510,6 +518,7 @@ mod tests {
             Node::FILE(boo),
             exec.resolve_node("/foo/bar/boo/".to_owned()).unwrap()
         );
+        assert_eq!(3, exec.nodes_created);
         test_replay(exec.recording);
     }
 

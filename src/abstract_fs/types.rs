@@ -188,6 +188,6 @@ impl Workload {
 pub struct AbstractExecutor {
     pub dirs: Vec<Dir>,
     pub files: Vec<File>,
-
+    pub nodes_created: usize,
     pub recording: Workload,
 }
