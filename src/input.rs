@@ -1,8 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::HashSet,
     hash::{DefaultHasher, Hash, Hasher},
-    vec,
 };
 
 use libafl::{
@@ -14,7 +12,7 @@ use libafl::{
     Error,
 };
 use libafl_bolts::Named;
-use rand::{rngs::StdRng, seq::index, Rng};
+use rand::{rngs::StdRng, Rng};
 
 use crate::abstract_fs::{
     generator::{generate_new, OperationKind},
