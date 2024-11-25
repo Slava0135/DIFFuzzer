@@ -14,18 +14,20 @@ pub enum OperationKind {
     REMOVE,
 }
 
+impl OperationKind {
+    pub fn all() -> HashSet<Self> {
+        HashSet::from([
+            OperationKind::CREATE,
+            OperationKind::MKDIR,
+            OperationKind::REMOVE,
+        ])
+    }
+}
+
 pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
     let mut executor = AbstractExecutor::new();
     for _ in 0..size {
-        append_one(
-            rng,
-            &mut executor,
-            HashSet::from([
-                OperationKind::CREATE,
-                OperationKind::MKDIR,
-                OperationKind::REMOVE,
-            ]),
-        );
+        append_one(rng, &mut executor, OperationKind::all());
     }
     executor.recording
 }
