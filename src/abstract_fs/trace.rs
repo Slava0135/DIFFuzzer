@@ -56,6 +56,8 @@ pub fn parse_trace(trace: String) -> Result<Trace> {
     Ok(trace)
 }
 
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
