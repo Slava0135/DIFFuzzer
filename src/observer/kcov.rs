@@ -20,7 +20,7 @@ impl KCovObserver {
     pub fn new(kcov_path: Box<Path>) -> KCovObserver {
         KCovObserver {
             coverage: HashSet::new(),
-            kcov_path: kcov_path,
+            kcov_path,
         }
     }
 }

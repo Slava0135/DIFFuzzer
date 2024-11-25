@@ -1,11 +1,13 @@
 use std::num::ParseIntError;
 
-#[derive(Debug, PartialEq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct Trace {
     pub rows: Vec<TraceRow>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct TraceRow {
     index: u32,
     command: String,
@@ -55,8 +57,6 @@ pub fn parse_trace(trace: String) -> Result<Trace> {
     }
     Ok(trace)
 }
-
-
 
 #[cfg(test)]
 mod tests {
