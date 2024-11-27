@@ -30,32 +30,34 @@ impl From<ParseIntError> for TraceError {
     }
 }
 
-pub fn parse_trace(trace: String) -> Result<Trace> {
-    let lines: Vec<&str> = trace.split('\n').collect();
-    if lines.len() <= 1 {
-        return Err(TraceError::EmptyTrace);
-    }
-    let mut trace = Trace { rows: vec![] };
-    for line in &lines[1..] {
-        if line.trim().is_empty() {
-            break;
+impl Trace {
+    pub fn try_parse(trace: String) -> Result<Trace> {
+        let lines: Vec<&str> = trace.split('\n').collect();
+        if lines.len() <= 1 {
+            return Err(TraceError::EmptyTrace);
         }
-        let columns: Vec<&str> = line.split(",").collect();
-        if columns.len() != 4 {
-            return Err(TraceError::InvalidColumnsCount);
+        let mut trace = Trace { rows: vec![] };
+        for line in &lines[1..] {
+            if line.trim().is_empty() {
+                break;
+            }
+            let columns: Vec<&str> = line.split(",").collect();
+            if columns.len() != 4 {
+                return Err(TraceError::InvalidColumnsCount);
+            }
+            let index = columns[0].trim().parse()?;
+            let command = columns[1].trim().to_owned();
+            let return_code = columns[2].trim().parse()?;
+            let errno: String = columns[3].trim().to_owned();
+            trace.rows.push(TraceRow {
+                index,
+                command,
+                return_code,
+                errno,
+            });
         }
-        let index = columns[0].trim().parse()?;
-        let command = columns[1].trim().to_owned();
-        let return_code = columns[2].trim().parse()?;
-        let errno: String = columns[3].trim().to_owned();
-        trace.rows.push(TraceRow {
-            index,
-            command,
-            return_code,
-            errno,
-        });
+        Ok(trace)
     }
-    Ok(trace)
 }
 
 #[cfg(test)]
@@ -64,14 +66,14 @@ mod tests {
 
     #[test]
     fn test_empty_trace() {
-        assert_eq!(Err(TraceError::EmptyTrace), parse_trace("".to_owned()))
+        assert_eq!(Err(TraceError::EmptyTrace), Trace::try_parse("".to_owned()))
     }
 
     #[test]
     fn test_header_only() {
         assert_eq!(
             Ok(Trace { rows: vec![] }),
-            parse_trace("Index,Command,ReturnCode,Errno\n".to_owned())
+            Trace::try_parse("Index,Command,ReturnCode,Errno\n".to_owned())
         )
     }
 
@@ -85,7 +87,7 @@ Index,Command,ReturnCode,Errno
         .trim();
         assert_eq!(
             Err(TraceError::InvalidColumnsCount),
-            parse_trace(trace.to_owned())
+            Trace::try_parse(trace.to_owned())
         )
     }
 
@@ -114,7 +116,7 @@ Index,Command,ReturnCode,Errno
                     },
                 ]
             }),
-            parse_trace(trace.to_owned())
+            Trace::try_parse(trace.to_owned())
         )
     }
 }

@@ -4,7 +4,7 @@ use libafl::{executors::ExitKind, inputs::UsesInput, observers::Observer};
 use libafl_bolts::{ErrorBacktrace, Named};
 use serde::{Deserialize, Serialize};
 
-use crate::abstract_fs::trace::{parse_trace, Trace, TraceError};
+use crate::abstract_fs::trace::{Trace, TraceError};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct TraceObserver {
@@ -46,7 +46,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<(), libafl::Error> {
         self.trace = None;
-        self.trace = Some(parse_trace(read_to_string(self.trace_path.as_ref())?)?);
+        self.trace = Some(Trace::try_parse(read_to_string(self.trace_path.as_ref())?)?);
         Ok(())
     }
 
