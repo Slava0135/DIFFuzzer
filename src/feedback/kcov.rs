@@ -59,6 +59,6 @@ where
 
 impl Named for KCovFeedback {
     fn name(&self) -> &Cow<'static, str> {
-        &Cow::Borrowed("GoCoverFeedback")
+        &Cow::Borrowed("KCovFeedback")
     }
 }
