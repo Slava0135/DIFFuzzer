@@ -31,14 +31,6 @@ impl<S> Observer<S::Input, S> for TraceObserver
 where
     S: UsesInput,
 {
-    fn flush(&mut self) -> Result<(), libafl::Error> {
-        Ok(())
-    }
-
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), libafl::Error> {
-        Ok(())
-    }
-
     fn post_exec(
         &mut self,
         _state: &mut S,
@@ -47,23 +39,6 @@ where
     ) -> Result<(), libafl::Error> {
         self.trace = None;
         self.trace = Some(Trace::try_parse(read_to_string(self.trace_path.as_ref())?)?);
-        Ok(())
-    }
-
-    fn pre_exec_child(
-        &mut self,
-        _state: &mut S,
-        _input: &<S as UsesInput>::Input,
-    ) -> Result<(), libafl::Error> {
-        Ok(())
-    }
-
-    fn post_exec_child(
-        &mut self,
-        _state: &mut S,
-        _input: &<S as UsesInput>::Input,
-        _exit_kind: &ExitKind,
-    ) -> Result<(), libafl::Error> {
         Ok(())
     }
 }

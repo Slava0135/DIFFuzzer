@@ -71,7 +71,7 @@ impl AbstractExecutor {
             .insert(name, Node::DIR(dir_idx));
         self.recording.push(Operation::MKDIR {
             path: self.resolve_path(&Node::DIR(dir_idx)),
-            mode: mode,
+            mode,
         });
         self.nodes_created += 1;
         Ok(dir_idx)
@@ -91,7 +91,7 @@ impl AbstractExecutor {
             .insert(name, Node::FILE(file_idx));
         self.recording.push(Operation::CREATE {
             path: self.resolve_path(&Node::FILE(file_idx)),
-            mode: mode,
+            mode,
         });
         self.nodes_created += 1;
         Ok(file_idx)

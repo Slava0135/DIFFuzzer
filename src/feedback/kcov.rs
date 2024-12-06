@@ -55,20 +55,6 @@ where
             Ok(true)
         }
     }
-
-    fn append_metadata(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _observers: &OT,
-        _testcase: &mut libafl::corpus::Testcase<Workload>,
-    ) -> Result<(), libafl::Error> {
-        Ok(())
-    }
-
-    fn discard_metadata(&mut self, _state: &mut S, _input: &Workload) -> Result<(), libafl::Error> {
-        Ok(())
-    }
 }
 
 impl Named for KCovFeedback {
