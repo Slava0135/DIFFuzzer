@@ -2,12 +2,12 @@ use std::num::ParseIntError;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 pub struct Trace {
     pub rows: Vec<TraceRow>,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 pub struct TraceRow {
     index: u32,
     command: String,
@@ -57,6 +57,9 @@ impl Trace {
             });
         }
         Ok(trace)
+    }
+    pub fn same_as(self, other: Trace) -> bool {
+        self == other
     }
 }
 
