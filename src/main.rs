@@ -11,6 +11,7 @@ mod args;
 mod config;
 mod greybox;
 mod mount;
+mod blackbox;
 
 fn main() {
     let args = Args::parse();
