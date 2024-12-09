@@ -1,9 +1,11 @@
 use std::path::Path;
+use std::process::Command;
 
 use rand::prelude::StdRng;
 use rand::SeedableRng;
 
 use crate::abstract_fs::generator::generate_new;
+use crate::blackbox::comparator::compare_fs_states;
 use crate::mount::mount::FileSystemMount;
 
 pub fn runner_diff_with_end<FS: FileSystemMount>(mut count: usize,
@@ -18,7 +20,7 @@ pub fn runner_diff_with_end<FS: FileSystemMount>(mut count: usize,
     while count > 0 {
         let name: &Path = Path::new(&format!("test{}", count));
 
-        let _seq = generate_new(&mut rng, trace_len);
+        let seq = generate_new(&mut rng, trace_len);
         count -= 1;
 
         let ref_path: &Path = ref_mnt.join(name).as_path();
@@ -27,7 +29,14 @@ pub fn runner_diff_with_end<FS: FileSystemMount>(mut count: usize,
         fs_reference.setup(ref_path).unwrap();
         fs_target.setup(target_path).unwrap();
 
-        //make and exec
+        //todo: concurrency
+        let seq_path = seq.compile(Path::new("executor")).unwrap();
+        let exec = Command::new(format!("./{}", seq_path.display())).arg(ref_path.as_ref());
+        let output_ref = exec.output()?;
+        let exec = Command::new(format!("./{}", seq_path.display())).arg(target_path.as_ref());
+
+        let output_target = exec.output()?;
+        compare_fs_states(output_ref, output_target);
 
         fs_reference.teardown(ref_path).unwrap();
         fs_target.teardown(target_path).unwrap();
