@@ -8,41 +8,37 @@ use libafl::{
 
 use crate::{
     abstract_fs::{encode::encode_c, types::Workload},
-    fs_wrap::{setup, teardown, FileSystemType},
+    mount::mount::FileSystemMount,
 };
 
-struct WorkloadExecutor<S: State> {
+struct WorkloadExecutor<S: State, FS: FileSystemMount> {
     phantom: PhantomData<S>,
-    fs_type: FileSystemType,
+    fs_mount: FS,
     fs_dir: Box<Path>,
     test_dir: Box<Path>,
 }
 
-impl<S: State> WorkloadExecutor<S> {
-    pub fn new(
-        _state: &S,
-        fs_type: FileSystemType,
-        fs_dir: Box<Path>,
-        test_dir: Box<Path>,
-    ) -> Self {
+impl<S: State, FS: FileSystemMount> WorkloadExecutor<S, FS> {
+    pub fn new(_state: &S, fs_mount: FS, fs_dir: Box<Path>, test_dir: Box<Path>) -> Self {
         Self {
             phantom: PhantomData,
-            fs_type,
+            fs_mount,
             fs_dir,
             test_dir,
         }
     }
 }
 
-impl<S: State> UsesState for WorkloadExecutor<S> {
+impl<S: State, FS: FileSystemMount> UsesState for WorkloadExecutor<S, FS> {
     type State = S;
 }
 
-impl<EM, S, Z> Executor<EM, Z> for WorkloadExecutor<S>
+impl<EM, S, Z, FS> Executor<EM, Z> for WorkloadExecutor<S, FS>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions + UsesInput<Input = Workload>,
     Z: UsesState<State = S>,
+    FS: FileSystemMount,
 {
     fn run_target(
         &mut self,
@@ -59,11 +55,11 @@ where
         make.arg("-C").arg(self.test_dir.as_os_str());
         make.output()?;
 
-        setup(&self.fs_dir, self.fs_type)?;
+        self.fs_mount.setup(&self.fs_dir)?;
         let mut exec = Command::new(format!("./{}", test_exec.display()));
         exec.arg(self.fs_dir.as_ref());
         let output = exec.output()?;
-        teardown(&self.fs_dir, self.fs_type)?;
+        self.fs_mount.teardown(&self.fs_dir)?;
 
         if output.status.success() {
             Ok(ExitKind::Ok)
