@@ -5,3 +5,4 @@ pub mod mutator;
 pub mod trace;
 pub mod encode;
 pub mod output;
+pub mod compile;
