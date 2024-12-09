@@ -5,6 +5,7 @@ use log::info;
 const RAM_DISK_SIZE: usize = 1_000_000;
 const DEVICE: &str = "/dev/ram0";
 
+#[derive(Debug, Clone, Copy)]
 pub enum FileSystemType {
     EXT4,
     BTRFS,
