@@ -8,7 +8,7 @@ use crate::abstract_fs::generator::generate_new;
 use crate::blackbox::comparator::compare_fs_states;
 use crate::mount::mount::FileSystemMount;
 
-pub fn runner_diff_with_end<FS: FileSystemMount>(mut count: usize,
+pub fn run_diff_with_end<FS: FileSystemMount>(mut count: usize,
                                                  fs_reference: FS,
                                                  fs_target: FS,
                                                  trace_len: usize,
