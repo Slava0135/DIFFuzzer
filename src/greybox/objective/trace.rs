@@ -9,7 +9,7 @@ use libafl_bolts::{
     Named,
 };
 
-use crate::{abstract_fs::types::Workload, observer::trace::TraceObserver};
+use crate::{abstract_fs::types::Workload, greybox::observer::trace::TraceObserver};
 
 pub struct TraceObjective {
     fst_observer: Handle<TraceObserver>,

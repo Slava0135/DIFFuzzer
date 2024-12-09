@@ -9,7 +9,7 @@ use libafl_bolts::{
     Named,
 };
 
-use crate::{abstract_fs::types::Workload, observer::kcov::KCovObserver};
+use crate::{abstract_fs::types::Workload, greybox::observer::kcov::KCovObserver};
 
 pub struct KCovFeedback {
     observer: Handle<KCovObserver>,

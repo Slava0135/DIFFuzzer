@@ -7,10 +7,7 @@ use rand::{rngs::StdRng, SeedableRng};
 
 mod abstract_fs;
 mod fs_wrap;
-mod input;
-mod observer;
-mod feedback;
-mod objective;
+mod greybox;
 
 fn main() {
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();
