@@ -1,11 +1,10 @@
 use std::path::Path;
-use std::process::Command;
 
 use rand::prelude::StdRng;
 use rand::SeedableRng;
 
 use crate::abstract_fs::generator::generate_new;
-use crate::blackbox::comparator::compare_fs_states;
+use crate::blackbox::executor::WorkloadExecutor;
 use crate::mount::mount::FileSystemMount;
 
 pub fn run_diff_with_end<FS: FileSystemMount>(mut count: usize,
@@ -23,20 +22,16 @@ pub fn run_diff_with_end<FS: FileSystemMount>(mut count: usize,
         let seq = generate_new(&mut rng, trace_len);
         count -= 1;
 
-        let ref_path: &Path = ref_mnt.join(name).as_path();
-        let target_path: &Path = target_mnt.join(name).as_path();
+        let ref_path= ref_mnt.join(name).as_path().into_boxed_path();
+        let target_path = target_mnt.join(name).as_path().into_boxed_path();
 
         fs_reference.setup(ref_path).unwrap();
         fs_target.setup(target_path).unwrap();
 
-        //todo: concurrency
-        let seq_path = seq.compile(Path::new("executor")).unwrap();
-        let exec = Command::new(format!("./{}", seq_path.display())).arg(ref_path.as_ref());
-        let output_ref = exec.output()?;
-        let exec = Command::new(format!("./{}", seq_path.display())).arg(target_path.as_ref());
+        let workload_path = seq.compile(Path::new("executor")).unwrap();
 
-        let output_target = exec.output()?;
-        compare_fs_states(output_ref, output_target);
+        let executor = WorkloadExecutor{ref_path, target_path};
+        executor.execute_workload(workload_path).compare_outputs();
 
         fs_reference.teardown(ref_path).unwrap();
         fs_target.teardown(target_path).unwrap();
