@@ -55,31 +55,22 @@ pub fn fuzz() {
     let snd_kcov_feedback = KCovFeedback::new(snd_kcov_observer.handle());
 
     let mut feedback = feedback_or!(fst_kcov_feedback, snd_kcov_feedback);
-
     let mut objective =
         TraceObjective::new(fst_trace_observer.handle(), snd_trace_observer.handle());
 
     let mut state = StdState::new(
         StdRand::with_seed(current_nanos()),
-        // Corpus that will be evolved, we keep it in memory for performance
         InMemoryCorpus::<Workload>::new(),
-        // Corpus in which we store solutions (crashes in this example),
-        // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-        // States of the feedbacks.
-        // The feedbacks can report the data that should persist in the State.
         &mut feedback,
-        // Same for objective feedbacks
         &mut objective,
     )
     .unwrap();
 
     let monitor = SimpleMonitor::new(|s| info!("{s}"));
-
     let mut manager = SimpleEventManager::new(monitor);
 
     let scheduler = QueueScheduler::new();
-
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     let mut fst_harness = workload_harness(
@@ -90,7 +81,6 @@ pub fn fuzz() {
             .into_boxed_path(),
         temp_dir.clone().into_boxed_path(),
     );
-
     let mut snd_harness = workload_harness(
         Btrfs::new(),
         Path::new("/mnt")
@@ -101,7 +91,6 @@ pub fn fuzz() {
     );
 
     let timeout = Duration::new(10, 0);
-
     let fst_executor = InProcessExecutor::with_timeout(
         &mut fst_harness,
         tuple_list!(fst_kcov_observer, fst_trace_observer),
@@ -111,7 +100,6 @@ pub fn fuzz() {
         timeout,
     )
     .unwrap();
-
     let snd_executor = InProcessExecutor::with_timeout(
         &mut snd_harness,
         tuple_list!(snd_kcov_observer, snd_trace_observer),
