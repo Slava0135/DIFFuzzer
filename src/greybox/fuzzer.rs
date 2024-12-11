@@ -124,7 +124,7 @@ pub fn fuzz() {
 
     let mut executor = DiffExecutor::new(fst_executor, snd_executor, tuple_list!());
 
-    let mutator = WorkloadMutator::new(StdRng::seed_from_u64(123));
+    let mutator = WorkloadMutator::new(StdRng::seed_from_u64(current_nanos()));
     let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(
         mutator,
         NonZero::new(10).unwrap()
