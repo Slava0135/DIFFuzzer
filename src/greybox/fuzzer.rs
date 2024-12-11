@@ -6,14 +6,14 @@ use std::{
 };
 
 use libafl::{
-    corpus::{InMemoryCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
     executors::{DiffExecutor, InProcessExecutor},
     feedback_or,
     monitors::SimpleMonitor,
     schedulers::QueueScheduler,
     stages::StdMutationalStage,
-    state::StdState,
+    state::{HasCorpus, StdState},
     Error, Fuzzer, StdFuzzer,
 };
 use libafl_bolts::{
@@ -66,6 +66,11 @@ pub fn fuzz() {
         &mut objective,
     )
     .unwrap();
+
+    state
+        .corpus_mut()
+        .add(Testcase::new(Workload::new()))
+        .unwrap();
 
     let monitor = SimpleMonitor::new(|s| info!("{s}"));
     let mut manager = SimpleEventManager::new(monitor);
