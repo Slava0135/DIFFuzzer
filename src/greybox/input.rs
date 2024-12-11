@@ -44,6 +44,12 @@ pub struct WorkloadMutator {
     pub rng: StdRng,
 }
 
+impl WorkloadMutator {
+    pub fn new(rng: StdRng) -> Self {
+        Self { rng }
+    }
+}
+
 impl<S> Mutator<Workload, S> for WorkloadMutator
 where
     S: HasRand,
