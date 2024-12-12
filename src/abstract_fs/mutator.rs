@@ -50,7 +50,7 @@ pub fn insert(
 mod tests {
     use rand::{rngs::StdRng, SeedableRng};
 
-    use crate::abstract_fs::types::Operation;
+    use crate::abstract_fs::{generator::generate_new, types::Operation};
 
     use super::*;
 
@@ -133,5 +133,25 @@ mod tests {
             }),
             insert(&mut rng, &w, 3, HashSet::from([OperationKind::REMOVE]))
         );
+    }
+
+    #[test]
+    fn smoke_test_mutate() {
+        let mut rng = StdRng::seed_from_u64(123);
+        let mut w = generate_new(&mut rng, 3);
+        for _ in 0..10000 {
+            let p: f64 = rng.gen();
+            if w.ops.is_empty() || p >= 0.5 {
+                let index = rng.gen_range(0..=w.ops.len());
+                if let Some(workload) = insert(&mut rng, &w, index, OperationKind::all()) {
+                    w = workload;
+                }
+            } else {
+                let index = rng.gen_range(0..w.ops.len());
+                if let Some(workload) = remove(&w, index) {
+                    w = workload;
+                }
+            }
+        }
     }
 }
