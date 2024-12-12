@@ -42,6 +42,14 @@ pub fn fuzz() {
     std::fs::remove_dir_all(temp_dir.as_path()).unwrap_or(());
     std::fs::create_dir(temp_dir.as_path()).unwrap_or(());
 
+    let executor_dir = Path::new("executor");
+    let makefile = "makefile";
+    let executor_h = "executor.h";
+    let executor_cpp = "executor.cpp";
+    std::fs::copy(executor_dir.join(makefile), temp_dir.join(makefile)).unwrap();
+    std::fs::copy(executor_dir.join(executor_h), temp_dir.join(executor_h)).unwrap();
+    std::fs::copy(executor_dir.join(executor_cpp), temp_dir.join(executor_cpp)).unwrap();
+
     let trace_path = temp_dir.join("trace.csv");
     let kcov_path = temp_dir.join("kcov.dat");
 
