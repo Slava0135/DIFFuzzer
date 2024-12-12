@@ -29,7 +29,7 @@ fn harness<T: FileSystemMount>(
     debug!("compiling test");
     let test_exec = input.compile(&test_dir)?;
     fs_mount.setup(&fs_dir)?;
-    let mut exec = Command::new(format!("./{}", test_exec.display()));
+    let mut exec = Command::new(test_exec.as_ref());
     exec.arg(fs_dir);
     debug!("running test executable '{:?}'", exec);
     let output = exec.output()?;
