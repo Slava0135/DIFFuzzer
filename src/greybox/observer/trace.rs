@@ -38,7 +38,7 @@ where
         _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), libafl::Error> {
-        debug!("observing trace");
+        debug!("observing trace at '{}'", self.trace_path.display());
         self.trace = None;
         self.trace = Some(Trace::try_parse(read_to_string(self.trace_path.as_ref())?)?);
         Ok(())

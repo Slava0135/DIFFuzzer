@@ -41,7 +41,7 @@ where
         _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), libafl::Error> {
-        debug!("observing kcov coverage");
+        debug!("observing kcov coverage at '{}'", self.kcov_path.display());
         self.coverage.clear();
         let kcov = File::open(self.kcov_path.as_ref())?;
         let reader = BufReader::new(kcov);
