@@ -1,15 +1,15 @@
 use std::{fmt::Display, fs, io, path::Path, process::Command};
 
-use log::info;
+use log::debug;
 
 const RAM_DISK_SIZE: usize = 1_000_000;
 const DEVICE: &str = "/dev/ram0";
 
 pub trait FileSystemMount: Display {
     fn setup(&self, path: &Path) -> io::Result<()> {
-        info!("setting up '{}' filesystem at '{}'", self, path.display());
+        debug!("setting up '{}' filesystem at '{}'", self, path.display());
 
-        info!("creating mountpoint at '{}'", path.display());
+        debug!("creating mountpoint at '{}'", path.display());
         fs::create_dir_all(path)?;
 
         let mut modprobe = Command::new("modprobe");
@@ -17,7 +17,7 @@ pub trait FileSystemMount: Display {
             .arg("brd")
             .arg("rd_nr=1")
             .arg(format!("rd_size={RAM_DISK_SIZE}"));
-        info!(
+        debug!(
             "loading block ram device module: {}",
             format!("{:?}", modprobe)
         );
@@ -25,34 +25,34 @@ pub trait FileSystemMount: Display {
 
         let mut mkfs = Command::new(Self::mkfs_cmd());
         mkfs.arg(DEVICE);
-        info!("creating fs: {}", format!("{:?}", mkfs));
+        debug!("creating fs: {}", format!("{:?}", mkfs));
         mkfs.output()?;
 
         let mut mount = Command::new("mount");
         mount.arg("-t").arg(Self::mount_t()).arg(DEVICE).arg(path);
-        info!("mounting fs: {}", format!("{:?}", mount));
+        debug!("mounting fs: {}", format!("{:?}", mount));
         mount.output()?;
 
         Ok(())
     }
 
     fn teardown(&self, path: &Path) -> io::Result<()> {
-        info!("tearing down '{}' filesystem at '{}'", self, path.display());
+        debug!("tearing down '{}' filesystem at '{}'", self, path.display());
 
         let mut umount = Command::new("umount");
         umount.arg("-fl").arg(path);
-        info!("unmounting fs: {}", format!("{:?}", umount));
+        debug!("unmounting fs: {}", format!("{:?}", umount));
         umount.output()?;
 
         let mut rmmod = Command::new("rmmod");
         rmmod.arg("brd").output()?;
-        info!(
+        debug!(
             "removing block ram device module: {}",
             format!("{:?}", rmmod)
         );
         rmmod.output()?;
 
-        info!("removing mountpoint at '{}'", path.display());
+        debug!("removing mountpoint at '{}'", path.display());
         fs::remove_dir_all(path)?;
 
         Ok(())
