@@ -56,7 +56,7 @@ where
 {
     fn mutate(&mut self, _state: &mut S, input: &mut Workload) -> Result<MutationResult, Error> {
         let p: f64 = self.rng.gen();
-        if p > 0.3 {
+        if input.ops.is_empty() || p > 0.3 {
             let index = self.rng.gen_range(0..=input.ops.len());
             if let Some(workload) = insert(&mut self.rng, &input, index, OperationKind::all()) {
                 *input = workload;
