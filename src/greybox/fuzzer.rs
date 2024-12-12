@@ -1,9 +1,4 @@
-use std::{
-    env,
-    num::NonZero,
-    path::Path,
-    time::Duration,
-};
+use std::{env, num::NonZero, path::Path, time::Duration};
 
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
@@ -59,6 +54,7 @@ pub fn fuzz() {
     let exec_dir = temp_dir.join("exec");
     let trace_path = exec_dir.join("trace.csv");
     let kcov_path = exec_dir.join("kcov.dat");
+    let crashes_dir = Path::new("./crashes").to_owned();
 
     let fst_trace_observer = TraceObserver::new(trace_path.clone().into_boxed_path());
     let snd_trace_observer = TraceObserver::new(trace_path.clone().into_boxed_path());
@@ -74,14 +70,14 @@ pub fn fuzz() {
         TraceObjective::new(fst_trace_observer.handle(), snd_trace_observer.handle()),
         SaveTestObjective::new(
             test_dir.clone().into_boxed_path(),
-            Path::new("./testcases").to_owned().into_boxed_path()
+            crashes_dir.clone().into_boxed_path()
         ),
     );
 
     let mut state = StdState::new(
         StdRand::with_seed(current_nanos()),
         InMemoryCorpus::<Workload>::new(),
-        OnDiskCorpus::new(Path::new("./crashes")).unwrap(),
+        OnDiskCorpus::new(crashes_dir.clone()).unwrap(),
         &mut feedback,
         &mut objective,
     )
