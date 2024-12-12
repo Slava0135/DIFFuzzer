@@ -42,7 +42,7 @@ pub fn fuzz() {
     info!("setting up temporary directory");
     let temp_dir = env::temp_dir().join("DIFFuzzer");
     std::fs::remove_dir_all(temp_dir.as_path()).unwrap_or(());
-    std::fs::create_dir(temp_dir.as_path()).unwrap_or(());
+    std::fs::create_dir(temp_dir.as_path()).unwrap();
 
     info!("copying executor to '{}'", temp_dir.display());
     let executor_dir = Path::new("executor");
@@ -54,8 +54,10 @@ pub fn fuzz() {
     std::fs::copy(executor_dir.join(executor_cpp), temp_dir.join(executor_cpp)).unwrap();
 
     info!("setting up fuzzing components");
-    let trace_path = temp_dir.join("trace.csv");
-    let kcov_path = temp_dir.join("kcov.dat");
+    let test_dir = temp_dir.clone();
+    let exec_dir = temp_dir.join("exec");
+    let trace_path = exec_dir.join("trace.csv");
+    let kcov_path = exec_dir.join("kcov.dat");
 
     let fst_trace_observer = TraceObserver::new(trace_path.clone().into_boxed_path());
     let snd_trace_observer = TraceObserver::new(trace_path.clone().into_boxed_path());
@@ -96,7 +98,8 @@ pub fn fuzz() {
             .join("ext4")
             .join("fstest")
             .into_boxed_path(),
-        temp_dir.clone().into_boxed_path(),
+        test_dir.clone().into_boxed_path(),
+        exec_dir.clone().into_boxed_path(),
     );
     let mut snd_harness = workload_harness(
         Btrfs::new(),
@@ -104,7 +107,8 @@ pub fn fuzz() {
             .join("btrfs")
             .join("fstest")
             .into_boxed_path(),
-        temp_dir.clone().into_boxed_path(),
+        test_dir.clone().into_boxed_path(),
+        exec_dir.clone().into_boxed_path(),
     );
 
     let timeout = Duration::new(10, 0);
