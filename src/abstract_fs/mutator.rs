@@ -137,8 +137,7 @@ mod tests {
     fn smoke_test_mutate() {
         let mut rng = StdRng::seed_from_u64(123);
         let mut w = generate_new(&mut rng, 3);
-        for i in 0..10000 {
-            println!("{}", i);
+        for _ in 0..10000 {
             let p: f64 = rng.gen();
             if w.ops.is_empty() || p >= 0.5 {
                 let index = rng.gen_range(0..=w.ops.len());
