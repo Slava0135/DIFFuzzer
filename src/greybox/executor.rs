@@ -44,6 +44,7 @@ fn harness<T: FileSystemMount>(
 
     let mut exec = Command::new(test_exec_copy);
     exec.arg(fs_dir);
+    exec.current_dir(exec_dir);
     debug!("running test executable '{:?}'", exec);
     let output = exec.output()?;
 
