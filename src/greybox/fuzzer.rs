@@ -1,7 +1,7 @@
 use std::{
     env,
     num::NonZero,
-    path::{Path, PathBuf},
+    path::Path,
     time::Duration,
 };
 
@@ -9,7 +9,7 @@ use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
     executors::{DiffExecutor, InProcessExecutor},
-    feedback_or,
+    feedback_and, feedback_or,
     monitors::SimpleMonitor,
     schedulers::QueueScheduler,
     stages::StdMutationalStage,
@@ -26,6 +26,7 @@ use rand::{rngs::StdRng, SeedableRng};
 
 use crate::{
     abstract_fs::types::Workload,
+    greybox::objective::save_test::SaveTestObjective,
     mount::{btrfs::Btrfs, ext4::Ext4},
 };
 
@@ -69,13 +70,18 @@ pub fn fuzz() {
     let snd_kcov_feedback = KCovFeedback::new(snd_kcov_observer.handle());
 
     let mut feedback = feedback_or!(fst_kcov_feedback, snd_kcov_feedback);
-    let mut objective =
-        TraceObjective::new(fst_trace_observer.handle(), snd_trace_observer.handle());
+    let mut objective = feedback_and!(
+        TraceObjective::new(fst_trace_observer.handle(), snd_trace_observer.handle()),
+        SaveTestObjective::new(
+            test_dir.clone().into_boxed_path(),
+            Path::new("./testcases").to_owned().into_boxed_path()
+        ),
+    );
 
     let mut state = StdState::new(
         StdRand::with_seed(current_nanos()),
         InMemoryCorpus::<Workload>::new(),
-        OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
+        OnDiskCorpus::new(Path::new("./crashes")).unwrap(),
         &mut feedback,
         &mut objective,
     )
