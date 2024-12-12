@@ -6,10 +6,10 @@ type Result<T> = std::result::Result<T, ExecutorError>;
 
 #[derive(Debug)]
 pub enum ExecutorError {
-    NotADir,
-    SameName,
+    NotADir(String),
+    SameName(String),
     RemoveRoot,
-    NotFound,
+    NotFound(String),
 }
 
 impl AbstractExecutor {
@@ -58,7 +58,7 @@ impl AbstractExecutor {
 
     pub fn mkdir(&mut self, parent: &DirIndex, name: Name, mode: Mode) -> Result<DirIndex> {
         if self.name_exists(&parent, &name) {
-            return Err(ExecutorError::SameName);
+            return Err(ExecutorError::SameName(name));
         }
         let dir = Dir {
             parent: Some(parent.clone()),
@@ -79,7 +79,7 @@ impl AbstractExecutor {
 
     pub fn create(&mut self, parent: &DirIndex, name: Name, mode: Mode) -> Result<FileIndex> {
         if self.name_exists(&parent, &name) {
-            return Err(ExecutorError::SameName);
+            return Err(ExecutorError::SameName(name));
         }
         let file = File {
             parent: parent.clone(),
@@ -122,7 +122,7 @@ impl AbstractExecutor {
         let name = &path[split_at + 1..];
         let parent = match self.resolve_node(parent_path.to_owned())? {
             Node::DIR(dir_index) => dir_index,
-            _ => return Err(ExecutorError::NotADir),
+            _ => return Err(ExecutorError::NotADir(parent_path.to_owned())),
         };
         self.mkdir(&parent, name.to_owned(), mode)
     }
@@ -133,7 +133,7 @@ impl AbstractExecutor {
         let name = &path[split_at + 1..];
         let parent = match self.resolve_node(parent_path.to_owned())? {
             Node::DIR(dir_index) => dir_index,
-            _ => return Err(ExecutorError::NotADir),
+            _ => return Err(ExecutorError::NotADir(parent_path.to_owned())),
         };
         self.create(&parent, name.to_owned(), mode)
     }
@@ -169,15 +169,15 @@ impl AbstractExecutor {
     pub fn resolve_node(&self, path: PathName) -> Result<Node> {
         let mut last = Node::DIR(AbstractExecutor::root_index());
         let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
-        for segment in segments {
+        for segment in &segments {
             let dir = match last {
                 Node::DIR(dir_index) => self.dir(&dir_index),
-                _ => return Err(ExecutorError::NotADir),
+                _ => return Err(ExecutorError::NotADir(segments.concat())),
             };
             last = dir
                 .children
-                .get(segment)
-                .ok_or(ExecutorError::NotFound)?
+                .get(segment.to_owned())
+                .ok_or(ExecutorError::NotFound(segments.concat()))?
                 .clone();
         }
         Ok(last)
