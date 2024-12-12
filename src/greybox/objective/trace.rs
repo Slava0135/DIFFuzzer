@@ -53,7 +53,7 @@ where
             .trace
             .clone();
         match (fst_trace, snd_trace) {
-            (Some(fst_trace), Some(snd_trace)) => Ok(fst_trace.same_as(snd_trace)),
+            (Some(fst_trace), Some(snd_trace)) => Ok(!fst_trace.same_as(snd_trace)),
             (None, None) => Ok(false),
             _ => Ok(true),
         }
