@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use rand::{
     seq::{IteratorRandom, SliceRandom},
     Rng,
@@ -15,12 +13,12 @@ pub enum OperationKind {
 }
 
 impl OperationKind {
-    pub fn all() -> HashSet<Self> {
-        HashSet::from([
+    pub fn all() -> Vec<Self> {
+        vec![
             OperationKind::CREATE,
             OperationKind::MKDIR,
             OperationKind::REMOVE,
-        ])
+        ]
     }
 }
 
@@ -35,7 +33,7 @@ pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
 pub fn append_one(
     rng: &mut impl Rng,
     executor: &mut AbstractExecutor,
-    pick_from: HashSet<OperationKind>,
+    pick_from: Vec<OperationKind>,
 ) {
     let mode = vec![
         ModeFlag::S_IRWXU,
@@ -56,11 +54,11 @@ pub fn append_one(
         .filter(|&&d| d != AbstractExecutor::root_index())
         .map(|d| d.clone())
         .collect();
-    let mut banned_ops = HashSet::new();
+    let mut ops = pick_from;
     if alive_dirs_except_root.is_empty() {
-        banned_ops.insert(OperationKind::REMOVE);
+        ops.retain(|it| *it != OperationKind::REMOVE);
     }
-    match pick_from.difference(&banned_ops).choose(rng).unwrap() {
+    match ops.choose(rng).unwrap() {
         OperationKind::MKDIR => {
             executor
                 .mkdir(

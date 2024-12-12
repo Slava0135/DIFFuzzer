@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use rand::Rng;
 
 use super::{
@@ -22,7 +20,7 @@ pub fn insert(
     rng: &mut impl Rng,
     workload: &Workload,
     index: usize,
-    pick_from: HashSet<OperationKind>,
+    pick_from: Vec<OperationKind>,
 ) -> Option<Workload> {
     let (before, after) = workload.ops.split_at(index);
     let mut exec = AbstractExecutor::new();
@@ -110,7 +108,7 @@ mod tests {
         };
         assert_eq!(
             None,
-            insert(&mut rng, &w, 1, HashSet::from([OperationKind::REMOVE]))
+            insert(&mut rng, &w, 1, vec![OperationKind::REMOVE])
         );
         assert_eq!(
             Some(Workload {
@@ -131,7 +129,7 @@ mod tests {
                     },
                 ],
             }),
-            insert(&mut rng, &w, 3, HashSet::from([OperationKind::REMOVE]))
+            insert(&mut rng, &w, 3, vec![OperationKind::REMOVE])
         );
     }
 
@@ -139,7 +137,8 @@ mod tests {
     fn smoke_test_mutate() {
         let mut rng = StdRng::seed_from_u64(123);
         let mut w = generate_new(&mut rng, 3);
-        for _ in 0..10000 {
+        for i in 0..10000 {
+            println!("{}", i);
             let p: f64 = rng.gen();
             if w.ops.is_empty() || p >= 0.5 {
                 let index = rng.gen_range(0..=w.ops.len());
