@@ -24,10 +24,10 @@ use crate::{
     config::Config,
     greybox::objective::{self, console::ConsoleObjective, save_test::SaveTestObjective},
     mount::{btrfs::Btrfs, ext4::Ext4},
+    utils::harness::workload_harness
 };
 
 use super::{
-    executor::workload_harness,
     feedback::kcov::KCovFeedback,
     input::WorkloadMutator,
     objective::trace::TraceObjective,
