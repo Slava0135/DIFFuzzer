@@ -1,7 +1,7 @@
 use std::{path::Path, process::Command};
 
 use libafl::executors::ExitKind;
-use log::error;
+use log::{debug, error};
 
 use crate::{abstract_fs::types::Workload, mount::mount::FileSystemMount};
 
@@ -25,10 +25,13 @@ fn harness<T: FileSystemMount>(
     fs_dir: &Path,
     test_dir: &Path,
 ) -> Result<ExitKind, libafl::Error> {
+    debug!("executing harness");
+    debug!("compiling test");
     let test_exec = input.compile(&test_dir)?;
     fs_mount.setup(&fs_dir)?;
     let mut exec = Command::new(format!("./{}", test_exec.display()));
     exec.arg(fs_dir);
+    debug!("running test executable '{:?}'", exec);
     let output = exec.output()?;
     fs_mount.teardown(&fs_dir)?;
     if output.status.success() {

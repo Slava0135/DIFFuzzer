@@ -8,6 +8,7 @@ use libafl_bolts::{
     tuples::{Handle, MatchNameRef},
     Named,
 };
+use log::debug;
 
 use crate::{abstract_fs::types::Workload, greybox::observer::trace::TraceObserver};
 
@@ -40,6 +41,7 @@ where
         observers: &OT,
         _exit_kind: &libafl::executors::ExitKind,
     ) -> Result<bool, libafl::Error> {
+        debug!("do trace objective");
         let fst_trace = observers
             .get(&self.fst_observer)
             .expect("failed to get first trace observer")

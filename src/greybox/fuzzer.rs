@@ -38,10 +38,13 @@ use super::{
 };
 
 pub fn fuzz() {
+    info!("running greybox fuzzing");
+    info!("setting up temporary directory");
     let temp_dir = env::temp_dir().join("DIFFuzzer");
     std::fs::remove_dir_all(temp_dir.as_path()).unwrap_or(());
     std::fs::create_dir(temp_dir.as_path()).unwrap_or(());
 
+    info!("copying executor to '{}'", temp_dir.display());
     let executor_dir = Path::new("executor");
     let makefile = "makefile";
     let executor_h = "executor.h";
@@ -50,6 +53,7 @@ pub fn fuzz() {
     std::fs::copy(executor_dir.join(executor_h), temp_dir.join(executor_h)).unwrap();
     std::fs::copy(executor_dir.join(executor_cpp), temp_dir.join(executor_cpp)).unwrap();
 
+    info!("setting up fuzzing components");
     let trace_path = temp_dir.join("trace.csv");
     let kcov_path = temp_dir.join("kcov.dat");
 
@@ -131,6 +135,7 @@ pub fn fuzz() {
         NonZero::new(10).unwrap()
     ));
 
+    info!("starting fuzzing loop");
     loop {
         match fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut manager) {
             Ok(_) => break,

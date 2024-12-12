@@ -8,6 +8,7 @@ use libafl_bolts::{
     tuples::{Handle, MatchNameRef},
     Named,
 };
+use log::debug;
 
 use crate::{abstract_fs::types::Workload, greybox::observer::kcov::KCovObserver};
 
@@ -40,6 +41,7 @@ where
         observers: &OT,
         _exit_kind: &libafl::executors::ExitKind,
     ) -> Result<bool, libafl::Error> {
+        debug!("do kcov feedback");
         let coverage = &observers
             .get(&self.observer)
             .expect("failed to get kcov observer")

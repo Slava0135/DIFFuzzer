@@ -2,6 +2,7 @@ use std::{borrow::Cow, fs::read_to_string, path::Path};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::Observer};
 use libafl_bolts::{ErrorBacktrace, Named};
+use log::debug;
 use serde::{Deserialize, Serialize};
 
 use crate::abstract_fs::trace::{Trace, TraceError};
@@ -37,6 +38,7 @@ where
         _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), libafl::Error> {
+        debug!("observing trace");
         self.trace = None;
         self.trace = Some(Trace::try_parse(read_to_string(self.trace_path.as_ref())?)?);
         Ok(())

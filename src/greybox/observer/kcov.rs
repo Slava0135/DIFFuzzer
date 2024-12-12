@@ -8,6 +8,7 @@ use std::{
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::Observer};
 use libafl_bolts::Named;
+use log::debug;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -40,6 +41,7 @@ where
         _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), libafl::Error> {
+        debug!("observing kcov coverage");
         self.coverage.clear();
         let kcov = File::open(self.kcov_path.as_ref())?;
         let reader = BufReader::new(kcov);

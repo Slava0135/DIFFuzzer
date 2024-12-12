@@ -12,6 +12,7 @@ use libafl::{
     Error,
 };
 use libafl_bolts::Named;
+use log::debug;
 use rand::{rngs::StdRng, Rng};
 
 use crate::abstract_fs::{
@@ -55,6 +56,7 @@ where
     S: HasRand,
 {
     fn mutate(&mut self, _state: &mut S, input: &mut Workload) -> Result<MutationResult, Error> {
+        debug!("mutating input");
         let p: f64 = self.rng.gen();
         if input.ops.is_empty() || p > 0.3 {
             let index = self.rng.gen_range(0..=input.ops.len());
