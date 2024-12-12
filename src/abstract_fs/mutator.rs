@@ -1,8 +1,10 @@
+use std::collections::HashSet;
+
 use rand::Rng;
 
 use super::{
     generator::{append_one, OperationKind},
-    types::{AbstractExecutor, Workload},
+    types::{AbstractExecutor, Operation, Workload},
 };
 
 pub fn remove(workload: &Workload, index: usize) -> Option<Workload> {
@@ -22,6 +24,23 @@ pub fn insert(
     index: usize,
     pick_from: Vec<OperationKind>,
 ) -> Option<Workload> {
+    let mut used_names = HashSet::new();
+    for op in workload.ops.iter() {
+        match op {
+            Operation::MKDIR { path, mode: _ } => {
+                for segment in path.split("/") {
+                    used_names.insert(segment);
+                }
+            }
+            Operation::CREATE { path, mode: _ } => {
+                for segment in path.split("/") {
+                    used_names.insert(segment);
+                }
+            }
+            Operation::REMOVE { path: _ } => {}
+        }
+    }
+
     let (before, after) = workload.ops.split_at(index);
     let mut exec = AbstractExecutor::new();
     if !exec
@@ -32,7 +51,16 @@ pub fn insert(
     {
         return None;
     }
-    append_one(rng, &mut exec, pick_from);
+
+    let mut name_idx: usize = 0;
+    let mut gen_name = || loop {
+        let name = name_idx.to_string();
+        name_idx += 1;
+        if !used_names.contains(name.as_str()) {
+            break name;
+        }
+    };
+    append_one(rng, &mut exec, pick_from, &mut gen_name);
     if !exec
         .replay(&Workload {
             ops: after.to_vec(),
@@ -106,10 +134,7 @@ mod tests {
                 },
             ],
         };
-        assert_eq!(
-            None,
-            insert(&mut rng, &w, 1, vec![OperationKind::REMOVE])
-        );
+        assert_eq!(None, insert(&mut rng, &w, 1, vec![OperationKind::REMOVE]));
         assert_eq!(
             Some(Workload {
                 ops: vec![
@@ -136,8 +161,8 @@ mod tests {
     #[test]
     fn smoke_test_mutate() {
         let mut rng = StdRng::seed_from_u64(123);
-        let mut w = generate_new(&mut rng, 3);
-        for _ in 0..10000 {
+        let mut w = generate_new(&mut rng, 100);
+        for _ in 0..1000 {
             let p: f64 = rng.gen();
             if w.ops.is_empty() || p >= 0.5 {
                 let index = rng.gen_range(0..=w.ops.len());

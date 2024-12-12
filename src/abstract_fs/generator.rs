@@ -5,6 +5,8 @@ use rand::{
 
 use crate::abstract_fs::types::{AbstractExecutor, DirIndex, ModeFlag, Node, Workload};
 
+use super::types::Name;
+
 #[derive(PartialEq, Eq, Hash)]
 pub enum OperationKind {
     MKDIR,
@@ -24,8 +26,14 @@ impl OperationKind {
 
 pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
     let mut executor = AbstractExecutor::new();
+    let mut name_idx: usize = 0;
+    let mut gen_name = || {
+        let name = name_idx.to_string();
+        name_idx += 1;
+        name
+    };
     for _ in 0..size {
-        append_one(rng, &mut executor, OperationKind::all());
+        append_one(rng, &mut executor, OperationKind::all(), &mut gen_name);
     }
     executor.recording
 }
@@ -34,6 +42,7 @@ pub fn append_one(
     rng: &mut impl Rng,
     executor: &mut AbstractExecutor,
     pick_from: Vec<OperationKind>,
+    mut gen_name: impl FnMut() -> Name,
 ) {
     let mode = vec![
         ModeFlag::S_IRWXU,
@@ -61,20 +70,12 @@ pub fn append_one(
     match ops.choose(rng).unwrap() {
         OperationKind::MKDIR => {
             executor
-                .mkdir(
-                    alive_dirs.choose(rng).unwrap(),
-                    executor.nodes_created.to_string(),
-                    mode.clone(),
-                )
+                .mkdir(alive_dirs.choose(rng).unwrap(), gen_name(), mode.clone())
                 .unwrap();
         }
         OperationKind::CREATE => {
             executor
-                .create(
-                    alive_dirs.choose(rng).unwrap(),
-                    executor.nodes_created.to_string(),
-                    mode.clone(),
-                )
+                .create(alive_dirs.choose(rng).unwrap(), gen_name(), mode.clone())
                 .unwrap();
         }
         OperationKind::REMOVE => {
