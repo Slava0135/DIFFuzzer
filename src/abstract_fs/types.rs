@@ -171,6 +171,23 @@ pub enum Operation {
     REMOVE { path: PathName },
 }
 
+#[derive(PartialEq, Eq, Hash)]
+pub enum OperationKind {
+    MKDIR,
+    CREATE,
+    REMOVE,
+}
+
+impl OperationKind {
+    pub fn all() -> Vec<Self> {
+        vec![
+            OperationKind::CREATE,
+            OperationKind::MKDIR,
+            OperationKind::REMOVE,
+        ]
+    }
+}
+
 #[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize, SerdeAny)]
 pub struct Workload {
     pub ops: Vec<Operation>,

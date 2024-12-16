@@ -16,9 +16,9 @@ use log::debug;
 use rand::{rngs::StdRng, Rng};
 
 use crate::abstract_fs::{
-    generator::{generate_new, OperationKind},
+    generator::generate_new,
     mutator::{insert, remove},
-    types::Workload,
+    types::{OperationKind, Workload},
 };
 
 impl Input for Workload {

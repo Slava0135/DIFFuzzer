@@ -3,8 +3,8 @@ use std::collections::HashSet;
 use rand::Rng;
 
 use super::{
-    generator::{append_one, OperationKind},
-    types::{AbstractExecutor, Operation, Workload},
+    generator::append_one,
+    types::{AbstractExecutor, Operation, OperationKind, Workload},
 };
 
 pub fn remove(workload: &Workload, index: usize) -> Option<Workload> {

@@ -5,24 +5,7 @@ use rand::{
 
 use crate::abstract_fs::types::{AbstractExecutor, DirIndex, ModeFlag, Node, Workload};
 
-use super::types::Name;
-
-#[derive(PartialEq, Eq, Hash)]
-pub enum OperationKind {
-    MKDIR,
-    CREATE,
-    REMOVE,
-}
-
-impl OperationKind {
-    pub fn all() -> Vec<Self> {
-        vec![
-            OperationKind::CREATE,
-            OperationKind::MKDIR,
-            OperationKind::REMOVE,
-        ]
-    }
-}
+use super::types::{Name, OperationKind};
 
 pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
     let mut executor = AbstractExecutor::new();
