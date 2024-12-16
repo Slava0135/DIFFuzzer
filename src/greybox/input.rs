@@ -13,12 +13,12 @@ use libafl::{
 };
 use libafl_bolts::Named;
 use log::debug;
-use rand::{rngs::StdRng, Rng};
+use rand::{rngs::StdRng, seq::SliceRandom, Rng};
 
 use crate::abstract_fs::{
     generator::generate_new,
     mutator::{insert, remove},
-    types::{OperationWeights, Workload},
+    types::{MutationKind, MutationWeights, OperationWeights, Workload},
 };
 
 impl Input for Workload {
@@ -44,12 +44,21 @@ impl<S> Generator<Workload, S> for WorkloadGenerator {
 
 pub struct WorkloadMutator {
     pub rng: StdRng,
-    pub weights: OperationWeights,
+    pub operation_weights: OperationWeights,
+    pub mutation_weights: MutationWeights,
 }
 
 impl WorkloadMutator {
-    pub fn new(rng: StdRng, weights: OperationWeights) -> Self {
-        Self { rng, weights }
+    pub fn new(
+        rng: StdRng,
+        operation_weights: OperationWeights,
+        mutation_weights: MutationWeights,
+    ) -> Self {
+        Self {
+            rng,
+            operation_weights,
+            mutation_weights,
+        }
     }
 }
 
@@ -59,22 +68,37 @@ where
 {
     fn mutate(&mut self, _state: &mut S, input: &mut Workload) -> Result<MutationResult, Error> {
         debug!("mutating input");
-        let p: f64 = self.rng.gen();
-        if input.ops.is_empty() || p > 0.3 {
-            let index = self.rng.gen_range(0..=input.ops.len());
-            if let Some(workload) = insert(&mut self.rng, &input, index, &self.weights) {
-                *input = workload;
-                Ok(MutationResult::Mutated)
-            } else {
-                Ok(MutationResult::Skipped)
+        let mut mutations = self.mutation_weights.clone();
+        if input.ops.is_empty() {
+            mutations
+                .weights
+                .retain(|(op, _)| *op != MutationKind::REMOVE);
+        }
+        match mutations
+            .weights
+            .choose_weighted(&mut self.rng, |item| item.1)
+            .unwrap()
+            .0
+        {
+            MutationKind::INSERT => {
+                let index = self.rng.gen_range(0..=input.ops.len());
+                if let Some(workload) =
+                    insert(&mut self.rng, &input, index, &self.operation_weights)
+                {
+                    *input = workload;
+                    Ok(MutationResult::Mutated)
+                } else {
+                    Ok(MutationResult::Skipped)
+                }
             }
-        } else {
-            let index = self.rng.gen_range(0..input.ops.len());
-            if let Some(workload) = remove(&input, index) {
-                *input = workload;
-                Ok(MutationResult::Mutated)
-            } else {
-                Ok(MutationResult::Skipped)
+            MutationKind::REMOVE => {
+                let index = self.rng.gen_range(0..input.ops.len());
+                if let Some(workload) = remove(&input, index) {
+                    *input = workload;
+                    Ok(MutationResult::Mutated)
+                } else {
+                    Ok(MutationResult::Skipped)
+                }
             }
         }
     }

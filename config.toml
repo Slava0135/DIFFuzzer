@@ -14,3 +14,16 @@ weights = [
     100,
   ],
 ]
+
+[mutation_weights]
+
+weights = [
+  [
+    "INSERT",
+    100,
+  ],
+  [
+    "REMOVE",
+    30,
+  ],
+]
