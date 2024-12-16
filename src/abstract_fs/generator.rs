@@ -5,7 +5,7 @@ use rand::{
 
 use crate::abstract_fs::types::{AbstractExecutor, DirIndex, ModeFlag, Node, Workload};
 
-use super::types::{Name, OperationKind};
+use super::types::{Name, OperationKind, OperationWeights};
 
 pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
     let mut executor = AbstractExecutor::new();
@@ -16,7 +16,7 @@ pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
         name
     };
     for _ in 0..size {
-        append_one(rng, &mut executor, OperationKind::all(), &mut gen_name);
+        append_one(rng, &mut executor, OperationKind::uniform(), &mut gen_name);
     }
     executor.recording
 }
@@ -24,7 +24,7 @@ pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
 pub fn append_one(
     rng: &mut impl Rng,
     executor: &mut AbstractExecutor,
-    pick_from: Vec<OperationKind>,
+    weights: OperationWeights,
     mut gen_name: impl FnMut() -> Name,
 ) {
     let mode = vec![
@@ -46,11 +46,11 @@ pub fn append_one(
         .filter(|&&d| d != AbstractExecutor::root_index())
         .map(|d| d.clone())
         .collect();
-    let mut ops = pick_from;
+    let mut ops = weights;
     if alive_dirs_except_root.is_empty() {
-        ops.retain(|it| *it != OperationKind::REMOVE);
+        ops.retain(|(op, _)| *op != OperationKind::REMOVE);
     }
-    match ops.choose(rng).unwrap() {
+    match ops.choose_weighted(rng, |item| item.1).unwrap().0 {
         OperationKind::MKDIR => {
             executor
                 .mkdir(alive_dirs.choose(rng).unwrap(), gen_name(), mode.clone())
