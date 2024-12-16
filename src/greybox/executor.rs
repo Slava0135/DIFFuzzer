@@ -15,7 +15,7 @@ pub fn workload_harness<T: FileSystemMount>(
         Ok(exit) => exit,
         Err(err) => {
             error!("{err:?}");
-            ExitKind::Crash
+            panic!("{err:?}");
         }
     };
 }
