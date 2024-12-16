@@ -144,7 +144,7 @@ pub fn fuzz(config: Config) {
     );
     let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(
         mutator,
-        NonZero::new(10).unwrap()
+        NonZero::new(config.max_mutations.into()).unwrap()
     ));
 
     info!("starting fuzzing loop");
