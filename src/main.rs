@@ -18,8 +18,7 @@ fn main() {
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();
     info!("logger initialized");
     info!("reading configuration");
-    let config = fs::read_to_string(args.config_path)
-        .expect("failed to read configuration file");
+    let config = fs::read_to_string(args.config_path).expect("failed to read configuration file");
     let config: Config = toml::from_str(&config).expect("bad configuration");
     fuzz(config);
 }
