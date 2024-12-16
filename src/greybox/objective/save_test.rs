@@ -67,7 +67,7 @@ where
             self.test_dir.join(TEST_EXE_FILENAME),
             path.with_extension("out"),
         )?;
-        match serde_json::to_string(input) {
+        match serde_json::to_string_pretty(input) {
             Ok(json) => std::fs::write(path.with_extension("json"), json)?,
             Err(err) => {
                 return Err(libafl::Error::Serialize(
