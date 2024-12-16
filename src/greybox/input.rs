@@ -46,6 +46,7 @@ pub struct WorkloadMutator {
     pub rng: StdRng,
     pub operation_weights: OperationWeights,
     pub mutation_weights: MutationWeights,
+    pub max_length: u16,
 }
 
 impl WorkloadMutator {
@@ -53,11 +54,13 @@ impl WorkloadMutator {
         rng: StdRng,
         operation_weights: OperationWeights,
         mutation_weights: MutationWeights,
+        max_length: u16,
     ) -> Self {
         Self {
             rng,
             operation_weights,
             mutation_weights,
+            max_length,
         }
     }
 }
@@ -73,6 +76,11 @@ where
             mutations
                 .weights
                 .retain(|(op, _)| *op != MutationKind::REMOVE);
+        }
+        if input.ops.len() >= self.max_length.into() {
+            mutations
+                .weights
+                .retain(|(op, _)| *op != MutationKind::INSERT);
         }
         match mutations
             .weights

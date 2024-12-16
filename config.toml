@@ -1,5 +1,6 @@
-[operation_weights]
+max_workload_length = 100
 
+[operation_weights]
 weights = [
   [
     "CREATE",
@@ -16,7 +17,6 @@ weights = [
 ]
 
 [mutation_weights]
-
 weights = [
   [
     "INSERT",
