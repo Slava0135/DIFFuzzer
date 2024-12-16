@@ -24,8 +24,9 @@ use crate::{
     config::Config,
     greybox::objective::{self, console::ConsoleObjective, save_test::SaveTestObjective},
     mount::{btrfs::Btrfs, ext4::Ext4},
-    utils::harness::workload_harness
+    utils::harness::workload_harness,
 };
+use crate::utils::temp_dir_actions::get_temp_dir;
 
 use super::{
     feedback::kcov::KCovFeedback,
@@ -37,18 +38,7 @@ use super::{
 pub fn fuzz(config: Config) {
     info!("running greybox fuzzing");
     info!("setting up temporary directory");
-    let temp_dir = env::temp_dir().join("DIFFuzzer");
-    std::fs::remove_dir_all(temp_dir.as_path()).unwrap_or(());
-    std::fs::create_dir(temp_dir.as_path()).unwrap();
-
-    info!("copying executor to '{}'", temp_dir.display());
-    let executor_dir = Path::new("executor");
-    let makefile = "makefile";
-    let executor_h = "executor.h";
-    let executor_cpp = "executor.cpp";
-    std::fs::copy(executor_dir.join(makefile), temp_dir.join(makefile)).unwrap();
-    std::fs::copy(executor_dir.join(executor_h), temp_dir.join(executor_h)).unwrap();
-    std::fs::copy(executor_dir.join(executor_cpp), temp_dir.join(executor_cpp)).unwrap();
+    let temp_dir = get_temp_dir();
 
     info!("setting up fuzzing components");
     let test_dir = temp_dir.clone();
@@ -97,7 +87,7 @@ pub fn fuzz(config: Config) {
         &mut feedback,
         &mut objective,
     )
-    .unwrap();
+        .unwrap();
 
     state
         .corpus_mut()
@@ -142,7 +132,7 @@ pub fn fuzz(config: Config) {
         &mut manager,
         timeout,
     )
-    .unwrap();
+        .unwrap();
     let snd_executor = InProcessExecutor::with_timeout(
         &mut snd_harness,
         tuple_list!(snd_kcov_observer, snd_trace_observer),
@@ -151,7 +141,7 @@ pub fn fuzz(config: Config) {
         &mut manager,
         timeout,
     )
-    .unwrap();
+        .unwrap();
 
     let mut executor = DiffExecutor::new(fst_executor, snd_executor, tuple_list!());
 

@@ -4,8 +4,7 @@ use libafl::executors::ExitKind;
 use log::{debug, error};
 
 use crate::{abstract_fs::types::Workload, mount::mount::FileSystemMount};
-
-use super::objective::console::ConsolePipe;
+use crate::abstract_fs::types::ConsolePipe;
 
 pub fn workload_harness<T: FileSystemMount>(
     fs_mount: T,
