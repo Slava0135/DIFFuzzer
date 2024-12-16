@@ -171,6 +171,34 @@ pub enum Operation {
     REMOVE { path: PathName },
 }
 
+#[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Copy)]
+pub enum OperationKind {
+    MKDIR,
+    CREATE,
+    REMOVE,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct OperationWeights {
+    pub weights: Vec<(OperationKind, u32)>,
+}
+
+impl OperationWeights {
+    pub fn new(weights: Vec<(OperationKind, u32)>) -> Self {
+        Self { weights }
+    }
+
+    pub fn uniform() -> Self {
+        Self {
+            weights: vec![
+                (OperationKind::CREATE, 100),
+                (OperationKind::MKDIR, 100),
+                (OperationKind::REMOVE, 100),
+            ],
+        }
+    }
+}
+
 #[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize, SerdeAny)]
 pub struct Workload {
     pub ops: Vec<Operation>,

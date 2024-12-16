@@ -3,8 +3,8 @@ use std::collections::HashSet;
 use rand::Rng;
 
 use super::{
-    generator::{append_one, OperationKind},
-    types::{AbstractExecutor, Operation, Workload},
+    generator::append_one,
+    types::{AbstractExecutor, Operation, OperationWeights, Workload},
 };
 
 pub fn remove(workload: &Workload, index: usize) -> Option<Workload> {
@@ -22,7 +22,7 @@ pub fn insert(
     rng: &mut impl Rng,
     workload: &Workload,
     index: usize,
-    pick_from: Vec<OperationKind>,
+    weights: &OperationWeights,
 ) -> Option<Workload> {
     let mut used_names = HashSet::new();
     for op in workload.ops.iter() {
@@ -60,7 +60,7 @@ pub fn insert(
             break name;
         }
     };
-    append_one(rng, &mut exec, pick_from, &mut gen_name);
+    append_one(rng, &mut exec, weights, &mut gen_name);
     if !exec
         .replay(&Workload {
             ops: after.to_vec(),
@@ -76,7 +76,10 @@ pub fn insert(
 mod tests {
     use rand::{rngs::StdRng, SeedableRng};
 
-    use crate::abstract_fs::{generator::generate_new, types::Operation};
+    use crate::abstract_fs::{
+        generator::generate_new,
+        types::{Operation, OperationKind},
+    };
 
     use super::*;
 
@@ -134,7 +137,15 @@ mod tests {
                 },
             ],
         };
-        assert_eq!(None, insert(&mut rng, &w, 1, vec![OperationKind::REMOVE]));
+        assert_eq!(
+            None,
+            insert(
+                &mut rng,
+                &w,
+                1,
+                &OperationWeights::new(vec![(OperationKind::REMOVE, 100)])
+            )
+        );
         assert_eq!(
             Some(Workload {
                 ops: vec![
@@ -154,19 +165,24 @@ mod tests {
                     },
                 ],
             }),
-            insert(&mut rng, &w, 3, vec![OperationKind::REMOVE])
+            insert(
+                &mut rng,
+                &w,
+                3,
+                &OperationWeights::new(vec![(OperationKind::REMOVE, 100)])
+            )
         );
     }
 
     #[test]
     fn smoke_test_mutate() {
         let mut rng = StdRng::seed_from_u64(123);
-        let mut w = generate_new(&mut rng, 100);
+        let mut w = generate_new(&mut rng, 100, &OperationWeights::uniform());
         for _ in 0..1000 {
             let p: f64 = rng.gen();
             if w.ops.is_empty() || p >= 0.5 {
                 let index = rng.gen_range(0..=w.ops.len());
-                if let Some(workload) = insert(&mut rng, &w, index, OperationKind::all()) {
+                if let Some(workload) = insert(&mut rng, &w, index, &OperationWeights::uniform()) {
                     w = workload;
                 }
             } else {

@@ -1,0 +1,16 @@
+[operation_weights]
+
+weights = [
+  [
+    "CREATE",
+    100,
+  ],
+  [
+    "MKDIR",
+    100,
+  ],
+  [
+    "REMOVE",
+    100,
+  ],
+]
