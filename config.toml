@@ -1,5 +1,8 @@
-[operation_weights]
+[greybox]
+max_workload_length = 100
+max_mutations = 10
 
+[operation_weights]
 weights = [
   [
     "CREATE",
@@ -12,5 +15,17 @@ weights = [
   [
     "REMOVE",
     100,
+  ],
+]
+
+[mutation_weights]
+weights = [
+  [
+    "INSERT",
+    100,
+  ],
+  [
+    "REMOVE",
+    30,
   ],
 ]

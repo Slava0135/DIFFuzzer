@@ -199,6 +199,23 @@ impl OperationWeights {
     }
 }
 
+#[derive(PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
+pub enum MutationKind {
+    INSERT,
+    REMOVE,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct MutationWeights {
+    pub weights: Vec<(MutationKind, u32)>,
+}
+
+impl MutationWeights {
+    pub fn new(weights: Vec<(MutationKind, u32)>) -> Self {
+        Self { weights }
+    }
+}
+
 #[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize, SerdeAny)]
 pub struct Workload {
     pub ops: Vec<Operation>,
