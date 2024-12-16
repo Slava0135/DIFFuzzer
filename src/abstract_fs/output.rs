@@ -4,8 +4,8 @@ use regex::Regex;
 
 #[derive(Debug, PartialEq)]
 pub struct Output {
-    success_n: u16,
-    failure_n: u16,
+    pub success_n: u16,
+    pub failure_n: u16,
 }
 
 type Result<T> = std::result::Result<T, OutputError>;

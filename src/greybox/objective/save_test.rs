@@ -3,9 +3,9 @@ use std::{borrow::Cow, path::Path};
 use libafl::{
     feedbacks::{Feedback, StateInitializer},
     inputs::Input,
-    state::State,
+    state::State, HasMetadata,
 };
-use libafl_bolts::{tuples::MatchNameRef, Named};
+use libafl_bolts::{tuples::MatchNameRef, ErrorBacktrace, Named};
 
 use crate::abstract_fs::{
     compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME},
@@ -56,15 +56,27 @@ where
         _observers: &OT,
         testcase: &mut libafl::corpus::Testcase<Workload>,
     ) -> Result<(), libafl::Error> {
-        let name = testcase.input().as_ref().unwrap().generate_name(None);
+        let input = testcase.input().as_ref().unwrap().clone();
+        testcase.metadata_map_mut().insert(input.clone());
+        let name = input.generate_name(None);
+        let path = self.saved_test_dir.join(name.clone());
         std::fs::copy(
             self.test_dir.join(TEST_SOURCE_FILENAME),
-            self.saved_test_dir.join(name.clone() + ".c"),
+            path.with_extension("c"),
         )?;
         std::fs::copy(
             self.test_dir.join(TEST_EXE_FILENAME),
-            self.saved_test_dir.join(name.clone() + ".out"),
+            path.with_extension("out"),
         )?;
+        match serde_json::to_string_pretty(&input) {
+            Ok(json) => std::fs::write(path.with_extension("json"), json)?,
+            Err(err) => {
+                return Err(libafl::Error::Serialize(
+                    err.to_string(),
+                    ErrorBacktrace::new(),
+                ));
+            }
+        }
         Ok(())
     }
 }

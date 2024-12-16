@@ -58,7 +58,7 @@ impl Trace {
         }
         Ok(trace)
     }
-    pub fn same_as(self, other: Trace) -> bool {
+    pub fn same_as(&self, other: &Trace) -> bool {
         self == other
     }
 }
