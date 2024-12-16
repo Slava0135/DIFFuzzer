@@ -1,4 +1,4 @@
-use std::{env, num::NonZero, path::Path, time::Duration};
+use std::{cell::RefCell, env, num::NonZero, path::Path, rc::Rc, time::Duration};
 
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
@@ -22,7 +22,7 @@ use rand::{rngs::StdRng, SeedableRng};
 use crate::{
     abstract_fs::types::Workload,
     config::Config,
-    greybox::objective::save_test::SaveTestObjective,
+    greybox::objective::{self, console::ConsoleObjective, save_test::SaveTestObjective},
     mount::{btrfs::Btrfs, ext4::Ext4},
 };
 
@@ -63,12 +63,27 @@ pub fn fuzz(config: Config) {
     let fst_kcov_observer = KCovObserver::new(kcov_path.clone().into_boxed_path());
     let snd_kcov_observer = KCovObserver::new(kcov_path.clone().into_boxed_path());
 
+    let fst_stdout = Rc::new(RefCell::new("".to_owned()));
+    let fst_stderr = Rc::new(RefCell::new("".to_owned()));
+    let snd_stdout = Rc::new(RefCell::new("".to_owned()));
+    let snd_stderr = Rc::new(RefCell::new("".to_owned()));
+
     let fst_kcov_feedback = KCovFeedback::new(fst_kcov_observer.handle());
     let snd_kcov_feedback = KCovFeedback::new(snd_kcov_observer.handle());
 
     let mut feedback = feedback_or!(fst_kcov_feedback, snd_kcov_feedback);
-    let mut objective = feedback_and!(
+
+    let objective = feedback_or!(
         TraceObjective::new(fst_trace_observer.handle(), snd_trace_observer.handle()),
+        ConsoleObjective::new(
+            fst_stdout.clone(),
+            fst_stderr.clone(),
+            snd_stdout.clone(),
+            snd_stderr.clone(),
+        ),
+    );
+    let mut objective = feedback_and!(
+        objective,
         SaveTestObjective::new(
             test_dir.clone().into_boxed_path(),
             crashes_dir.clone().into_boxed_path()
@@ -103,6 +118,8 @@ pub fn fuzz(config: Config) {
             .into_boxed_path(),
         test_dir.clone().into_boxed_path(),
         exec_dir.clone().into_boxed_path(),
+        fst_stdout,
+        fst_stderr,
     );
     let mut snd_harness = workload_harness(
         Btrfs::new(),
@@ -112,6 +129,8 @@ pub fn fuzz(config: Config) {
             .into_boxed_path(),
         test_dir.clone().into_boxed_path(),
         exec_dir.clone().into_boxed_path(),
+        snd_stdout,
+        snd_stderr,
     );
 
     let timeout = Duration::new(config.greybox.timeout.into(), 0);

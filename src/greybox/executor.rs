@@ -5,13 +5,25 @@ use log::{debug, error};
 
 use crate::{abstract_fs::types::Workload, mount::mount::FileSystemMount};
 
+use super::objective::console::ConsolePipe;
+
 pub fn workload_harness<T: FileSystemMount>(
     fs_mount: T,
     fs_dir: Box<Path>,
     test_dir: Box<Path>,
     exec_dir: Box<Path>,
+    stdout: ConsolePipe,
+    stderr: ConsolePipe,
 ) -> impl Fn(&Workload) -> ExitKind {
-    return move |input: &Workload| match harness(&input, &fs_mount, &fs_dir, &test_dir, &exec_dir) {
+    return move |input: &Workload| match harness(
+        &input,
+        &fs_mount,
+        &fs_dir,
+        &test_dir,
+        &exec_dir,
+        stdout.clone(),
+        stderr.clone(),
+    ) {
         Ok(exit) => exit,
         Err(err) => {
             error!("{err:?}");
@@ -26,6 +38,8 @@ fn harness<T: FileSystemMount>(
     fs_dir: &Path,
     test_dir: &Path,
     exec_dir: &Path,
+    stdout: ConsolePipe,
+    stderr: ConsolePipe,
 ) -> Result<ExitKind, libafl::Error> {
     debug!("executing harness");
     debug!("compiling test at '{}'", test_dir.display());
@@ -49,6 +63,9 @@ fn harness<T: FileSystemMount>(
     let output = exec.output()?;
 
     fs_mount.teardown(&fs_dir)?;
+
+    stdout.replace(String::from_utf8(output.stdout)?);
+    stderr.replace(String::from_utf8(output.stderr)?);
 
     if output.status.success() {
         Ok(ExitKind::Ok)
