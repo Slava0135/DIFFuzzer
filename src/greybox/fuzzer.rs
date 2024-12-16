@@ -20,7 +20,8 @@ use log::{error, info};
 use rand::{rngs::StdRng, SeedableRng};
 
 use crate::{
-    abstract_fs::types::{OperationWeights, Workload},
+    abstract_fs::types::Workload,
+    config::Config,
     greybox::objective::save_test::SaveTestObjective,
     mount::{btrfs::Btrfs, ext4::Ext4},
 };
@@ -33,7 +34,7 @@ use super::{
     observer::{kcov::KCovObserver, trace::TraceObserver},
 };
 
-pub fn fuzz() {
+pub fn fuzz(config: Config) {
     info!("running greybox fuzzing");
     info!("setting up temporary directory");
     let temp_dir = env::temp_dir().join("DIFFuzzer");
@@ -137,7 +138,7 @@ pub fn fuzz() {
 
     let mutator = WorkloadMutator::new(
         StdRng::seed_from_u64(current_nanos()),
-        OperationWeights::uniform(),
+        config.operation_weights.clone(),
     );
     let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(
         mutator,
