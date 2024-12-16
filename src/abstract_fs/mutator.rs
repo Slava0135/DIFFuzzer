@@ -76,7 +76,10 @@ pub fn insert(
 mod tests {
     use rand::{rngs::StdRng, SeedableRng};
 
-    use crate::abstract_fs::{generator::generate_new, types::{Operation, OperationKind}};
+    use crate::abstract_fs::{
+        generator::generate_new,
+        types::{Operation, OperationKind},
+    };
 
     use super::*;
 
@@ -134,7 +137,15 @@ mod tests {
                 },
             ],
         };
-        assert_eq!(None, insert(&mut rng, &w, 1, vec![(OperationKind::REMOVE, 100)]));
+        assert_eq!(
+            None,
+            insert(
+                &mut rng,
+                &w,
+                1,
+                OperationWeights::new(vec![(OperationKind::REMOVE, 100)])
+            )
+        );
         assert_eq!(
             Some(Workload {
                 ops: vec![
@@ -154,7 +165,12 @@ mod tests {
                     },
                 ],
             }),
-            insert(&mut rng, &w, 3, vec![(OperationKind::REMOVE, 100)])
+            insert(
+                &mut rng,
+                &w,
+                3,
+                OperationWeights::new(vec![(OperationKind::REMOVE, 100)])
+            )
         );
     }
 
@@ -166,7 +182,7 @@ mod tests {
             let p: f64 = rng.gen();
             if w.ops.is_empty() || p >= 0.5 {
                 let index = rng.gen_range(0..=w.ops.len());
-                if let Some(workload) = insert(&mut rng, &w, index, OperationKind::uniform()) {
+                if let Some(workload) = insert(&mut rng, &w, index, OperationWeights::uniform()) {
                     w = workload;
                 }
             } else {

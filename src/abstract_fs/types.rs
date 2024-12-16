@@ -178,17 +178,25 @@ pub enum OperationKind {
     REMOVE,
 }
 
-impl OperationKind {
-    pub fn uniform() -> OperationWeights {
-        vec![
-            (OperationKind::CREATE, 100),
-            (OperationKind::MKDIR, 100),
-            (OperationKind::REMOVE, 100),
-        ]
-    }
+pub struct OperationWeights {
+    pub weights: Vec<(OperationKind, u32)>,
 }
 
-pub type OperationWeights = Vec<(OperationKind, u32)>;
+impl OperationWeights {
+    pub fn new(weights: Vec<(OperationKind, u32)>) -> Self {
+        Self { weights }
+    }
+
+    pub fn uniform() -> Self {
+        Self {
+            weights: vec![
+                (OperationKind::CREATE, 100),
+                (OperationKind::MKDIR, 100),
+                (OperationKind::REMOVE, 100),
+            ],
+        }
+    }
+}
 
 #[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize, SerdeAny)]
 pub struct Workload {

@@ -18,7 +18,7 @@ use rand::{rngs::StdRng, Rng};
 use crate::abstract_fs::{
     generator::generate_new,
     mutator::{insert, remove},
-    types::{OperationKind, Workload},
+    types::{OperationWeights, Workload},
 };
 
 impl Input for Workload {
@@ -60,7 +60,9 @@ where
         let p: f64 = self.rng.gen();
         if input.ops.is_empty() || p > 0.3 {
             let index = self.rng.gen_range(0..=input.ops.len());
-            if let Some(workload) = insert(&mut self.rng, &input, index, OperationKind::uniform()) {
+            if let Some(workload) =
+                insert(&mut self.rng, &input, index, OperationWeights::uniform())
+            {
                 *input = workload;
                 Ok(MutationResult::Mutated)
             } else {

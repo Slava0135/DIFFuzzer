@@ -16,7 +16,12 @@ pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
         name
     };
     for _ in 0..size {
-        append_one(rng, &mut executor, OperationKind::uniform(), &mut gen_name);
+        append_one(
+            rng,
+            &mut executor,
+            OperationWeights::uniform(),
+            &mut gen_name,
+        );
     }
     executor.recording
 }
@@ -48,9 +53,9 @@ pub fn append_one(
         .collect();
     let mut ops = weights;
     if alive_dirs_except_root.is_empty() {
-        ops.retain(|(op, _)| *op != OperationKind::REMOVE);
+        ops.weights.retain(|(op, _)| *op != OperationKind::REMOVE);
     }
-    match ops.choose_weighted(rng, |item| item.1).unwrap().0 {
+    match ops.weights.choose_weighted(rng, |item| item.1).unwrap().0 {
         OperationKind::MKDIR => {
             executor
                 .mkdir(alive_dirs.choose(rng).unwrap(), gen_name(), mode.clone())
