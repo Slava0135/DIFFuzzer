@@ -140,11 +140,11 @@ pub fn fuzz(config: Config) {
         StdRng::seed_from_u64(current_nanos()),
         config.operation_weights.clone(),
         config.mutation_weights.clone(),
-        config.max_workload_length,
+        config.greybox.max_workload_length,
     );
     let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(
         mutator,
-        NonZero::new(config.max_mutations.into()).unwrap()
+        NonZero::new(config.greybox.max_mutations.into()).unwrap()
     ));
 
     info!("starting fuzzing loop");

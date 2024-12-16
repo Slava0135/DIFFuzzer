@@ -1,3 +1,4 @@
+[greybox]
 max_workload_length = 100
 max_mutations = 10
 
