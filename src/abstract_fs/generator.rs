@@ -7,7 +7,7 @@ use crate::abstract_fs::types::{AbstractExecutor, DirIndex, ModeFlag, Node, Work
 
 use super::types::{Name, OperationKind, OperationWeights};
 
-pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
+pub fn generate_new(rng: &mut impl Rng, size: usize, weights: &OperationWeights) -> Workload {
     let mut executor = AbstractExecutor::new();
     let mut name_idx: usize = 0;
     let mut gen_name = || {
@@ -16,12 +16,7 @@ pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
         name
     };
     for _ in 0..size {
-        append_one(
-            rng,
-            &mut executor,
-            OperationWeights::uniform(),
-            &mut gen_name,
-        );
+        append_one(rng, &mut executor, &weights, &mut gen_name);
     }
     executor.recording
 }
@@ -29,7 +24,7 @@ pub fn generate_new(rng: &mut impl Rng, size: usize) -> Workload {
 pub fn append_one(
     rng: &mut impl Rng,
     executor: &mut AbstractExecutor,
-    weights: OperationWeights,
+    weights: &OperationWeights,
     mut gen_name: impl FnMut() -> Name,
 ) {
     let mode = vec![
@@ -51,7 +46,7 @@ pub fn append_one(
         .filter(|&&d| d != AbstractExecutor::root_index())
         .map(|d| d.clone())
         .collect();
-    let mut ops = weights;
+    let mut ops = weights.clone();
     if alive_dirs_except_root.is_empty() {
         ops.weights.retain(|(op, _)| *op != OperationKind::REMOVE);
     }
@@ -90,7 +85,7 @@ mod tests {
     fn test_generate_new() {
         for i in 0..1000 {
             let mut rng = StdRng::seed_from_u64(i);
-            generate_new(&mut rng, 1000);
+            generate_new(&mut rng, 1000, &OperationWeights::uniform());
         }
     }
 }

@@ -20,7 +20,7 @@ use log::{error, info};
 use rand::{rngs::StdRng, SeedableRng};
 
 use crate::{
-    abstract_fs::types::Workload,
+    abstract_fs::types::{OperationWeights, Workload},
     greybox::objective::save_test::SaveTestObjective,
     mount::{btrfs::Btrfs, ext4::Ext4},
 };
@@ -135,7 +135,10 @@ pub fn fuzz() {
 
     let mut executor = DiffExecutor::new(fst_executor, snd_executor, tuple_list!());
 
-    let mutator = WorkloadMutator::new(StdRng::seed_from_u64(current_nanos()));
+    let mutator = WorkloadMutator::new(
+        StdRng::seed_from_u64(current_nanos()),
+        OperationWeights::uniform(),
+    );
     let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(
         mutator,
         NonZero::new(10).unwrap()

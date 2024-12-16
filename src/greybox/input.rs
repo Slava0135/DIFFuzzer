@@ -32,22 +32,24 @@ impl Input for Workload {
 pub struct WorkloadGenerator {
     pub rng: StdRng,
     pub max_size: usize,
+    pub weights: OperationWeights,
 }
 
 impl<S> Generator<Workload, S> for WorkloadGenerator {
     fn generate(&mut self, _state: &mut S) -> Result<Workload, Error> {
         let size = self.rng.gen_range(1..=self.max_size);
-        Ok(generate_new(&mut self.rng, size))
+        Ok(generate_new(&mut self.rng, size, &self.weights))
     }
 }
 
 pub struct WorkloadMutator {
     pub rng: StdRng,
+    pub weights: OperationWeights,
 }
 
 impl WorkloadMutator {
-    pub fn new(rng: StdRng) -> Self {
-        Self { rng }
+    pub fn new(rng: StdRng, weights: OperationWeights) -> Self {
+        Self { rng, weights }
     }
 }
 
@@ -60,9 +62,7 @@ where
         let p: f64 = self.rng.gen();
         if input.ops.is_empty() || p > 0.3 {
             let index = self.rng.gen_range(0..=input.ops.len());
-            if let Some(workload) =
-                insert(&mut self.rng, &input, index, OperationWeights::uniform())
-            {
+            if let Some(workload) = insert(&mut self.rng, &input, index, &self.weights) {
                 *input = workload;
                 Ok(MutationResult::Mutated)
             } else {

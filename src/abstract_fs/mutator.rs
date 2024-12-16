@@ -22,7 +22,7 @@ pub fn insert(
     rng: &mut impl Rng,
     workload: &Workload,
     index: usize,
-    weights: OperationWeights,
+    weights: &OperationWeights,
 ) -> Option<Workload> {
     let mut used_names = HashSet::new();
     for op in workload.ops.iter() {
@@ -143,7 +143,7 @@ mod tests {
                 &mut rng,
                 &w,
                 1,
-                OperationWeights::new(vec![(OperationKind::REMOVE, 100)])
+                &OperationWeights::new(vec![(OperationKind::REMOVE, 100)])
             )
         );
         assert_eq!(
@@ -169,7 +169,7 @@ mod tests {
                 &mut rng,
                 &w,
                 3,
-                OperationWeights::new(vec![(OperationKind::REMOVE, 100)])
+                &OperationWeights::new(vec![(OperationKind::REMOVE, 100)])
             )
         );
     }
@@ -177,12 +177,12 @@ mod tests {
     #[test]
     fn smoke_test_mutate() {
         let mut rng = StdRng::seed_from_u64(123);
-        let mut w = generate_new(&mut rng, 100);
+        let mut w = generate_new(&mut rng, 100, &OperationWeights::uniform());
         for _ in 0..1000 {
             let p: f64 = rng.gen();
             if w.ops.is_empty() || p >= 0.5 {
                 let index = rng.gen_range(0..=w.ops.len());
-                if let Some(workload) = insert(&mut rng, &w, index, OperationWeights::uniform()) {
+                if let Some(workload) = insert(&mut rng, &w, index, &OperationWeights::uniform()) {
                     w = workload;
                 }
             } else {

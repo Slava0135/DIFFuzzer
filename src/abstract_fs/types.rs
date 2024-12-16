@@ -171,13 +171,14 @@ pub enum Operation {
     REMOVE { path: PathName },
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Copy)]
 pub enum OperationKind {
     MKDIR,
     CREATE,
     REMOVE,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
 pub struct OperationWeights {
     pub weights: Vec<(OperationKind, u32)>,
 }
