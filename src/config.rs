@@ -13,4 +13,5 @@ pub struct Config {
 pub struct GreyboxConfig {
     pub max_workload_length: u16,
     pub max_mutations: u16,
+    pub timeout: u8,
 }

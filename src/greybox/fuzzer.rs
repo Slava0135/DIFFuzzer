@@ -114,7 +114,7 @@ pub fn fuzz(config: Config) {
         exec_dir.clone().into_boxed_path(),
     );
 
-    let timeout = Duration::new(10, 0);
+    let timeout = Duration::new(config.greybox.timeout.into(), 0);
     let fst_executor = InProcessExecutor::with_timeout(
         &mut fst_harness,
         tuple_list!(fst_kcov_observer, fst_trace_observer),
