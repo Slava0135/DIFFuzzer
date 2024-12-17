@@ -3,33 +3,32 @@ use std::path::Path;
 use std::process::Command;
 use std::str;
 
-pub struct Hasher<'h> {
-    pub path: &'h Path,
-    pub options: &'h str,
+pub struct Hasher {
+    pub path: Box<Path>,
+    pub options: String,
 }
 
-impl Hasher<'_> {
-    pub fn compare_hash(&self, target_path: &Path, ref_path: &Path) {
-        let hash_target = self.calculate_hash(target_path);
-        let hash_reference = self.calculate_hash(ref_path);
+impl Hasher {
+    pub fn compare(&self, fst_path: &Path, snd_path: &Path) {
+        let hash_target = self.eval(fst_path);
+        let hash_reference = self.eval(snd_path);
         if hash_target != hash_reference {
-            warn!("Hash not equals");
-            Command::new(self.path)
-                .arg(self.options)
+            Command::new(self.path.as_ref())
+                .arg(&self.options)
                 .arg("-d")
-                .arg(target_path)
-                .arg(ref_path)
+                .arg(fst_path)
+                .arg(snd_path)
                 .output()
-                .expect("Error when difference calculating");
+                .expect("error when comparing hashes");
         }
     }
 
-    pub fn calculate_hash(&self, path: &Path) -> Vec<u8> {
-        let output = Command::new(self.path)
-            .arg(self.options)
+    fn eval(&self, path: &Path) -> Vec<u8> {
+        let output = Command::new(self.path.as_ref())
+            .arg(&self.options)
             .arg(path)
             .output()
-            .expect("Error when hash calculating");
+            .expect("error when evaluating hash");
         if !output.status.success() {
             let err_str = match str::from_utf8(&output.stderr) {
                 Ok(val) => val,

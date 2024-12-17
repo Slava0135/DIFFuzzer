@@ -69,7 +69,7 @@ pub fn fuzz<FS: FileSystemMount>(
         let workload = generate_new(&mut rng, trace_len, &config.operation_weights);
         fst_harness(&workload);
         snd_harness(&workload);
-        hasher.compare_hash(&fst_fs_dir, &snd_fs_dir);
+        hasher.compare(&fst_fs_dir, &snd_fs_dir);
     }
 }
 
