@@ -1,6 +1,6 @@
 use rand::{
-    seq::{IteratorRandom, SliceRandom},
     Rng,
+    seq::{IteratorRandom, SliceRandom},
 };
 
 use crate::abstract_fs::types::{AbstractExecutor, DirIndex, ModeFlag, Node, Workload};
@@ -77,7 +77,7 @@ pub fn append_one(
 
 #[cfg(test)]
 mod tests {
-    use rand::{rngs::StdRng, SeedableRng};
+    use rand::{SeedableRng, rngs::StdRng};
 
     use super::*;
 

@@ -1,12 +1,12 @@
 use std::{borrow::Cow, path::Path};
 
 use libafl::{
+    HasMetadata,
     feedbacks::{Feedback, StateInitializer},
     inputs::Input,
     state::State,
-    HasMetadata,
 };
-use libafl_bolts::{tuples::MatchNameRef, ErrorBacktrace, Named};
+use libafl_bolts::{ErrorBacktrace, Named, tuples::MatchNameRef};
 
 use crate::abstract_fs::{
     compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME},

@@ -5,8 +5,8 @@ use libafl::{
     state::State,
 };
 use libafl_bolts::{
-    tuples::{Handle, MatchNameRef},
     Named,
+    tuples::{Handle, MatchNameRef},
 };
 use log::debug;
 

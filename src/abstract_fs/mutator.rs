@@ -74,7 +74,7 @@ pub fn insert(
 }
 
 mod tests {
-    use rand::{rngs::StdRng, SeedableRng};
+    use rand::{SeedableRng, rngs::StdRng};
 
     use crate::abstract_fs::{
         generator::generate_new,

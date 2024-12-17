@@ -1,14 +1,13 @@
 use std::borrow::Cow;
 
 use libafl::{
+    HasMetadata,
     feedbacks::{Feedback, StateInitializer},
     state::State,
-    HasMetadata,
 };
 use libafl_bolts::{
-    impl_serdeany,
+    Named, impl_serdeany,
     tuples::{Handle, MatchNameRef},
-    Named,
 };
 use log::debug;
 use serde::{Deserialize, Serialize};

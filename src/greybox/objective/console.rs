@@ -2,10 +2,10 @@ use std::{cell::RefCell, rc::Rc};
 
 use std::borrow::Cow;
 
+use libafl::HasMetadata;
 use libafl::feedbacks::{Feedback, StateInitializer};
 use libafl::state::State;
-use libafl::HasMetadata;
-use libafl_bolts::{impl_serdeany, Named};
+use libafl_bolts::{Named, impl_serdeany};
 use log::debug;
 use serde::{Deserialize, Serialize};
 

@@ -4,16 +4,16 @@ use std::{
 };
 
 use libafl::{
+    Error,
     corpus::CorpusId,
     generators::Generator,
     inputs::Input,
     mutators::{MutationResult, Mutator},
     state::HasRand,
-    Error,
 };
 use libafl_bolts::Named;
 use log::debug;
-use rand::{rngs::StdRng, seq::SliceRandom, Rng};
+use rand::{Rng, rngs::StdRng, seq::SliceRandom};
 
 use crate::abstract_fs::{
     generator::generate_new,

@@ -1,6 +1,6 @@
 use log::info;
-use rand::prelude::StdRng;
 use rand::SeedableRng;
+use rand::prelude::StdRng;
 use std::env;
 use std::path::{Path, PathBuf};
 

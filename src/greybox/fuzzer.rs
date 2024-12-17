@@ -1,6 +1,7 @@
 use std::{cell::RefCell, env, num::NonZero, path::Path, rc::Rc, time::Duration};
 
 use libafl::{
+    Error, Fuzzer, StdFuzzer,
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
     executors::{DiffExecutor, InProcessExecutor},
@@ -9,15 +10,14 @@ use libafl::{
     schedulers::QueueScheduler,
     stages::StdMutationalStage,
     state::{HasCorpus, StdState},
-    Error, Fuzzer, StdFuzzer,
 };
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
-    tuples::{tuple_list, Handled},
+    tuples::{Handled, tuple_list},
 };
 use log::{error, info};
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{SeedableRng, rngs::StdRng};
 
 use crate::utils::temp_dir_actions::get_temp_dir;
 use crate::{

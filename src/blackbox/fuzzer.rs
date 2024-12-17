@@ -5,8 +5,8 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use rand::prelude::StdRng;
 use rand::SeedableRng;
+use rand::prelude::StdRng;
 
 use crate::abstract_fs::types::ConsolePipe;
 use crate::blackbox::hasher_wrapper::Hasher;
