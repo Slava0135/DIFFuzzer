@@ -19,7 +19,7 @@ use libafl_bolts::{
 use log::{error, info};
 use rand::{SeedableRng, rngs::StdRng};
 
-use crate::utils::temp_dir_actions::get_temp_dir;
+use crate::utils::temp_dir_actions::setup_temp_dir;
 use crate::{
     abstract_fs::types::Workload,
     config::Config,
@@ -38,7 +38,7 @@ use super::{
 pub fn fuzz(config: Config) {
     info!("running greybox fuzzing");
     info!("setting up temporary directory");
-    let temp_dir = get_temp_dir();
+    let temp_dir = setup_temp_dir();
 
     info!("setting up fuzzing components");
     let test_dir = temp_dir.clone();

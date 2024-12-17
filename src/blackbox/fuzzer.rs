@@ -14,7 +14,7 @@ use crate::config::Config;
 use crate::{
     abstract_fs::generator::generate_new, abstract_fs::types::Workload, mount::btrfs::Btrfs,
     mount::ext4::Ext4, mount::mount::FileSystemMount, utils::harness::workload_harness,
-    utils::temp_dir_actions::get_temp_dir,
+    utils::temp_dir_actions::setup_temp_dir,
 };
 
 pub fn fuzz_with_end<FS: FileSystemMount>(
@@ -31,7 +31,7 @@ pub fn fuzz_with_end<FS: FileSystemMount>(
 
     info!("setting up temporary directory");
 
-    let temp_dir = get_temp_dir();
+    let temp_dir = setup_temp_dir();
     info!("setting up fuzzing components");
     let test_dir = temp_dir.clone();
     let exec_dir = temp_dir.join("exec");
