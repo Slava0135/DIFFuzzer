@@ -8,7 +8,7 @@ use rand::SeedableRng;
 use rand::prelude::StdRng;
 
 use crate::abstract_fs::types::ConsolePipe;
-use crate::blackbox::hasher_wrapper::Hasher;
+use crate::blackbox::hasher::Hasher;
 use crate::config::Config;
 use crate::harness::workload_harness;
 use crate::mount::mount::FileSystemMount;
