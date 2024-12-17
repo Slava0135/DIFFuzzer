@@ -27,12 +27,7 @@ impl SaveTestObjective {
     }
 }
 
-impl<S> StateInitializer<S> for SaveTestObjective {
-    fn init_state(&mut self, _state: &mut S) -> Result<(), libafl::Error> {
-        std::fs::create_dir(self.saved_test_dir.as_ref()).unwrap_or(());
-        Ok(())
-    }
-}
+impl<S> StateInitializer<S> for SaveTestObjective {}
 
 impl<EM, OT, S> Feedback<EM, Workload, OT, S> for SaveTestObjective
 where
