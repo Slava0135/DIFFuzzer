@@ -3,6 +3,8 @@
 #![allow(dead_code)]
 
 use std::{collections::HashMap, fmt::Display, vec};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use libafl::SerdeAny;
 use serde::{Deserialize, Serialize};
@@ -236,3 +238,5 @@ pub struct AbstractExecutor {
     pub nodes_created: usize,
     pub recording: Workload,
 }
+
+pub type ConsolePipe = Rc<RefCell<String>>;

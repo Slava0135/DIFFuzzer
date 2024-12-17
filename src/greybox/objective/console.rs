@@ -1,6 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
 
-pub type ConsolePipe = Rc<RefCell<String>>;
 
 use std::borrow::Cow;
 
@@ -12,7 +11,7 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 
 use crate::abstract_fs::output::Output;
-use crate::abstract_fs::types::Workload;
+use crate::abstract_fs::types::{ConsolePipe, Workload};
 
 pub struct ConsoleObjective {
     fst_stdout: ConsolePipe,
