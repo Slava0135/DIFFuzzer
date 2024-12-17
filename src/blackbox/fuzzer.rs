@@ -1,7 +1,6 @@
 use libafl::executors::ExitKind;
 use log::info;
 use std::cell::RefCell;
-use std::env;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -11,10 +10,11 @@ use rand::prelude::StdRng;
 use crate::abstract_fs::types::ConsolePipe;
 use crate::blackbox::hasher_wrapper::Hasher;
 use crate::config::Config;
+use crate::harness::workload_harness;
+use crate::mount::mount::FileSystemMount;
+use crate::temp_dir::setup_temp_dir;
 use crate::{
-    abstract_fs::generator::generate_new, abstract_fs::types::Workload, mount::btrfs::Btrfs,
-    mount::ext4::Ext4, mount::mount::FileSystemMount, utils::harness::workload_harness,
-    utils::temp_dir_actions::setup_temp_dir,
+    abstract_fs::generator::generate_new, abstract_fs::types::Workload,
 };
 
 pub fn fuzz_with_end<FS: FileSystemMount>(

@@ -12,7 +12,8 @@ mod blackbox;
 mod config;
 mod greybox;
 mod mount;
-mod utils;
+mod harness;
+mod temp_dir;
 
 fn main() {
     let args = Args::parse();

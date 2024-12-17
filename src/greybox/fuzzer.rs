@@ -1,4 +1,4 @@
-use std::{cell::RefCell, env, num::NonZero, path::Path, rc::Rc, time::Duration};
+use std::{cell::RefCell, num::NonZero, path::Path, rc::Rc, time::Duration};
 
 use libafl::{
     Error, Fuzzer, StdFuzzer,
@@ -19,13 +19,8 @@ use libafl_bolts::{
 use log::{error, info};
 use rand::{SeedableRng, rngs::StdRng};
 
-use crate::utils::temp_dir_actions::setup_temp_dir;
 use crate::{
-    abstract_fs::types::Workload,
-    config::Config,
-    greybox::objective::{self, console::ConsoleObjective, save_test::SaveTestObjective},
-    mount::{btrfs::Btrfs, ext4::Ext4},
-    utils::harness::workload_harness,
+    abstract_fs::types::Workload, config::Config, greybox::objective::{console::ConsoleObjective, save_test::SaveTestObjective}, harness::workload_harness, mount::{btrfs::Btrfs, ext4::Ext4}, temp_dir::setup_temp_dir
 };
 
 use super::{
