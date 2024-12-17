@@ -14,7 +14,7 @@ impl FileSystemMount for Ext4 {
     fn mkfs_cmd() -> String {
         "mkfs.ext4".to_owned()
     }
-    fn mount_t() -> String {
+    fn mount_t(&self) -> String {
         "ext4".to_owned()
     }
 }

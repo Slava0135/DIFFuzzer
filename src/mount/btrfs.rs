@@ -14,7 +14,7 @@ impl FileSystemMount for Btrfs {
     fn mkfs_cmd() -> String {
         "mkfs.btrfs".to_owned()
     }
-    fn mount_t() -> String {
+    fn mount_t(&self) -> String {
         "btrfs".to_owned()
     }
 }
