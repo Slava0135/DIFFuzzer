@@ -1,6 +1,6 @@
 use log::info;
-use std::{env, fs};
 use std::path::{Path, PathBuf};
+use std::{env, fs};
 
 pub fn setup_temp_dir() -> PathBuf {
     let temp_dir = env::temp_dir().join("DIFFuzzer");

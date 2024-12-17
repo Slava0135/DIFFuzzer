@@ -20,7 +20,11 @@ use log::{error, info};
 use rand::{SeedableRng, rngs::StdRng};
 
 use crate::{
-    abstract_fs::types::Workload, config::Config, greybox::objective::{console::ConsoleObjective, save_test::SaveTestObjective}, harness::workload_harness, mount::{btrfs::Btrfs, ext4::Ext4}, temp_dir::setup_temp_dir
+    abstract_fs::types::Workload,
+    config::Config,
+    greybox::{harness::workload_harness, objective::{console::ConsoleObjective, save_test::SaveTestObjective}},
+    mount::{btrfs::Btrfs, ext4::Ext4},
+    temp_dir::setup_temp_dir,
 };
 
 use super::{

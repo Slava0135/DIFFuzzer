@@ -1,37 +1,31 @@
+use std::io;
+use std::string::FromUtf8Error;
 use std::{path::Path, process::Command};
 
-use libafl::executors::ExitKind;
-use log::{debug, error};
+use log::debug;
 
 use crate::abstract_fs::types::ConsolePipe;
 use crate::{abstract_fs::types::Workload, mount::mount::FileSystemMount};
 
-pub fn workload_harness<T: FileSystemMount>(
-    fs_mount: T,
-    fs_dir: Box<Path>,
-    test_dir: Box<Path>,
-    exec_dir: Box<Path>,
-    stdout: ConsolePipe,
-    stderr: ConsolePipe,
-) -> impl Fn(&Workload) -> ExitKind {
-    return move |input: &Workload| match harness(
-        &input,
-        &fs_mount,
-        &fs_dir,
-        &test_dir,
-        &exec_dir,
-        stdout.clone(),
-        stderr.clone(),
-    ) {
-        Ok(exit) => exit,
-        Err(err) => {
-            error!("{err:?}");
-            panic!("{err:?}");
-        }
-    };
+#[derive(Debug)]
+pub enum HarnessError {
+    IOError(io::Error),
+    FromUtf8Error(FromUtf8Error),
 }
 
-fn harness<T: FileSystemMount>(
+impl From<io::Error> for HarnessError {
+    fn from(value: io::Error) -> Self {
+        HarnessError::IOError(value)
+    }
+}
+
+impl From<FromUtf8Error> for HarnessError {
+    fn from(value: FromUtf8Error) -> Self {
+        HarnessError::FromUtf8Error(value)
+    }
+}
+
+pub fn harness<T: FileSystemMount>(
     input: &Workload,
     fs_mount: &T,
     fs_dir: &Path,
@@ -39,7 +33,7 @@ fn harness<T: FileSystemMount>(
     exec_dir: &Path,
     stdout: ConsolePipe,
     stderr: ConsolePipe,
-) -> Result<ExitKind, libafl::Error> {
+) -> Result<bool, HarnessError> {
     debug!("executing harness");
     debug!("compiling test at '{}'", test_dir.display());
     let test_exec = input.compile(&test_dir)?;
@@ -66,9 +60,5 @@ fn harness<T: FileSystemMount>(
     stdout.replace(String::from_utf8(output.stdout)?);
     stderr.replace(String::from_utf8(output.stderr)?);
 
-    if output.status.success() {
-        Ok(ExitKind::Ok)
-    } else {
-        Ok(ExitKind::Crash)
-    }
+    Ok(output.status.success())
 }

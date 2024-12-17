@@ -11,8 +11,8 @@ mod args;
 mod blackbox;
 mod config;
 mod greybox;
-mod mount;
 mod harness;
+mod mount;
 mod temp_dir;
 
 fn main() {

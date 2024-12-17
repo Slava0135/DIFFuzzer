@@ -1,4 +1,3 @@
-use libafl::executors::ExitKind;
 use log::info;
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -10,7 +9,7 @@ use rand::prelude::StdRng;
 use crate::abstract_fs::types::ConsolePipe;
 use crate::blackbox::hasher::Hasher;
 use crate::config::Config;
-use crate::harness::workload_harness;
+use crate::harness::{HarnessError, harness};
 use crate::mount::mount::FileSystemMount;
 use crate::temp_dir::setup_temp_dir;
 use crate::{abstract_fs::generator::generate_new, abstract_fs::types::Workload};
@@ -48,7 +47,7 @@ pub fn fuzz<FS: FileSystemMount>(
         .join("fstest")
         .into_boxed_path();
 
-    let fst_harness = get_workload_harness(
+    let fst_harness = workload_harness(
         fst_fs,
         test_dir.clone(),
         exec_dir.clone(),
@@ -56,7 +55,7 @@ pub fn fuzz<FS: FileSystemMount>(
         fst_stdout,
         fst_stderr,
     );
-    let snd_harness = get_workload_harness(
+    let snd_harness = workload_harness(
         snd_fs,
         test_dir.clone(),
         exec_dir.clone(),
@@ -73,20 +72,23 @@ pub fn fuzz<FS: FileSystemMount>(
     }
 }
 
-fn get_workload_harness<FS: FileSystemMount>(
+fn workload_harness<FS: FileSystemMount>(
     fs: FS,
     test_dir: PathBuf,
     exec_dir: PathBuf,
     fs_dir: Box<Path>,
     stdout: ConsolePipe,
     stderr: ConsolePipe,
-) -> impl Fn(&Workload) -> ExitKind {
-    return workload_harness(
-        fs,
-        test_dir.into_boxed_path(),
-        exec_dir.into_boxed_path(),
-        fs_dir,
-        stdout,
-        stderr,
-    );
+) -> impl Fn(&Workload) -> Result<bool, HarnessError> {
+    return move |input: &Workload| {
+        harness(
+            &input,
+            &fs,
+            &fs_dir,
+            &test_dir,
+            &exec_dir,
+            stdout.clone(),
+            stderr.clone(),
+        )
+    };
 }
