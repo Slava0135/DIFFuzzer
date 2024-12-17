@@ -48,14 +48,23 @@ mod tests {
     fn test_parse_empty() {
         assert_eq!(Err(OutputError::Empty), Output::try_parse("".to_owned()));
     }
-    
+
     #[test]
     fn test_parse_invalid() {
-        assert_eq!(Err(OutputError::Regex), Output::try_parse("#SUCCESS 10 | #FAILURE 0".to_owned()));
+        assert_eq!(
+            Err(OutputError::Regex),
+            Output::try_parse("#SUCCESS 10 | #FAILURE 0".to_owned())
+        );
     }
 
     #[test]
     fn test_parse() {
-        assert_eq!(Ok(Output{success_n:10,failure_n:0}), Output::try_parse("foo\nbar\n#SUCCESS: 10 | #FAILURE: 0".to_owned()));
+        assert_eq!(
+            Ok(Output {
+                success_n: 10,
+                failure_n: 0
+            }),
+            Output::try_parse("foo\nbar\n#SUCCESS: 10 | #FAILURE: 0".to_owned())
+        );
     }
 }

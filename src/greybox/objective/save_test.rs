@@ -3,7 +3,8 @@ use std::{borrow::Cow, path::Path};
 use libafl::{
     feedbacks::{Feedback, StateInitializer},
     inputs::Input,
-    state::State, HasMetadata,
+    state::State,
+    HasMetadata,
 };
 use libafl_bolts::{tuples::MatchNameRef, ErrorBacktrace, Named};
 

@@ -1,6 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
 
-
 use std::borrow::Cow;
 
 use libafl::feedbacks::{Feedback, StateInitializer};

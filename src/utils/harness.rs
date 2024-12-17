@@ -3,8 +3,8 @@ use std::{path::Path, process::Command};
 use libafl::executors::ExitKind;
 use log::{debug, error};
 
-use crate::{abstract_fs::types::Workload, mount::mount::FileSystemMount};
 use crate::abstract_fs::types::ConsolePipe;
+use crate::{abstract_fs::types::Workload, mount::mount::FileSystemMount};
 
 pub fn workload_harness<T: FileSystemMount>(
     fs_mount: T,

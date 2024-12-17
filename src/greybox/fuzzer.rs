@@ -19,6 +19,7 @@ use libafl_bolts::{
 use log::{error, info};
 use rand::{rngs::StdRng, SeedableRng};
 
+use crate::utils::temp_dir_actions::get_temp_dir;
 use crate::{
     abstract_fs::types::Workload,
     config::Config,
@@ -26,7 +27,6 @@ use crate::{
     mount::{btrfs::Btrfs, ext4::Ext4},
     utils::harness::workload_harness,
 };
-use crate::utils::temp_dir_actions::get_temp_dir;
 
 use super::{
     feedback::kcov::KCovFeedback,
@@ -87,7 +87,7 @@ pub fn fuzz(config: Config) {
         &mut feedback,
         &mut objective,
     )
-        .unwrap();
+    .unwrap();
 
     state
         .corpus_mut()
@@ -132,7 +132,7 @@ pub fn fuzz(config: Config) {
         &mut manager,
         timeout,
     )
-        .unwrap();
+    .unwrap();
     let snd_executor = InProcessExecutor::with_timeout(
         &mut snd_harness,
         tuple_list!(snd_kcov_observer, snd_trace_observer),
@@ -141,7 +141,7 @@ pub fn fuzz(config: Config) {
         &mut manager,
         timeout,
     )
-        .unwrap();
+    .unwrap();
 
     let mut executor = DiffExecutor::new(fst_executor, snd_executor, tuple_list!());
 

@@ -1,5 +1,5 @@
-pub mod input;
-pub mod observer;
 pub mod feedback;
-pub mod objective;
 pub mod fuzzer;
+pub mod input;
+pub mod objective;
+pub mod observer;

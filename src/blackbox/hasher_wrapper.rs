@@ -1,8 +1,7 @@
-use std::path::Path;
-use std::str;
-use std::process::Command;
 use log::warn;
-
+use std::path::Path;
+use std::process::Command;
+use std::str;
 
 pub struct Hasher<'h> {
     pub path: &'h Path,
@@ -20,7 +19,8 @@ impl Hasher<'_> {
                 .arg("-d")
                 .arg(target_path)
                 .arg(ref_path)
-                .output().expect("Error when difference calculating");
+                .output()
+                .expect("Error when difference calculating");
         }
     }
 
@@ -35,7 +35,11 @@ impl Hasher<'_> {
                 Ok(val) => val,
                 Err(_) => panic!("got non UTF-8 data from stderr"),
             };
-            warn!("failed to eval abstract state for filesystem {}:{}", path.display(), err_str);
+            warn!(
+                "failed to eval abstract state for filesystem {}:{}",
+                path.display(),
+                err_str
+            );
         }
         return output.stdout;
     }

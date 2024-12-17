@@ -2,9 +2,9 @@
 
 #![allow(dead_code)]
 
-use std::{collections::HashMap, fmt::Display, vec};
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::{collections::HashMap, fmt::Display, vec};
 
 use libafl::SerdeAny;
 use serde::{Deserialize, Serialize};

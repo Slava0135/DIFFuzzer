@@ -8,10 +8,10 @@ use log::info;
 
 mod abstract_fs;
 mod args;
+mod blackbox;
 mod config;
 mod greybox;
 mod mount;
-mod blackbox;
 mod utils;
 
 fn main() {
