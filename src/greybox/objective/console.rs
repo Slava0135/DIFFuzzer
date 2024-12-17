@@ -59,8 +59,12 @@ where
         _exit_kind: &libafl::executors::ExitKind,
     ) -> Result<bool, libafl::Error> {
         debug!("do console objective");
-        let fst_output = Output::try_parse(self.fst_stdout.borrow().to_owned());
-        let snd_output = Output::try_parse(self.snd_stdout.borrow().to_owned());
+        self.metadata.fst_stdout = self.fst_stdout.borrow().clone();
+        self.metadata.fst_stderr = self.fst_stderr.borrow().clone();
+        self.metadata.snd_stdout = self.snd_stdout.borrow().clone();
+        self.metadata.snd_stderr = self.snd_stderr.borrow().clone();
+        let fst_output = Output::try_parse(&self.metadata.fst_stdout);
+        let snd_output = Output::try_parse(&self.metadata.snd_stdout);
         match (fst_output, snd_output) {
             (Ok(fst_output), Ok(snd_output)) => Ok(fst_output.success_n != snd_output.success_n
                 || fst_output.failure_n != snd_output.failure_n),
@@ -76,10 +80,6 @@ where
         _observers: &OT,
         testcase: &mut libafl::corpus::Testcase<Workload>,
     ) -> Result<(), libafl::Error> {
-        self.metadata.fst_stdout = self.fst_stdout.borrow().clone();
-        self.metadata.fst_stderr = self.fst_stderr.borrow().clone();
-        self.metadata.snd_stdout = self.snd_stdout.borrow().clone();
-        self.metadata.snd_stderr = self.snd_stderr.borrow().clone();
         testcase.metadata_map_mut().insert(self.metadata.clone());
         Ok(())
     }

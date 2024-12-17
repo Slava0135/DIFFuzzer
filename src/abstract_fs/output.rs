@@ -24,7 +24,7 @@ impl From<ParseIntError> for OutputError {
 }
 
 impl Output {
-    pub fn try_parse(output: String) -> Result<Output> {
+    pub fn try_parse(output: &str) -> Result<Output> {
         let last = output.lines().last().ok_or(OutputError::Empty)?;
         let re = Regex::new(
             r"\s*#SUCCESS:\s*(?P<success_n>\d+)\s*[|]\s#FAILURE:\s*(?P<failure_n>\d+)\s*",
@@ -46,14 +46,14 @@ mod tests {
 
     #[test]
     fn test_parse_empty() {
-        assert_eq!(Err(OutputError::Empty), Output::try_parse("".to_owned()));
+        assert_eq!(Err(OutputError::Empty), Output::try_parse(""));
     }
 
     #[test]
     fn test_parse_invalid() {
         assert_eq!(
             Err(OutputError::Regex),
-            Output::try_parse("#SUCCESS 10 | #FAILURE 0".to_owned())
+            Output::try_parse("#SUCCESS 10 | #FAILURE 0")
         );
     }
 
@@ -64,7 +64,7 @@ mod tests {
                 success_n: 10,
                 failure_n: 0
             }),
-            Output::try_parse("foo\nbar\n#SUCCESS: 10 | #FAILURE: 0".to_owned())
+            Output::try_parse("foo\nbar\n#SUCCESS: 10 | #FAILURE: 0")
         );
     }
 }
