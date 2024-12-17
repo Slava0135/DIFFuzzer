@@ -29,7 +29,7 @@ pub trait FileSystemMount: Display {
         mkfs.output()?;
 
         let mut mount = Command::new("mount");
-        mount.arg("-t").arg(self.mount_t()).arg(DEVICE).arg(path);
+        mount.arg("-t").arg(Self::mount_t()).arg(DEVICE).arg(path);
         debug!("mounting fs: {}", format!("{:?}", mount));
         mount.output()?;
 
@@ -66,7 +66,7 @@ pub trait FileSystemMount: Display {
 
     /// Used in default implementation: `mount -t` argument.
     /// Example: `"ext4"` or `"btrfs"`
-    fn mount_t(&self) -> String {
+    fn mount_t() -> String {
         todo!()
     }
 }
