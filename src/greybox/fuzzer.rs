@@ -12,7 +12,7 @@ use rand::{rngs::StdRng, SeedableRng};
 use crate::{
     abstract_fs::{
         compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME},
-        types::Workload,
+        types::{ConsolePipe, Workload},
     },
     config::Config,
     greybox::objective::{console::ConsoleObjective, trace::TraceObjective},
@@ -22,12 +22,23 @@ use crate::{
 
 use super::{feedback::kcov::KCovFeedback, harness::Harness, mutator::Mutator};
 
+const TRACE_FILENAME: &str = "trace.csv";
+const KCOV_FILENAME: &str = "kcov.dat";
+
 pub struct Fuzzer {
     corpus: Vec<Workload>,
     next_seed: usize,
 
     fst_exec_dir: Box<Path>,
     snd_exec_dir: Box<Path>,
+    fst_trace_path: Box<Path>,
+    snd_trace_path: Box<Path>,
+
+    fst_stdout: ConsolePipe,
+    snd_stdout: ConsolePipe,
+    fst_stderr: ConsolePipe,
+    snd_stderr: ConsolePipe,
+
     test_dir: Box<Path>,
     crashes_path: Box<Path>,
 
@@ -37,6 +48,8 @@ pub struct Fuzzer {
     trace_objective: TraceObjective,
     console_objective: ConsoleObjective,
 
+    fst_fs_name: String,
+    snd_fs_name: String,
     fst_harness: Harness<Ext4>,
     snd_harness: Harness<Btrfs>,
 
@@ -72,10 +85,10 @@ impl Fuzzer {
         let test_dir = temp_dir.clone();
         let fst_exec_dir = temp_dir.join("fst_exec");
         let snd_exec_dir = temp_dir.join("snd_exec");
-        let fst_trace_path = fst_exec_dir.join("trace.csv");
-        let fst_kcov_path = fst_exec_dir.join("kcov.dat");
-        let snd_trace_path = snd_exec_dir.join("trace.csv");
-        let snd_kcov_path = snd_exec_dir.join("kcov.dat");
+        let fst_trace_path = fst_exec_dir.join(TRACE_FILENAME);
+        let fst_kcov_path = fst_exec_dir.join(KCOV_FILENAME);
+        let snd_trace_path = snd_exec_dir.join(TRACE_FILENAME);
+        let snd_kcov_path = snd_exec_dir.join(KCOV_FILENAME);
 
         let crashes_path = Path::new("./crashes");
         fs::create_dir(crashes_path).unwrap_or(());
@@ -99,25 +112,29 @@ impl Fuzzer {
             snd_stderr.clone(),
         );
 
+        let fst_mount = Ext4::new();
+        let fst_fs_name = fst_mount.to_string();
         let fst_harness = Harness::new(
-            Ext4::new(),
+            fst_mount,
             Path::new("/mnt")
-                .join("ext4")
+                .join(fst_fs_name.to_lowercase())
                 .join("fstest")
                 .into_boxed_path(),
             fst_exec_dir.clone().into_boxed_path(),
-            fst_stdout,
-            fst_stderr,
+            fst_stdout.clone(),
+            fst_stderr.clone(),
         );
+        let snd_mount = Btrfs::new();
+        let snd_fs_name = snd_mount.to_string();
         let snd_harness = Harness::new(
             Btrfs::new(),
             Path::new("/mnt")
-                .join("btrfs")
+                .join(snd_fs_name.to_lowercase())
                 .join("fstest")
                 .into_boxed_path(),
             snd_exec_dir.clone().into_boxed_path(),
-            snd_stdout,
-            snd_stderr,
+            snd_stdout.clone(),
+            snd_stderr.clone(),
         );
 
         let mutator = Mutator::new(
@@ -139,6 +156,14 @@ impl Fuzzer {
 
             fst_exec_dir: fst_exec_dir.into_boxed_path(),
             snd_exec_dir: snd_exec_dir.into_boxed_path(),
+            fst_trace_path: fst_trace_path.into_boxed_path(),
+            snd_trace_path: snd_trace_path.into_boxed_path(),
+
+            fst_stdout,
+            snd_stdout,
+            fst_stderr,
+            snd_stderr,
+
             test_dir: test_dir.into_boxed_path(),
             crashes_path: crashes_path.to_path_buf().into_boxed_path(),
 
@@ -147,6 +172,9 @@ impl Fuzzer {
 
             trace_objective,
             console_objective,
+
+            fst_fs_name,
+            snd_fs_name,
 
             fst_harness,
             snd_harness,
@@ -250,6 +278,36 @@ impl Fuzzer {
         debug!("saving workload as json at '{}'", json_path.display());
         let json = serde_json::to_string_pretty(&input)?;
         fs::write(json_path, json)?;
+
+        let fst_trace_path = crash_dir.join(format!("{}.{}", &self.fst_fs_name, TRACE_FILENAME));
+        let snd_trace_path = crash_dir.join(format!("{}.{}", &self.snd_fs_name, TRACE_FILENAME));
+        debug!(
+            "saving traces at '{}' and '{}'",
+            fst_trace_path.display(),
+            snd_trace_path.display()
+        );
+        fs::copy(self.fst_trace_path.as_ref(), fst_trace_path)?;
+        fs::copy(self.snd_trace_path.as_ref(), snd_trace_path)?;
+
+        let fst_stdout_path = crash_dir.join(format!("{}.stdout.txt", &self.fst_fs_name));
+        let snd_stdout_path = crash_dir.join(format!("{}.stdout.txt", &self.snd_fs_name));
+        debug!(
+            "saving stdout at '{}' and '{}'",
+            fst_stdout_path.display(),
+            snd_stdout_path.display()
+        );
+        fs::write(fst_stdout_path, self.fst_stdout.borrow().clone())?;
+        fs::write(snd_stdout_path, self.snd_stdout.borrow().clone())?;
+
+        let fst_stderr_path = crash_dir.join(format!("{}.stderr.txt", &self.fst_fs_name));
+        let snd_stderr_path = crash_dir.join(format!("{}.stderr.txt", &self.snd_fs_name));
+        debug!(
+            "saving stderr at '{}' and '{}'",
+            fst_stderr_path.display(),
+            snd_stderr_path.display()
+        );
+        fs::write(fst_stderr_path, self.fst_stderr.borrow().clone())?;
+        fs::write(snd_stderr_path, self.snd_stderr.borrow().clone())?;
 
         self.stats.crashes += 1;
         Ok(())
