@@ -230,6 +230,9 @@ impl Fuzzer {
             "creating testcase crash directory at '{}'",
             crash_dir.display()
         );
+        if fs::exists(crash_dir.as_path())? {
+            return Ok(());
+        }
         fs::create_dir(crash_dir.as_path())?;
 
         let source_path = crash_dir.join(TEST_SOURCE_FILENAME);
