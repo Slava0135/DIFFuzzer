@@ -5,7 +5,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use log::info;
+use log::{debug, error, info};
 use rand::{rngs::StdRng, SeedableRng};
 
 use crate::{
@@ -21,6 +21,8 @@ use super::{feedback::kcov::KCovFeedback, harness::Harness, mutator::Mutator};
 pub struct Fuzzer {
     corpus: Vec<Workload>,
     next_seed: usize,
+
+    test_dir: Box<Path>,
 
     fst_kcov_feedback: KCovFeedback,
     snd_kcov_feedback: KCovFeedback,
@@ -72,7 +74,6 @@ impl Fuzzer {
                 .join("ext4")
                 .join("fstest")
                 .into_boxed_path(),
-            test_dir.clone().into_boxed_path(),
             exec_dir.clone().into_boxed_path(),
             fst_stdout,
             fst_stderr,
@@ -83,7 +84,6 @@ impl Fuzzer {
                 .join("btrfs")
                 .join("fstest")
                 .into_boxed_path(),
-            test_dir.clone().into_boxed_path(),
             exec_dir.clone().into_boxed_path(),
             snd_stdout,
             snd_stderr,
@@ -106,6 +106,8 @@ impl Fuzzer {
             corpus: vec![Workload::new()],
             next_seed: 0,
 
+            test_dir: test_dir.into_boxed_path(),
+
             fst_kcov_feedback,
             snd_kcov_feedback,
 
@@ -122,9 +124,21 @@ impl Fuzzer {
     pub fn fuzz(&mut self) {
         info!("starting fuzzing loop");
         loop {
-            let input = self.pick_input();
-            let input = self.mutator.mutate(input);
+            match self.fuzz_one() {
+                Err(err) => error!("{}", err),
+                _ => {}
+            }
         }
+    }
+
+    fn fuzz_one(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        debug!("picking input");
+        let input = self.pick_input();
+        debug!("mutating input");
+        let input = self.mutator.mutate(input);
+        debug!("compiling test at '{}'", self.test_dir.display());
+        let test_executable = input.compile(&self.test_dir)?;
+        Ok(())
     }
 
     fn pick_input(&mut self) -> Workload {

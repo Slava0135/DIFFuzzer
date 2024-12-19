@@ -45,7 +45,6 @@ impl Mutator {
         input
     }
     fn mutate_once(&mut self, input: &mut Workload) -> bool {
-        debug!("mutating input");
         let mut mutations = self.mutation_weights.clone();
         if input.ops.is_empty() {
             mutations
