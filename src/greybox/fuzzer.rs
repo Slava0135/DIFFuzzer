@@ -142,16 +142,37 @@ impl Fuzzer {
     fn fuzz_one(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         debug!("picking input");
         let input = self.pick_input();
+
         debug!("mutating input");
         let input = self.mutator.mutate(input);
+
         debug!("compiling test at '{}'", self.test_dir.display());
         let input_path = input.compile(&self.test_dir)?;
+
         debug!("setting up executable directories");
         setup_dir(self.fst_exec_dir.as_ref())?;
         setup_dir(self.snd_exec_dir.as_ref())?;
+
         debug!("running harness");
         self.fst_harness.run(&input_path)?;
         self.snd_harness.run(&input_path)?;
+
+        debug!("doing objectives");
+        let console_is_interesting = self.console_objective.is_interesting()?;
+        let trace_is_interesting = self.trace_objective.is_interesting()?;
+        if console_is_interesting || trace_is_interesting {
+            self.report_crash();
+            return Ok(());
+        }
+
+        debug!("getting feedback");
+        let fst_kcov_is_interesting = self.fst_kcov_feedback.is_interesting()?;
+        let snd_kcov_is_interesting = self.snd_kcov_feedback.is_interesting()?;
+        if fst_kcov_is_interesting || snd_kcov_is_interesting {
+            self.add_to_corpus();
+            return Ok(());
+        }
+
         Ok(())
     }
 
@@ -160,6 +181,14 @@ impl Fuzzer {
             self.next_seed = 0
         }
         self.corpus.get(self.next_seed).unwrap().clone()
+    }
+
+    fn report_crash(&self) {
+        debug!("report crash");
+    }
+
+    fn add_to_corpus(&mut self) {
+        debug!("adding new seed to corpus");
     }
 }
 
