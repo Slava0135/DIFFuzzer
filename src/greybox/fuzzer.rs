@@ -10,7 +10,11 @@ use log::{debug, error, info};
 use rand::{rngs::StdRng, SeedableRng};
 
 use crate::{
-    abstract_fs::types::Workload,
+    abstract_fs::{
+        compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME},
+        encode::encode_c,
+        types::Workload,
+    },
     config::Config,
     greybox::objective::{console::ConsoleObjective, trace::TraceObjective},
     mount::{btrfs::Btrfs, ext4::Ext4},
@@ -26,6 +30,7 @@ pub struct Fuzzer {
     fst_exec_dir: Box<Path>,
     snd_exec_dir: Box<Path>,
     test_dir: Box<Path>,
+    crashes_path: Box<Path>,
 
     fst_kcov_feedback: KCovFeedback,
     snd_kcov_feedback: KCovFeedback,
@@ -72,6 +77,9 @@ impl Fuzzer {
         let fst_kcov_path = fst_exec_dir.join("kcov.dat");
         let snd_trace_path = snd_exec_dir.join("trace.csv");
         let snd_kcov_path = snd_exec_dir.join("kcov.dat");
+
+        let crashes_path = Path::new("./crashes");
+        fs::create_dir(crashes_path).unwrap_or(());
 
         let fst_stdout = Rc::new(RefCell::new("".to_owned()));
         let fst_stderr = Rc::new(RefCell::new("".to_owned()));
@@ -133,6 +141,7 @@ impl Fuzzer {
             fst_exec_dir: fst_exec_dir.into_boxed_path(),
             snd_exec_dir: snd_exec_dir.into_boxed_path(),
             test_dir: test_dir.into_boxed_path(),
+            crashes_path: crashes_path.to_path_buf().into_boxed_path(),
 
             fst_kcov_feedback,
             snd_kcov_feedback,
@@ -182,7 +191,8 @@ impl Fuzzer {
         let console_is_interesting = self.console_objective.is_interesting()?;
         let trace_is_interesting = self.trace_objective.is_interesting()?;
         if console_is_interesting || trace_is_interesting {
-            self.report_crash();
+            self.report_crash(input, &input_path)?;
+            self.show_stats();
             return Ok(());
         }
 
@@ -191,6 +201,7 @@ impl Fuzzer {
         let snd_kcov_is_interesting = self.snd_kcov_feedback.is_interesting()?;
         if fst_kcov_is_interesting || snd_kcov_is_interesting {
             self.add_to_corpus(input);
+            self.show_stats();
             return Ok(());
         }
 
@@ -207,15 +218,22 @@ impl Fuzzer {
         workload
     }
 
-    fn report_crash(&mut self) {
-        self.stats.crashes += 1;
+    fn report_crash(&mut self, input: Workload, input_path: &Path) -> io::Result<()> {
         debug!("report crash");
+        let name = input.generate_name();
+        let crash_dir = self.crashes_path.join(name);
+        debug!("creating testcase crash directory");
+        fs::create_dir(crash_dir.as_path())?;
+        debug!("saving metadata");
+        fs::write(crash_dir.join(TEST_SOURCE_FILENAME), encode_c(input))?;
+        fs::copy(input_path, crash_dir.join(TEST_EXE_FILENAME))?;
+        self.stats.crashes += 1;
+        Ok(())
     }
 
     fn add_to_corpus(&mut self, input: Workload) {
         debug!("adding new input to corpus");
         self.corpus.push(input);
-        self.show_stats();
     }
 
     fn show_stats(&self) {
