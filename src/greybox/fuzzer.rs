@@ -164,7 +164,7 @@ impl Fuzzer {
         loop {
             match self.fuzz_one() {
                 Err(err) => error!("{}", err),
-                _ => {}
+                _ => self.stats.executions += 1,
             }
         }
     }
@@ -205,7 +205,6 @@ impl Fuzzer {
             return Ok(());
         }
 
-        self.stats.executions += 1;
         Ok(())
     }
 
