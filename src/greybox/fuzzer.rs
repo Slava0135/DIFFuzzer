@@ -255,9 +255,9 @@ impl Fuzzer {
             .as_secs_f64();
         info!(
             "corpus: {}, crashes: {}, executions: {}, exec/s: {:.2}",
-            self.stats.executions,
             self.corpus.len(),
             self.stats.crashes,
+            self.stats.executions,
             (self.stats.executions as f64) / secs_since_start
         );
     }
