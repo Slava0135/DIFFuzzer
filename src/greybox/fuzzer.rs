@@ -55,6 +55,8 @@ pub struct Fuzzer {
 
     mutator: Mutator,
 
+    heartbeat_interval: u16,
+
     stats: Stats,
 }
 
@@ -62,6 +64,7 @@ struct Stats {
     executions: usize,
     crashes: usize,
     start: Instant,
+    last_time_showed: Instant,
 }
 
 impl Stats {
@@ -70,6 +73,7 @@ impl Stats {
             executions: 0,
             crashes: 0,
             start: Instant::now(),
+            last_time_showed: Instant::now(),
         }
     }
 }
@@ -181,6 +185,8 @@ impl Fuzzer {
 
             mutator,
 
+            heartbeat_interval: config.greybox.heartbeat_interval,
+
             stats: Stats::new(),
         }
     }
@@ -192,6 +198,13 @@ impl Fuzzer {
             match self.fuzz_one() {
                 Err(err) => error!("{}", err),
                 _ => self.stats.executions += 1,
+            }
+            if Instant::now()
+                .duration_since(self.stats.last_time_showed)
+                .as_secs()
+                > self.heartbeat_interval.into()
+            {
+                self.show_stats();
             }
         }
     }
@@ -318,7 +331,8 @@ impl Fuzzer {
         self.corpus.push(input);
     }
 
-    fn show_stats(&self) {
+    fn show_stats(&mut self) {
+        self.stats.last_time_showed = Instant::now();
         let since_start = Instant::now().duration_since(self.stats.start);
         let secs = since_start.as_secs();
         info!(

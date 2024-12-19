@@ -2,6 +2,7 @@
 max_workload_length = 100
 max_mutations = 10
 timeout = 10 # in seconds
+heartbeat_interval = 30 # in seconds
 
 [operation_weights]
 weights = [
