@@ -194,6 +194,7 @@ impl Fuzzer {
             return Ok(());
         }
 
+        self.stats.executions += 1;
         Ok(())
     }
 
