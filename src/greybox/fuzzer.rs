@@ -180,7 +180,9 @@ impl Fuzzer {
         if self.next_seed >= self.corpus.len() {
             self.next_seed = 0
         }
-        self.corpus.get(self.next_seed).unwrap().clone()
+        let workload = self.corpus.get(self.next_seed).unwrap().clone();
+        self.next_seed += 1;
+        workload
     }
 
     fn report_crash(&self) {
