@@ -244,10 +244,10 @@ impl Fuzzer {
         );
         fs::copy(input_path, exe_path)?;
 
-        let json_path = crash_dir.with_extension("json");
+        let json_path = crash_dir.join("test").with_extension("json");
         debug!("saving workload as json at '{}'", json_path.display());
         let json = serde_json::to_string_pretty(&input)?;
-        std::fs::write(json_path, json)?;
+        fs::write(json_path, json)?;
 
         self.stats.crashes += 1;
         Ok(())
