@@ -224,15 +224,18 @@ impl Fuzzer {
     fn report_crash(&mut self, input: Workload, input_path: &Path) -> io::Result<()> {
         let name = input.generate_name();
         debug!("report crash '{}'", name);
+
         let crash_dir = self.crashes_path.join(name);
         debug!(
             "creating testcase crash directory at '{}'",
             crash_dir.display()
         );
         fs::create_dir(crash_dir.as_path())?;
+
         let source_path = crash_dir.join(TEST_SOURCE_FILENAME);
         debug!("saving source code at '{}'", source_path.display());
-        fs::write(source_path, encode_c(input))?;
+        fs::write(source_path, encode_c(input.clone()))?;
+
         let exe_path = crash_dir.join(TEST_EXE_FILENAME);
         debug!(
             "copying executable from '{}' to '{}'",
@@ -240,6 +243,12 @@ impl Fuzzer {
             exe_path.display()
         );
         fs::copy(input_path, exe_path)?;
+
+        let json_path = crash_dir.with_extension("json");
+        debug!("saving workload as json at '{}'", json_path.display());
+        let json = serde_json::to_string_pretty(&input)?;
+        std::fs::write(json_path, json)?;
+
         self.stats.crashes += 1;
         Ok(())
     }
