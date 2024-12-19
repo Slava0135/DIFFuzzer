@@ -1,3 +1,5 @@
+use std::error::Error;
+use std::fmt::Display;
 use std::io;
 use std::string::FromUtf8Error;
 use std::{path::Path, process::Command};
@@ -24,6 +26,17 @@ impl From<FromUtf8Error> for HarnessError {
         HarnessError::FromUtf8Error(value)
     }
 }
+
+impl Display for HarnessError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HarnessError::IOError(err) => write!(f, "IOError: {}", err),
+            HarnessError::FromUtf8Error(err) => write!(f, "FromUtf8Error: {}", err),
+        }
+    }
+}
+
+impl Error for HarnessError {}
 
 pub fn harness<T: FileSystemMount>(
     input_path: &Path,

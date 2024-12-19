@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    fs, io,
     path::Path,
     rc::Rc,
     time::{SystemTime, UNIX_EPOCH},
@@ -22,6 +23,8 @@ pub struct Fuzzer {
     corpus: Vec<Workload>,
     next_seed: usize,
 
+    fst_exec_dir: Box<Path>,
+    snd_exec_dir: Box<Path>,
     test_dir: Box<Path>,
 
     fst_kcov_feedback: KCovFeedback,
@@ -45,21 +48,24 @@ impl Fuzzer {
 
         info!("setting up fuzzing components");
         let test_dir = temp_dir.clone();
-        let exec_dir = temp_dir.join("exec");
-        let trace_path = exec_dir.join("trace.csv");
-        let kcov_path = exec_dir.join("kcov.dat");
+        let fst_exec_dir = temp_dir.join("fst_exec");
+        let snd_exec_dir = temp_dir.join("snd_exec");
+        let fst_trace_path = fst_exec_dir.join("trace.csv");
+        let fst_kcov_path = fst_exec_dir.join("kcov.dat");
+        let snd_trace_path = snd_exec_dir.join("trace.csv");
+        let snd_kcov_path = snd_exec_dir.join("kcov.dat");
 
         let fst_stdout = Rc::new(RefCell::new("".to_owned()));
         let fst_stderr = Rc::new(RefCell::new("".to_owned()));
         let snd_stdout = Rc::new(RefCell::new("".to_owned()));
         let snd_stderr = Rc::new(RefCell::new("".to_owned()));
 
-        let fst_kcov_feedback = KCovFeedback::new(kcov_path.clone().into_boxed_path());
-        let snd_kcov_feedback = KCovFeedback::new(kcov_path.clone().into_boxed_path());
+        let fst_kcov_feedback = KCovFeedback::new(fst_kcov_path.clone().into_boxed_path());
+        let snd_kcov_feedback = KCovFeedback::new(snd_kcov_path.clone().into_boxed_path());
 
         let trace_objective = TraceObjective::new(
-            trace_path.clone().into_boxed_path(),
-            trace_path.clone().into_boxed_path(),
+            fst_trace_path.clone().into_boxed_path(),
+            snd_trace_path.clone().into_boxed_path(),
         );
         let console_objective = ConsoleObjective::new(
             fst_stdout.clone(),
@@ -74,7 +80,7 @@ impl Fuzzer {
                 .join("ext4")
                 .join("fstest")
                 .into_boxed_path(),
-            exec_dir.clone().into_boxed_path(),
+            fst_exec_dir.clone().into_boxed_path(),
             fst_stdout,
             fst_stderr,
         );
@@ -84,7 +90,7 @@ impl Fuzzer {
                 .join("btrfs")
                 .join("fstest")
                 .into_boxed_path(),
-            exec_dir.clone().into_boxed_path(),
+            snd_exec_dir.clone().into_boxed_path(),
             snd_stdout,
             snd_stderr,
         );
@@ -106,6 +112,8 @@ impl Fuzzer {
             corpus: vec![Workload::new()],
             next_seed: 0,
 
+            fst_exec_dir: fst_exec_dir.into_boxed_path(),
+            snd_exec_dir: snd_exec_dir.into_boxed_path(),
             test_dir: test_dir.into_boxed_path(),
 
             fst_kcov_feedback,
@@ -137,7 +145,13 @@ impl Fuzzer {
         debug!("mutating input");
         let input = self.mutator.mutate(input);
         debug!("compiling test at '{}'", self.test_dir.display());
-        let test_executable = input.compile(&self.test_dir)?;
+        let input_path = input.compile(&self.test_dir)?;
+        debug!("setting up executable directories");
+        setup_dir(self.fst_exec_dir.as_ref())?;
+        setup_dir(self.snd_exec_dir.as_ref())?;
+        debug!("running harness");
+        self.fst_harness.run(&input_path)?;
+        self.snd_harness.run(&input_path)?;
         Ok(())
     }
 
@@ -147,4 +161,9 @@ impl Fuzzer {
         }
         self.corpus.get(self.next_seed).unwrap().clone()
     }
+}
+
+fn setup_dir(path: &Path) -> io::Result<()> {
+    fs::remove_dir_all(path).unwrap_or(());
+    fs::create_dir(path)
 }
