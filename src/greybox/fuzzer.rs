@@ -250,15 +250,17 @@ impl Fuzzer {
     }
 
     fn show_stats(&self) {
-        let secs_since_start = Instant::now()
-            .duration_since(self.stats.start)
-            .as_secs_f64();
+        let since_start = Instant::now().duration_since(self.stats.start);
+        let secs = since_start.as_secs();
         info!(
-            "corpus: {}, crashes: {}, executions: {}, exec/s: {:.2}",
+            "corpus: {}, crashes: {}, executions: {}, exec/s: {:.2}, time: {}:{}:{}",
             self.corpus.len(),
             self.stats.crashes,
             self.stats.executions,
-            (self.stats.executions as f64) / secs_since_start
+            (self.stats.executions as f64) / (secs as f64),
+            secs / (60 * 60),
+            (secs / (60)) % 60,
+            secs % 60,
         );
     }
 }
