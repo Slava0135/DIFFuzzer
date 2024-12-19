@@ -253,7 +253,7 @@ impl Fuzzer {
         let since_start = Instant::now().duration_since(self.stats.start);
         let secs = since_start.as_secs();
         info!(
-            "corpus: {}, crashes: {}, executions: {}, exec/s: {:.2}, time: {}:{}:{}",
+            "corpus: {}, crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
             self.corpus.len(),
             self.stats.crashes,
             self.stats.executions,
