@@ -3,10 +3,10 @@
 #![allow(dead_code)]
 
 use std::cell::RefCell;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::rc::Rc;
 use std::{collections::HashMap, fmt::Display, vec};
 
-use libafl::SerdeAny;
 use serde::{Deserialize, Serialize};
 
 /// Flags for `open(path, flags, mode)` syscall.
@@ -77,7 +77,7 @@ pub enum OpenFlag {
 
     O_TTY_INIT,
 }
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize, SerdeAny)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
 #[allow(nonstandard_style)]
 pub enum ModeFlag {
     /// Read, write, execute/search by owner.
@@ -166,7 +166,7 @@ pub enum Node {
     DIR(DirIndex),
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize, SerdeAny)]
+#[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
 pub enum Operation {
     MKDIR { path: PathName, mode: Mode },
     CREATE { path: PathName, mode: Mode },
@@ -218,7 +218,7 @@ impl MutationWeights {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize, SerdeAny)]
+#[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
 pub struct Workload {
     pub ops: Vec<Operation>,
 }
@@ -229,6 +229,11 @@ impl Workload {
     }
     pub fn push(&mut self, op: Operation) {
         self.ops.push(op);
+    }
+    pub fn generate_name(&self) -> String {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        format!("{:016x}", hasher.finish())
     }
 }
 

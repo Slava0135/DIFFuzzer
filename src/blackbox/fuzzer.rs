@@ -3,13 +3,13 @@ use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use rand::SeedableRng;
 use rand::prelude::StdRng;
+use rand::SeedableRng;
 
 use crate::abstract_fs::types::ConsolePipe;
 use crate::blackbox::hasher::Hasher;
 use crate::config::Config;
-use crate::harness::{HarnessError, harness};
+use crate::harness::{harness, HarnessError};
 use crate::mount::mount::FileSystemMount;
 use crate::temp_dir::setup_temp_dir;
 use crate::{abstract_fs::generator::generate_new, abstract_fs::types::Workload};

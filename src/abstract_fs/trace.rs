@@ -1,4 +1,4 @@
-use std::num::ParseIntError;
+use std::{error::Error, fmt::Display, num::ParseIntError};
 
 use serde::{Deserialize, Serialize};
 
@@ -29,6 +29,20 @@ impl From<ParseIntError> for TraceError {
         TraceError::IntParse(err)
     }
 }
+
+impl Display for TraceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TraceError::EmptyTrace => write!(f, "EmptyTraceError"),
+            TraceError::InvalidColumnsCount => write!(f, "InvalidColumnsCountError"),
+            TraceError::IntParse(parse_int_error) => {
+                write!(f, "IntParseError: {}", parse_int_error)
+            }
+        }
+    }
+}
+
+impl Error for TraceError {}
 
 impl Trace {
     pub fn try_parse(trace: String) -> Result<Trace> {

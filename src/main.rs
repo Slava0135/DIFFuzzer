@@ -3,7 +3,7 @@ use std::fs;
 use args::Args;
 use clap::Parser;
 use config::Config;
-use greybox::fuzzer::fuzz;
+use greybox::fuzzer::Fuzzer;
 use log::info;
 
 mod abstract_fs;
@@ -23,5 +23,6 @@ fn main() {
     info!("reading configuration");
     let config = fs::read_to_string(args.config_path).expect("failed to read configuration file");
     let config: Config = toml::from_str(&config).expect("bad configuration");
-    fuzz(config);
+    let fuzzer = Fuzzer::new(config);
+    fuzzer.fuzz();
 }

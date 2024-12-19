@@ -1,166 +1,124 @@
-use std::{cell::RefCell, num::NonZero, path::Path, rc::Rc, time::Duration};
+use std::{
+    cell::RefCell,
+    path::Path,
+    rc::Rc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
-use libafl::{
-    Error, Fuzzer, StdFuzzer,
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
-    events::SimpleEventManager,
-    executors::{DiffExecutor, InProcessExecutor},
-    feedback_and, feedback_or,
-    monitors::SimpleMonitor,
-    schedulers::QueueScheduler,
-    stages::StdMutationalStage,
-    state::{HasCorpus, StdState},
-};
-use libafl_bolts::{
-    current_nanos,
-    rands::StdRand,
-    tuples::{Handled, tuple_list},
-};
-use log::{error, info};
-use rand::{SeedableRng, rngs::StdRng};
+use log::info;
+use rand::{rngs::StdRng, SeedableRng};
 
 use crate::{
     abstract_fs::types::Workload,
     config::Config,
-    greybox::{harness::workload_harness, objective::{console::ConsoleObjective, save_test::SaveTestObjective}},
+    greybox::objective::{console::ConsoleObjective, trace::TraceObjective},
     mount::{btrfs::Btrfs, ext4::Ext4},
     temp_dir::setup_temp_dir,
 };
 
-use super::{
-    feedback::kcov::KCovFeedback,
-    input::WorkloadMutator,
-    objective::trace::TraceObjective,
-    observer::{kcov::KCovObserver, trace::TraceObserver},
-};
+use super::{feedback::kcov::KCovFeedback, harness::Harness, mutator::Mutator};
 
-pub fn fuzz(config: Config) {
-    info!("running greybox fuzzing");
-    info!("setting up temporary directory");
-    let temp_dir = setup_temp_dir();
+pub struct Fuzzer {
+    corpus: Vec<Workload>,
+    next_seed: usize,
 
-    info!("setting up fuzzing components");
-    let test_dir = temp_dir.clone();
-    let exec_dir = temp_dir.join("exec");
-    let trace_path = exec_dir.join("trace.csv");
-    let kcov_path = exec_dir.join("kcov.dat");
-    let crashes_dir = Path::new("./crashes").to_owned();
+    fst_kcov_feedback: KCovFeedback,
+    snd_kcov_feedback: KCovFeedback,
 
-    let fst_trace_observer = TraceObserver::new(trace_path.clone().into_boxed_path());
-    let snd_trace_observer = TraceObserver::new(trace_path.clone().into_boxed_path());
+    trace_objective: TraceObjective,
+    console_objective: ConsoleObjective,
 
-    let fst_kcov_observer = KCovObserver::new(kcov_path.clone().into_boxed_path());
-    let snd_kcov_observer = KCovObserver::new(kcov_path.clone().into_boxed_path());
+    fst_harness: Harness<Ext4>,
+    snd_harness: Harness<Btrfs>,
 
-    let fst_stdout = Rc::new(RefCell::new("".to_owned()));
-    let fst_stderr = Rc::new(RefCell::new("".to_owned()));
-    let snd_stdout = Rc::new(RefCell::new("".to_owned()));
-    let snd_stderr = Rc::new(RefCell::new("".to_owned()));
+    mutator: Mutator,
+}
 
-    let fst_kcov_feedback = KCovFeedback::new(fst_kcov_observer.handle());
-    let snd_kcov_feedback = KCovFeedback::new(snd_kcov_observer.handle());
+impl Fuzzer {
+    pub fn new(config: Config) -> Self {
+        info!("new greybox fuzzer");
 
-    let mut feedback = feedback_or!(fst_kcov_feedback, snd_kcov_feedback);
+        info!("setting up temporary directory");
+        let temp_dir = setup_temp_dir();
 
-    let objective = feedback_or!(
-        TraceObjective::new(fst_trace_observer.handle(), snd_trace_observer.handle()),
-        ConsoleObjective::new(
+        info!("setting up fuzzing components");
+        let test_dir = temp_dir.clone();
+        let exec_dir = temp_dir.join("exec");
+        let trace_path = exec_dir.join("trace.csv");
+        let kcov_path = exec_dir.join("kcov.dat");
+
+        let fst_stdout = Rc::new(RefCell::new("".to_owned()));
+        let fst_stderr = Rc::new(RefCell::new("".to_owned()));
+        let snd_stdout = Rc::new(RefCell::new("".to_owned()));
+        let snd_stderr = Rc::new(RefCell::new("".to_owned()));
+
+        let fst_kcov_feedback = KCovFeedback::new(kcov_path.clone().into_boxed_path());
+        let snd_kcov_feedback = KCovFeedback::new(kcov_path.clone().into_boxed_path());
+
+        let trace_objective = TraceObjective::new(
+            trace_path.clone().into_boxed_path(),
+            trace_path.clone().into_boxed_path(),
+        );
+        let console_objective = ConsoleObjective::new(
             fst_stdout.clone(),
             fst_stderr.clone(),
             snd_stdout.clone(),
             snd_stderr.clone(),
-        ),
-    );
-    let mut objective = feedback_and!(
-        objective,
-        SaveTestObjective::new(
+        );
+
+        let fst_harness = Harness::new(
+            Ext4::new(),
+            Path::new("/mnt")
+                .join("ext4")
+                .join("fstest")
+                .into_boxed_path(),
             test_dir.clone().into_boxed_path(),
-            crashes_dir.clone().into_boxed_path()
-        ),
-    );
+            exec_dir.clone().into_boxed_path(),
+            fst_stdout,
+            fst_stderr,
+        );
+        let snd_harness = Harness::new(
+            Btrfs::new(),
+            Path::new("/mnt")
+                .join("btrfs")
+                .join("fstest")
+                .into_boxed_path(),
+            test_dir.clone().into_boxed_path(),
+            exec_dir.clone().into_boxed_path(),
+            snd_stdout,
+            snd_stderr,
+        );
 
-    let mut state = StdState::new(
-        StdRand::with_seed(current_nanos()),
-        InMemoryCorpus::<Workload>::new(),
-        OnDiskCorpus::new(crashes_dir.clone()).unwrap(),
-        &mut feedback,
-        &mut objective,
-    )
-    .unwrap();
+        let mutator = Mutator::new(
+            StdRng::seed_from_u64(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64,
+            ),
+            config.operation_weights.clone(),
+            config.mutation_weights.clone(),
+            config.greybox.max_workload_length,
+        );
 
-    state
-        .corpus_mut()
-        .add(Testcase::new(Workload::new()))
-        .unwrap();
+        Self {
+            corpus: vec![Workload::new()],
+            next_seed: 0,
 
-    let monitor = SimpleMonitor::new(|s| info!("{s}"));
-    let mut manager = SimpleEventManager::new(monitor);
+            fst_kcov_feedback,
+            snd_kcov_feedback,
 
-    let scheduler = QueueScheduler::new();
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+            trace_objective,
+            console_objective,
 
-    let mut fst_harness = workload_harness(
-        Ext4::new(),
-        Path::new("/mnt")
-            .join("ext4")
-            .join("fstest")
-            .into_boxed_path(),
-        test_dir.clone().into_boxed_path(),
-        exec_dir.clone().into_boxed_path(),
-        fst_stdout,
-        fst_stderr,
-    );
-    let mut snd_harness = workload_harness(
-        Btrfs::new(),
-        Path::new("/mnt")
-            .join("btrfs")
-            .join("fstest")
-            .into_boxed_path(),
-        test_dir.clone().into_boxed_path(),
-        exec_dir.clone().into_boxed_path(),
-        snd_stdout,
-        snd_stderr,
-    );
+            fst_harness,
+            snd_harness,
 
-    let timeout = Duration::new(config.greybox.timeout.into(), 0);
-    let fst_executor = InProcessExecutor::with_timeout(
-        &mut fst_harness,
-        tuple_list!(fst_kcov_observer, fst_trace_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut manager,
-        timeout,
-    )
-    .unwrap();
-    let snd_executor = InProcessExecutor::with_timeout(
-        &mut snd_harness,
-        tuple_list!(snd_kcov_observer, snd_trace_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut manager,
-        timeout,
-    )
-    .unwrap();
-
-    let mut executor = DiffExecutor::new(fst_executor, snd_executor, tuple_list!());
-
-    let mutator = WorkloadMutator::new(
-        StdRng::seed_from_u64(current_nanos()),
-        config.operation_weights.clone(),
-        config.mutation_weights.clone(),
-        config.greybox.max_workload_length,
-    );
-    let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(
-        mutator,
-        NonZero::new(config.greybox.max_mutations.into()).unwrap()
-    ));
-
-    info!("starting fuzzing loop");
-    loop {
-        match fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut manager) {
-            Ok(_) => break,
-            Err(Error::ShuttingDown) => break,
-            Err(err) => error!("{err:?}"),
+            mutator,
         }
+    }
+
+    pub fn fuzz(self) {
+        info!("starting fuzzing loop");
     }
 }
