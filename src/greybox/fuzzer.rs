@@ -12,7 +12,6 @@ use rand::{rngs::StdRng, SeedableRng};
 use crate::{
     abstract_fs::{
         compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME},
-        encode::encode_c,
         types::Workload,
     },
     config::Config,
@@ -237,7 +236,7 @@ impl Fuzzer {
 
         let source_path = crash_dir.join(TEST_SOURCE_FILENAME);
         debug!("saving source code at '{}'", source_path.display());
-        fs::write(source_path, encode_c(input.clone()))?;
+        fs::write(source_path, input.clone().encode_c())?;
 
         let exe_path = crash_dir.join(TEST_EXE_FILENAME);
         debug!(
