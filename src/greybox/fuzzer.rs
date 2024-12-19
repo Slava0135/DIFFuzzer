@@ -3,7 +3,7 @@ use std::{
     fs, io,
     path::Path,
     rc::Rc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
 use log::{debug, error, info};
@@ -37,6 +37,24 @@ pub struct Fuzzer {
     snd_harness: Harness<Btrfs>,
 
     mutator: Mutator,
+
+    stats: Stats,
+}
+
+struct Stats {
+    executions: usize,
+    crashes: usize,
+    start: Instant,
+}
+
+impl Stats {
+    fn new() -> Self {
+        Stats {
+            executions: 0,
+            crashes: 0,
+            start: Instant::now(),
+        }
+    }
 }
 
 impl Fuzzer {
@@ -126,11 +144,14 @@ impl Fuzzer {
             snd_harness,
 
             mutator,
+
+            stats: Stats::new(),
         }
     }
 
     pub fn fuzz(&mut self) {
         info!("starting fuzzing loop");
+        self.stats.start = Instant::now();
         loop {
             match self.fuzz_one() {
                 Err(err) => error!("{}", err),
@@ -169,7 +190,7 @@ impl Fuzzer {
         let fst_kcov_is_interesting = self.fst_kcov_feedback.is_interesting()?;
         let snd_kcov_is_interesting = self.snd_kcov_feedback.is_interesting()?;
         if fst_kcov_is_interesting || snd_kcov_is_interesting {
-            self.add_to_corpus();
+            self.add_to_corpus(input);
             return Ok(());
         }
 
@@ -185,12 +206,28 @@ impl Fuzzer {
         workload
     }
 
-    fn report_crash(&self) {
+    fn report_crash(&mut self) {
+        self.stats.crashes += 1;
         debug!("report crash");
     }
 
-    fn add_to_corpus(&mut self) {
-        debug!("adding new seed to corpus");
+    fn add_to_corpus(&mut self, input: Workload) {
+        debug!("adding new input to corpus");
+        self.corpus.push(input);
+        self.show_stats();
+    }
+
+    fn show_stats(&self) {
+        let secs_since_start = Instant::now()
+            .duration_since(self.stats.start)
+            .as_secs_f64();
+        info!(
+            "corpus: {}, crashes: {}, executions: {}, exex/s: {:.2}",
+            self.stats.executions,
+            self.corpus.len(),
+            self.stats.crashes,
+            (self.stats.executions as f64) / secs_since_start
+        );
     }
 }
 
