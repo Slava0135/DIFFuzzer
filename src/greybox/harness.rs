@@ -1,41 +1,43 @@
 use std::path::Path;
 
-use libafl::executors::ExitKind;
-use log::error;
-
 use crate::{
-    abstract_fs::types::{ConsolePipe, Workload},
-    harness::harness,
+    abstract_fs::types::ConsolePipe,
+    harness::{harness, HarnessError},
     mount::mount::FileSystemMount,
 };
 
-pub fn workload_harness<T: FileSystemMount>(
+pub struct Harness<T: FileSystemMount> {
     fs_mount: T,
     fs_dir: Box<Path>,
-    test_dir: Box<Path>,
     exec_dir: Box<Path>,
     stdout: ConsolePipe,
     stderr: ConsolePipe,
-) -> impl Fn(&Workload) -> ExitKind {
-    return move |input: &Workload| match harness(
-        &input,
-        &fs_mount,
-        &fs_dir,
-        &test_dir,
-        &exec_dir,
-        stdout.clone(),
-        stderr.clone(),
-    ) {
-        Ok(ok) => {
-            if ok {
-                ExitKind::Ok
-            } else {
-                ExitKind::Crash
-            }
+}
+
+impl<T: FileSystemMount> Harness<T> {
+    pub fn new(
+        fs_mount: T,
+        fs_dir: Box<Path>,
+        exec_dir: Box<Path>,
+        stdout: ConsolePipe,
+        stderr: ConsolePipe,
+    ) -> Self {
+        Self {
+            fs_mount,
+            fs_dir,
+            exec_dir,
+            stdout,
+            stderr,
         }
-        Err(err) => {
-            error!("{err:?}");
-            panic!("{err:?}");
-        }
-    };
+    }
+    pub fn run(&self, input_path: &Path) -> Result<bool, HarnessError> {
+        harness(
+            input_path,
+            &self.fs_mount,
+            &self.fs_dir,
+            &self.exec_dir,
+            self.stdout.clone(),
+            self.stderr.clone(),
+        )
+    }
 }

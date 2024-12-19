@@ -1,53 +1,36 @@
-use std::{borrow::Cow, collections::HashSet};
+use std::{
+    collections::HashSet,
+    fs::File,
+    io::{BufRead, BufReader},
+    path::Path,
+};
 
-use libafl::{
-    feedbacks::{Feedback, StateInitializer},
-    state::State,
-};
-use libafl_bolts::{
-    Named,
-    tuples::{Handle, MatchNameRef},
-};
 use log::debug;
 
-use crate::{abstract_fs::types::Workload, greybox::observer::kcov::KCovObserver};
-
 pub struct KCovFeedback {
-    observer: Handle<KCovObserver>,
     all_coverage: HashSet<u64>,
+    kcov_path: Box<Path>,
 }
 
 impl KCovFeedback {
-    pub fn new(observer: Handle<KCovObserver>) -> Self {
+    pub fn new(kcov_path: Box<Path>) -> Self {
         Self {
-            observer,
             all_coverage: HashSet::new(),
+            kcov_path,
         }
     }
-}
-
-impl<S> StateInitializer<S> for KCovFeedback {}
-
-impl<EM, OT, S> Feedback<EM, Workload, OT, S> for KCovFeedback
-where
-    S: State,
-    OT: MatchNameRef,
-{
-    fn is_interesting(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &Workload,
-        observers: &OT,
-        _exit_kind: &libafl::executors::ExitKind,
-    ) -> Result<bool, libafl::Error> {
+    pub fn is_interesting(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
         debug!("do kcov feedback");
-        let coverage = &observers
-            .get(&self.observer)
-            .expect("failed to get kcov observer")
-            .coverage;
+        let kcov = File::open(self.kcov_path.as_ref())?;
+        let reader = BufReader::new(kcov);
+        let mut new_coverage = HashSet::new();
+        for line in reader.lines() {
+            let addr = line?;
+            let addr = parse_addr(addr)?;
+            new_coverage.insert(addr);
+        }
         let c = self.all_coverage.clone();
-        let diff: Vec<&u64> = coverage.difference(&c).collect();
+        let diff: Vec<&u64> = new_coverage.difference(&c).collect();
         if diff.is_empty() {
             Ok(false)
         } else {
@@ -59,8 +42,20 @@ where
     }
 }
 
-impl Named for KCovFeedback {
-    fn name(&self) -> &Cow<'static, str> {
-        &Cow::Borrowed("KCovFeedback")
+fn parse_addr(addr: String) -> Result<u64, std::num::ParseIntError> {
+    let prefix_removed = addr.trim_start_matches("0x");
+    u64::from_str_radix(prefix_removed, 16)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_addr() {
+        assert_eq!(
+            18446744071583434514,
+            parse_addr("0xffffffff81460712".to_owned()).unwrap()
+        );
     }
 }
