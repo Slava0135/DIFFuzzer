@@ -179,11 +179,15 @@ impl Fuzzer {
         debug!("compiling test at '{}'", self.test_dir.display());
         let input_path = input.compile(&self.test_dir)?;
 
-        debug!("setting up executable directories");
+        debug!(
+            "setting up executable directories at '{}' and '{}'",
+            self.fst_exec_dir.display(),
+            self.snd_exec_dir.display()
+        );
         setup_dir(self.fst_exec_dir.as_ref())?;
         setup_dir(self.snd_exec_dir.as_ref())?;
 
-        debug!("running harness");
+        debug!("running harness at '{}'", input_path.display());
         self.fst_harness.run(&input_path)?;
         self.snd_harness.run(&input_path)?;
 
@@ -218,14 +222,24 @@ impl Fuzzer {
     }
 
     fn report_crash(&mut self, input: Workload, input_path: &Path) -> io::Result<()> {
-        debug!("report crash");
         let name = input.generate_name();
+        debug!("report crash '{}'", name);
         let crash_dir = self.crashes_path.join(name);
-        debug!("creating testcase crash directory");
+        debug!(
+            "creating testcase crash directory at '{}'",
+            crash_dir.display()
+        );
         fs::create_dir(crash_dir.as_path())?;
-        debug!("saving metadata");
-        fs::write(crash_dir.join(TEST_SOURCE_FILENAME), encode_c(input))?;
-        fs::copy(input_path, crash_dir.join(TEST_EXE_FILENAME))?;
+        let source_path = crash_dir.join(TEST_SOURCE_FILENAME);
+        debug!("saving source code at '{}'", source_path.display());
+        fs::write(source_path, encode_c(input))?;
+        let exe_path = crash_dir.join(TEST_EXE_FILENAME);
+        debug!(
+            "copying executable from '{}' to '{}'",
+            input_path.display(),
+            exe_path.display()
+        );
+        fs::copy(input_path, exe_path)?;
         self.stats.crashes += 1;
         Ok(())
     }
