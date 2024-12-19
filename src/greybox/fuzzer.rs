@@ -99,6 +99,7 @@ impl Fuzzer {
             config.operation_weights.clone(),
             config.mutation_weights.clone(),
             config.greybox.max_workload_length,
+            config.greybox.max_mutations,
         );
 
         Self {
@@ -118,7 +119,18 @@ impl Fuzzer {
         }
     }
 
-    pub fn fuzz(self) {
+    pub fn fuzz(&mut self) {
         info!("starting fuzzing loop");
+        loop {
+            let input = self.pick_input();
+            let input = self.mutator.mutate(input);
+        }
+    }
+
+    fn pick_input(&mut self) -> Workload {
+        if self.next_seed >= self.corpus.len() {
+            self.next_seed = 0
+        }
+        self.corpus.get(self.next_seed).unwrap().clone()
     }
 }

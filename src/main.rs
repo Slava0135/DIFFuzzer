@@ -23,6 +23,6 @@ fn main() {
     info!("reading configuration");
     let config = fs::read_to_string(args.config_path).expect("failed to read configuration file");
     let config: Config = toml::from_str(&config).expect("bad configuration");
-    let fuzzer = Fuzzer::new(config);
+    let mut fuzzer = Fuzzer::new(config);
     fuzzer.fuzz();
 }

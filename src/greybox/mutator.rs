@@ -7,10 +7,11 @@ use crate::abstract_fs::{
 };
 
 pub struct Mutator {
-    pub rng: StdRng,
-    pub operation_weights: OperationWeights,
-    pub mutation_weights: MutationWeights,
-    pub max_length: u16,
+    rng: StdRng,
+    operation_weights: OperationWeights,
+    mutation_weights: MutationWeights,
+    max_length: u16,
+    max_mutations: u16,
 }
 
 impl Mutator {
@@ -19,18 +20,31 @@ impl Mutator {
         operation_weights: OperationWeights,
         mutation_weights: MutationWeights,
         max_length: u16,
+        max_mutations: u16,
     ) -> Self {
         Self {
             rng,
             operation_weights,
             mutation_weights,
             max_length,
+            max_mutations,
         }
     }
 }
 
 impl Mutator {
-    fn mutate(&mut self, input: &mut Workload) -> bool {
+    pub fn mutate(&mut self, input: Workload) -> Workload {
+        let mut input = input;
+        let mut count = 0;
+        let n = self.rng.gen_range(1..=self.max_mutations);
+        while count < n {
+            if self.mutate_once(&mut input) {
+                count += 1;
+            }
+        }
+        input
+    }
+    fn mutate_once(&mut self, input: &mut Workload) -> bool {
         debug!("mutating input");
         let mut mutations = self.mutation_weights.clone();
         if input.ops.is_empty() {
