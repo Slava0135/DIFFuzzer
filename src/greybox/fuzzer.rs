@@ -223,7 +223,7 @@ impl Fuzzer {
             .duration_since(self.stats.start)
             .as_secs_f64();
         info!(
-            "corpus: {}, crashes: {}, executions: {}, exex/s: {:.2}",
+            "corpus: {}, crashes: {}, executions: {}, exec/s: {:.2}",
             self.stats.executions,
             self.corpus.len(),
             self.stats.crashes,
