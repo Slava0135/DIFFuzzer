@@ -4,3 +4,4 @@ pub mod harness;
 pub mod input;
 pub mod objective;
 pub mod observer;
+pub mod metadata;

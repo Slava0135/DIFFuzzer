@@ -6,7 +6,6 @@ use std::{
 use libafl::{
     Error,
     corpus::CorpusId,
-    generators::Generator,
     inputs::Input,
     mutators::{MutationResult, Mutator},
     state::HasRand,
@@ -16,7 +15,6 @@ use log::debug;
 use rand::{Rng, rngs::StdRng, seq::SliceRandom};
 
 use crate::abstract_fs::{
-    generator::generate_new,
     mutator::{insert, remove},
     types::{MutationKind, MutationWeights, OperationWeights, Workload},
 };
@@ -26,19 +24,6 @@ impl Input for Workload {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
         format!("{:016x}", hasher.finish())
-    }
-}
-
-pub struct WorkloadGenerator {
-    pub rng: StdRng,
-    pub max_size: usize,
-    pub weights: OperationWeights,
-}
-
-impl<S> Generator<Workload, S> for WorkloadGenerator {
-    fn generate(&mut self, _state: &mut S) -> Result<Workload, Error> {
-        let size = self.rng.gen_range(1..=self.max_size);
-        Ok(generate_new(&mut self.rng, size, &self.weights))
     }
 }
 
