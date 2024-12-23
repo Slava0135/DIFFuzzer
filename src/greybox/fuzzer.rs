@@ -85,7 +85,6 @@ impl Fuzzer {
     pub fn new(config: Config) -> Self {
         info!("new greybox fuzzer");
 
-        info!("setting up temporary directory");
         let temp_dir = setup_temp_dir();
 
         info!("setting up fuzzing components");

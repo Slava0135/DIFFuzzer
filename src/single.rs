@@ -27,7 +27,6 @@ pub fn run(test_path: &Path, save_to_dir: &Path, mount: impl FileSystemMount) {
         .with_context(|| format!("failed to parse json"))
         .unwrap();
 
-    info!("setting up temporary directory");
     let temp_dir = setup_temp_dir();
     let test_dir = temp_dir.clone();
 

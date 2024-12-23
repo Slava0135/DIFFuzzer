@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 pub fn setup_temp_dir() -> PathBuf {
+    info!("setting up temporary directory");
     let temp_dir = env::temp_dir().join("DIFFuzzer");
     fs::remove_dir_all(temp_dir.as_path()).unwrap_or(());
     fs::create_dir(temp_dir.as_path()).unwrap();

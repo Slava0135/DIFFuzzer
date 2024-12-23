@@ -26,7 +26,6 @@ pub fn fuzz<FS: FileSystemMount>(
     info!("running blackbox fuzzing");
     let mut rng = StdRng::seed_from_u64(seed);
 
-    info!("setting up temporary directory");
     let temp_dir = setup_temp_dir();
 
     info!("setting up fuzzing components");
