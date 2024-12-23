@@ -30,7 +30,7 @@ impl<T: FileSystemMount> Harness<T> {
             stderr,
         }
     }
-    pub fn run(&self, input_path: &Path) -> Result<bool, HarnessError> {
+    pub fn run(&self, input_path: &Path) -> anyhow::Result<bool> {
         harness(
             input_path,
             &self.fs_mount,
