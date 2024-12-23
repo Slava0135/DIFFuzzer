@@ -1,10 +1,6 @@
 use std::path::Path;
 
-use crate::{
-    abstract_fs::types::ConsolePipe,
-    harness::{harness, HarnessError},
-    mount::mount::FileSystemMount,
-};
+use crate::{abstract_fs::types::ConsolePipe, harness::harness, mount::mount::FileSystemMount};
 
 pub struct Harness<T: FileSystemMount> {
     fs_mount: T,
