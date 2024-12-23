@@ -14,6 +14,8 @@ mod greybox;
 mod harness;
 mod mount;
 mod temp_dir;
+mod single;
+mod save;
 
 fn main() {
     let args = Args::parse();

@@ -8,6 +8,8 @@ use std::{
 use anyhow::Context;
 use log::debug;
 
+pub const KCOV_FILENAME: &str = "kcov.dat";
+
 pub struct KCovFeedback {
     all_coverage: HashSet<u64>,
     kcov_path: Box<Path>,

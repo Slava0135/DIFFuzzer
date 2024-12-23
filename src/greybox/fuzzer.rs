@@ -13,18 +13,20 @@ use rand::{rngs::StdRng, SeedableRng};
 use crate::{
     abstract_fs::{
         compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME},
+        trace::TRACE_FILENAME,
         types::{ConsolePipe, Workload},
     },
     config::Config,
-    greybox::objective::{console::ConsoleObjective, trace::TraceObjective},
+    greybox::{
+        feedback::kcov::KCOV_FILENAME,
+        objective::{console::ConsoleObjective, trace::TraceObjective},
+    },
     mount::{btrfs::Btrfs, ext4::Ext4},
+    save::{save_output, save_testcase},
     temp_dir::setup_temp_dir,
 };
 
 use super::{feedback::kcov::KCovFeedback, harness::Harness, mutator::Mutator};
-
-const TRACE_FILENAME: &str = "trace.csv";
-const KCOV_FILENAME: &str = "kcov.dat";
 
 pub struct Fuzzer {
     corpus: Vec<Workload>,
@@ -305,76 +307,23 @@ impl Fuzzer {
             )
         })?;
 
-        let source_path = crash_dir.join(TEST_SOURCE_FILENAME);
-        fs::write(&source_path, input.clone().encode_c()).with_context(|| {
-            format!("failed to save source file to '{}'", source_path.display())
-        })?;
-
-        let exe_path = crash_dir.join(TEST_EXE_FILENAME);
-        fs::copy(&input_path, &exe_path).with_context(|| {
-            format!(
-                "failed to copy executable from '{}' to '{}'",
-                input_path.display(),
-                exe_path.display()
-            )
-        })?;
-
-        let json_path = crash_dir.join("test").with_extension("json");
-        let json = serde_json::to_string_pretty(&input).with_context(|| {
-            format!(
-                "failed to copy workload as json at '{}'",
-                json_path.display()
-            )
-        })?;
-        fs::write(json_path, json)?;
-
-        let fst_trace_path = crash_dir.join(format!("{}.{}", &self.fst_fs_name, TRACE_FILENAME));
-        let snd_trace_path = crash_dir.join(format!("{}.{}", &self.snd_fs_name, TRACE_FILENAME));
-        fs::copy(&self.fst_trace_path, &fst_trace_path).with_context(|| {
-            format!(
-                "failed to copy first trace from '{}' to '{}'",
-                self.fst_trace_path.display(),
-                fst_trace_path.display()
-            )
-        })?;
-        fs::copy(&self.snd_trace_path, &snd_trace_path).with_context(|| {
-            format!(
-                "failed to copy second trace from '{}' to '{}'",
-                self.snd_trace_path.display(),
-                snd_trace_path.display()
-            )
-        })?;
-
-        let fst_stdout_path = crash_dir.join(format!("{}.stdout.txt", &self.fst_fs_name));
-        let snd_stdout_path = crash_dir.join(format!("{}.stdout.txt", &self.snd_fs_name));
-
-        fs::write(&fst_stdout_path, self.fst_stdout.borrow().clone()).with_context(|| {
-            format!(
-                "failed to save first stdout at '{}'",
-                fst_stdout_path.display()
-            )
-        })?;
-        fs::write(&snd_stdout_path, self.snd_stdout.borrow().clone()).with_context(|| {
-            format!(
-                "failed to save second stdout at '{}'",
-                fst_stdout_path.display()
-            )
-        })?;
-
-        let fst_stderr_path = crash_dir.join(format!("{}.stderr.txt", &self.fst_fs_name));
-        let snd_stderr_path = crash_dir.join(format!("{}.stderr.txt", &self.snd_fs_name));
-        fs::write(&fst_stderr_path, self.fst_stderr.borrow().clone()).with_context(|| {
-            format!(
-                "failed to save first stderr at '{}'",
-                fst_stderr_path.display()
-            )
-        })?;
-        fs::write(&snd_stderr_path, self.snd_stderr.borrow().clone()).with_context(|| {
-            format!(
-                "failed to save second stdout at '{}'",
-                snd_stderr_path.display()
-            )
-        })?;
+        save_testcase(&crash_dir, input_path, &input)?;
+        save_output(
+            &crash_dir,
+            &self.fst_trace_path,
+            &self.fst_fs_name,
+            self.fst_stdout.borrow().clone(),
+            self.fst_stderr.borrow().clone(),
+        )
+        .with_context(|| format!("failed to save output for first harness"))?;
+        save_output(
+            &crash_dir,
+            &self.snd_trace_path,
+            &self.snd_fs_name,
+            self.snd_stdout.borrow().clone(),
+            self.snd_stderr.borrow().clone(),
+        )
+        .with_context(|| format!("failed to save output for first harness"))?;
 
         self.stats.crashes += 1;
         Ok(())
