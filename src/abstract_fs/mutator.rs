@@ -73,6 +73,7 @@ pub fn insert(
     }
 }
 
+#[cfg(test)]
 mod tests {
     use rand::{rngs::StdRng, SeedableRng};
 

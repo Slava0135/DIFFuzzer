@@ -42,6 +42,7 @@ fn encode_mode(mode: &Mode) -> String {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use abstract_fs::types::ModeFlag;
 
