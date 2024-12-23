@@ -16,6 +16,8 @@ pub struct TraceRow {
     errno: String,
 }
 
+pub const TRACE_FILENAME: &str = "trace.csv";
+
 type Result<T> = std::result::Result<T, TraceError>;
 
 #[derive(Error, Debug, PartialEq)]
