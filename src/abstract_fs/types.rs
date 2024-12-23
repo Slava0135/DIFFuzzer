@@ -3,12 +3,13 @@
 #![allow(dead_code)]
 
 use std::cell::RefCell;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::rc::Rc;
 use std::{collections::HashMap, fmt::Display, vec};
 
+use base64::prelude::BASE64_URL_SAFE;
+use base64::Engine;
 use serde::{Deserialize, Serialize};
-use siphasher::sip128::{Hasher128, SipHasher13};
+use siphasher::sip128::SipHasher13;
 
 /// Flags for `open(path, flags, mode)` syscall.
 ///
@@ -234,8 +235,8 @@ impl Workload {
     pub fn generate_name(&self) -> String {
         let bytes = bincode::serialize(self).unwrap();
         let hasher = SipHasher13::new();
-        let hash = hasher.hash(&bytes).as_u128();
-        format!("{:032x}", hash)
+        let hash = hasher.hash(&bytes).as_bytes();
+        BASE64_URL_SAFE.encode(hash)
     }
 }
 
