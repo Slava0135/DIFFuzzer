@@ -1,14 +1,11 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 
 use args::Args;
 use clap::Parser;
 use config::Config;
 use greybox::fuzzer::Fuzzer;
 use log::info;
-use mount::{btrfs::Btrfs, ext4::Ext4, mount::FileSystemMount};
+use mount::{btrfs::Btrfs, ext4::Ext4};
 
 mod abstract_fs;
 mod args;
