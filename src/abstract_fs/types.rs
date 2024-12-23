@@ -8,6 +8,7 @@ use std::rc::Rc;
 use std::{collections::HashMap, fmt::Display, vec};
 
 use serde::{Deserialize, Serialize};
+use siphasher::sip128::{Hasher128, SipHasher13};
 
 /// Flags for `open(path, flags, mode)` syscall.
 ///
@@ -231,9 +232,10 @@ impl Workload {
         self.ops.push(op);
     }
     pub fn generate_name(&self) -> String {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        format!("{:016x}", hasher.finish())
+        let bytes = bincode::serialize(self).unwrap();
+        let hasher = SipHasher13::new();
+        let hash = hasher.hash(&bytes).as_u128();
+        format!("{:032x}", hash)
     }
 }
 
