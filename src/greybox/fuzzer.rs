@@ -197,7 +197,7 @@ impl Fuzzer {
         self.stats.start = Instant::now();
         loop {
             match self.fuzz_one() {
-                Err(err) => error!("{}", err),
+                Err(err) => error!("{:?}", err),
                 _ => self.stats.executions += 1,
             }
             if Instant::now()
