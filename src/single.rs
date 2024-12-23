@@ -38,7 +38,7 @@ pub fn run(test_path: &Path, save_to_dir: &Path, mount: impl FileSystemMount) {
         .unwrap();
     let trace_path = exec_dir.join(TRACE_FILENAME);
 
-    debug!("compiling test at '{}'", test_dir.display());
+    info!("compiling test at '{}'", test_dir.display());
     let input_path = input
         .compile(test_dir.as_path())
         .with_context(|| format!("failed to compile test"))
@@ -59,11 +59,13 @@ pub fn run(test_path: &Path, save_to_dir: &Path, mount: impl FileSystemMount) {
         stderr.clone(),
     );
 
+    info!("running harnss");
     harness
         .run(&input_path)
         .with_context(|| format!("failed to run harness"))
         .unwrap();
 
+    info!("saving results");
     save_testcase(save_to_dir, &input_path, &input)
         .with_context(|| format!("failed to save testcase"))
         .unwrap();
