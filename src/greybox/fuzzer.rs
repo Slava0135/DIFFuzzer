@@ -210,7 +210,7 @@ impl Fuzzer {
         }
     }
 
-    fn fuzz_one(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn fuzz_one(&mut self) -> anyhow::Result<()> {
         debug!("picking input");
         let input = self.pick_input();
 
