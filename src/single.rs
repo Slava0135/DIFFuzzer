@@ -59,7 +59,7 @@ pub fn run(test_path: &Path, save_to_dir: &Path, mount: impl FileSystemMount) {
         stderr.clone(),
     );
 
-    info!("running harnss");
+    info!("running harness");
     harness
         .run(&input_path)
         .with_context(|| format!("failed to run harness"))
