@@ -34,10 +34,9 @@ pub fn harness<T: FileSystemMount>(
     let mut exec = Command::new(test_exec_copy);
     exec.arg(fs_dir);
     exec.current_dir(exec_dir);
-    debug!("running test executable '{:?}'", exec);
     let output = exec
         .output()
-        .with_context(|| format!("failed to run executable"))?;
+        .with_context(|| format!("failed to run executable '{:?}'", exec))?;
 
     fs_mount.teardown(&fs_dir).with_context(|| {
         format!(
