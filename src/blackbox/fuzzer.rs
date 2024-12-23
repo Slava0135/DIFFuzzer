@@ -1,16 +1,15 @@
 use log::info;
 use std::cell::RefCell;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::rc::Rc;
 
 use rand::prelude::StdRng;
 use rand::SeedableRng;
 
 use crate::abstract_fs::generator::generate_new;
-use crate::abstract_fs::types::ConsolePipe;
 use crate::blackbox::hasher::Hasher;
 use crate::config::Config;
-use crate::harness::harness;
+use crate::harness::Harness;
 use crate::mount::mount::FileSystemMount;
 use crate::temp_dir::setup_temp_dir;
 
@@ -46,16 +45,16 @@ pub fn fuzz<FS: FileSystemMount>(
         .join("fstest")
         .into_boxed_path();
 
-    let fst_harness = workload_harness(
+    let fst_harness = Harness::new(
         fst_fs,
-        exec_dir.clone(),
+        exec_dir.clone().into_boxed_path(),
         fst_fs_dir.clone(),
         fst_stdout,
         fst_stderr,
     );
-    let snd_harness = workload_harness(
+    let snd_harness = Harness::new(
         snd_fs,
-        exec_dir.clone(),
+        exec_dir.clone().into_boxed_path(),
         snd_fs_dir.clone(),
         snd_stdout,
         snd_stderr,
@@ -67,23 +66,4 @@ pub fn fuzz<FS: FileSystemMount>(
         // snd_harness(&workload);
         hasher.compare(&fst_fs_dir, &snd_fs_dir);
     }
-}
-
-fn workload_harness<FS: FileSystemMount>(
-    fs: FS,
-    exec_dir: PathBuf,
-    fs_dir: Box<Path>,
-    stdout: ConsolePipe,
-    stderr: ConsolePipe,
-) -> impl Fn(&Path) -> anyhow::Result<bool> {
-    return move |input_path: &Path| {
-        harness(
-            &input_path,
-            &fs,
-            &fs_dir,
-            &exec_dir,
-            stdout.clone(),
-            stderr.clone(),
-        )
-    };
 }

@@ -14,18 +14,13 @@ use crate::{
     abstract_fs::{
         trace::TRACE_FILENAME,
         types::{ConsolePipe, Workload},
-    },
-    config::Config,
-    greybox::{
+    }, config::Config, greybox::{
         feedback::kcov::KCOV_FILENAME,
         objective::{console::ConsoleObjective, trace::TraceObjective},
-    },
-    mount::{btrfs::Btrfs, ext4::Ext4},
-    save::{save_output, save_testcase},
-    temp_dir::setup_temp_dir,
+    }, harness::Harness, mount::{btrfs::Btrfs, ext4::Ext4}, save::{save_output, save_testcase}, temp_dir::setup_temp_dir
 };
 
-use super::{feedback::kcov::KCovFeedback, harness::Harness, mutator::Mutator};
+use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 
 pub struct Fuzzer {
     corpus: Vec<Workload>,

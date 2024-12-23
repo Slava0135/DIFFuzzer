@@ -5,54 +5,72 @@ use anyhow::Context;
 use crate::abstract_fs::types::ConsolePipe;
 use crate::mount::mount::FileSystemMount;
 
-pub fn harness<T: FileSystemMount>(
-    input_path: &Path,
-    fs_mount: &T,
-    fs_dir: &Path,
-    exec_dir: &Path,
+pub struct Harness<T: FileSystemMount> {
+    fs_mount: T,
+    fs_dir: Box<Path>,
+    exec_dir: Box<Path>,
     stdout: ConsolePipe,
     stderr: ConsolePipe,
-) -> anyhow::Result<bool> {
-    let test_exec_copy = exec_dir.join("test.out");
-    std::fs::copy(input_path, &test_exec_copy).with_context(|| {
-        format!(
-            "failed to copy executable from '{}' to '{}'",
-            input_path.display(),
-            test_exec_copy.display()
-        )
-    })?;
+}
 
-    fs_mount.setup(&fs_dir).with_context(|| {
-        format!(
-            "failed to setup fs '{}' at '{}'",
+impl<T: FileSystemMount> Harness<T> {
+    pub fn new(
+        fs_mount: T,
+        fs_dir: Box<Path>,
+        exec_dir: Box<Path>,
+        stdout: ConsolePipe,
+        stderr: ConsolePipe,
+    ) -> Self {
+        Self {
             fs_mount,
-            fs_dir.display()
-        )
-    })?;
+            fs_dir,
+            exec_dir,
+            stdout,
+            stderr,
+        }
+    }
+    pub fn run(&self, input_path: &Path) -> anyhow::Result<bool> {
+        let test_exec_copy = self.exec_dir.join("test.out");
+        std::fs::copy(input_path, &test_exec_copy).with_context(|| {
+            format!(
+                "failed to copy executable from '{}' to '{}'",
+                input_path.display(),
+                test_exec_copy.display()
+            )
+        })?;
 
-    let mut exec = Command::new(test_exec_copy);
-    exec.arg(fs_dir);
-    exec.current_dir(exec_dir);
-    let output = exec
-        .output()
-        .with_context(|| format!("failed to run executable '{:?}'", exec))?;
+        self.fs_mount.setup(&self.fs_dir).with_context(|| {
+            format!(
+                "failed to setup fs '{}' at '{}'",
+                self.fs_mount,
+                self.fs_dir.display()
+            )
+        })?;
 
-    fs_mount.teardown(&fs_dir).with_context(|| {
-        format!(
-            "failed to teardown fs '{}' at '{}'",
-            fs_mount,
-            fs_dir.display()
-        )
-    })?;
+        let mut exec = Command::new(test_exec_copy);
+        exec.arg(self.fs_dir.as_os_str());
+        exec.current_dir(&self.exec_dir);
+        let output = exec
+            .output()
+            .with_context(|| format!("failed to run executable '{:?}'", exec))?;
 
-    stdout.replace(
-        String::from_utf8(output.stdout)
-            .with_context(|| format!("failed to convert stdout to string"))?,
-    );
-    stderr.replace(
-        String::from_utf8(output.stderr)
-            .with_context(|| format!("failed to convert stderr to string"))?,
-    );
+        self.fs_mount.teardown(&self.fs_dir).with_context(|| {
+            format!(
+                "failed to teardown fs '{}' at '{}'",
+                self.fs_mount,
+                self.fs_dir.display()
+            )
+        })?;
 
-    Ok(output.status.success())
+        self.stdout.replace(
+            String::from_utf8(output.stdout)
+                .with_context(|| format!("failed to convert stdout to string"))?,
+        );
+        self.stderr.replace(
+            String::from_utf8(output.stderr)
+                .with_context(|| format!("failed to convert stderr to string"))?,
+        );
+
+        Ok(output.status.success())
+    }
 }
