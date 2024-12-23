@@ -6,7 +6,7 @@ use std::{
 };
 
 use anyhow::Context;
-use log::{debug, info};
+use log::info;
 
 use crate::{
     abstract_fs::{trace::TRACE_FILENAME, types::Workload},

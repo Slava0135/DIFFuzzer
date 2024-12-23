@@ -12,7 +12,6 @@ use rand::{rngs::StdRng, SeedableRng};
 
 use crate::{
     abstract_fs::{
-        compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME},
         trace::TRACE_FILENAME,
         types::{ConsolePipe, Workload},
     },

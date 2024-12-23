@@ -1,7 +1,6 @@
 use std::{path::Path, process::Command};
 
 use anyhow::Context;
-use log::debug;
 
 use crate::abstract_fs::types::ConsolePipe;
 use crate::mount::mount::FileSystemMount;
