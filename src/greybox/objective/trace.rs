@@ -19,7 +19,7 @@ impl TraceObjective {
 }
 
 impl TraceObjective {
-    pub fn is_interesting(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
+    pub fn is_interesting(&mut self) -> anyhow::Result<bool> {
         debug!("do trace objective");
         let fst_trace = Trace::try_parse(read_to_string(self.fst_trace_path.as_ref())?)?;
         let snd_trace = Trace::try_parse(read_to_string(self.snd_trace_path.as_ref())?)?;

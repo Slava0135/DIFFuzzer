@@ -24,7 +24,7 @@ impl ConsoleObjective {
             snd_stderr,
         }
     }
-    pub fn is_interesting(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
+    pub fn is_interesting(&mut self) -> anyhow::Result<bool> {
         debug!("do console objective");
         let fst_output = Output::try_parse(&self.fst_stdout.borrow())?;
         let snd_output = Output::try_parse(&self.snd_stdout.borrow())?;

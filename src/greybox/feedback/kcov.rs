@@ -19,7 +19,7 @@ impl KCovFeedback {
             kcov_path,
         }
     }
-    pub fn is_interesting(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
+    pub fn is_interesting(&mut self) -> anyhow::Result<bool>{
         debug!("do kcov feedback");
         let kcov = File::open(self.kcov_path.as_ref())?;
         let reader = BufReader::new(kcov);
