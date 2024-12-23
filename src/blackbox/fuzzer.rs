@@ -6,13 +6,13 @@ use std::rc::Rc;
 use rand::prelude::StdRng;
 use rand::SeedableRng;
 
+use crate::abstract_fs::generator::generate_new;
 use crate::abstract_fs::types::ConsolePipe;
 use crate::blackbox::hasher::Hasher;
 use crate::config::Config;
-use crate::harness::{harness, HarnessError};
+use crate::harness::harness;
 use crate::mount::mount::FileSystemMount;
 use crate::temp_dir::setup_temp_dir;
-use crate::{abstract_fs::generator::generate_new, abstract_fs::types::Workload};
 
 pub fn fuzz<FS: FileSystemMount>(
     count: usize,
@@ -76,7 +76,7 @@ fn workload_harness<FS: FileSystemMount>(
     fs_dir: Box<Path>,
     stdout: ConsolePipe,
     stderr: ConsolePipe,
-) -> impl Fn(&Path) -> Result<bool, HarnessError> {
+) -> impl Fn(&Path) -> anyhow::Result<bool> {
     return move |input_path: &Path| {
         harness(
             &input_path,
