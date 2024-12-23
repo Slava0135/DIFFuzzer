@@ -15,7 +15,13 @@ pub fn harness<T: FileSystemMount>(
     stderr: ConsolePipe,
 ) -> anyhow::Result<bool> {
     let test_exec_copy = exec_dir.join("test.out");
-    std::fs::copy(input_path, test_exec_copy.clone());
+    std::fs::copy(input_path, &test_exec_copy).with_context(|| {
+        format!(
+            "failed to copy executable from '{}' to '{}'",
+            input_path.display(),
+            test_exec_copy.display()
+        )
+    })?;
 
     fs_mount.setup(&fs_dir).with_context(|| {
         format!(
@@ -39,7 +45,7 @@ pub fn harness<T: FileSystemMount>(
             fs_mount,
             fs_dir.display()
         )
-    });
+    })?;
 
     stdout.replace(
         String::from_utf8(output.stdout)
