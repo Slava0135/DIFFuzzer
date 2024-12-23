@@ -6,6 +6,7 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
+use anyhow::Context;
 use log::{debug, error, info};
 use rand::{rngs::StdRng, SeedableRng};
 
@@ -196,7 +197,7 @@ impl Fuzzer {
         self.stats.start = Instant::now();
         loop {
             match self.fuzz_one() {
-                Err(err) => error!("{}", err),
+                Err(err) => error!("{:?}", err),
                 _ => self.stats.executions += 1,
             }
             if Instant::now()
@@ -209,7 +210,7 @@ impl Fuzzer {
         }
     }
 
-    fn fuzz_one(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn fuzz_one(&mut self) -> anyhow::Result<()> {
         debug!("picking input");
         let input = self.pick_input();
 
@@ -217,32 +218,55 @@ impl Fuzzer {
         let input = self.mutator.mutate(input);
 
         debug!("compiling test at '{}'", self.test_dir.display());
-        let input_path = input.compile(&self.test_dir)?;
-
-        debug!(
-            "setting up executable directories at '{}' and '{}'",
-            self.fst_exec_dir.display(),
-            self.snd_exec_dir.display()
-        );
-        setup_dir(self.fst_exec_dir.as_ref())?;
-        setup_dir(self.snd_exec_dir.as_ref())?;
+        let input_path = input
+            .compile(&self.test_dir)
+            .with_context(|| format!("failed to compile test"))?;
 
         debug!("running harness at '{}'", input_path.display());
-        self.fst_harness.run(&input_path)?;
-        self.snd_harness.run(&input_path)?;
+
+        setup_dir(self.fst_exec_dir.as_ref())
+            .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
+        setup_dir(self.snd_exec_dir.as_ref())
+            .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
+
+        self.fst_harness
+            .run(&input_path)
+            .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
+        self.snd_harness
+            .run(&input_path)
+            .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
 
         debug!("doing objectives");
-        let console_is_interesting = self.console_objective.is_interesting()?;
-        let trace_is_interesting = self.trace_objective.is_interesting()?;
+        let console_is_interesting = self
+            .console_objective
+            .is_interesting()
+            .with_context(|| format!("failed to do console objective"))?;
+        let trace_is_interesting = self
+            .trace_objective
+            .is_interesting()
+            .with_context(|| format!("failed to do trace objective"))?;
         if console_is_interesting || trace_is_interesting {
-            self.report_crash(input, &input_path)?;
+            self.report_crash(input, &input_path)
+                .with_context(|| format!("failed to report crash"))?;
             self.show_stats();
             return Ok(());
         }
 
         debug!("getting feedback");
-        let fst_kcov_is_interesting = self.fst_kcov_feedback.is_interesting()?;
-        let snd_kcov_is_interesting = self.snd_kcov_feedback.is_interesting()?;
+        let fst_kcov_is_interesting =
+            self.fst_kcov_feedback.is_interesting().with_context(|| {
+                format!(
+                    "failed to get first kcov feedback for '{}'",
+                    self.fst_fs_name
+                )
+            })?;
+        let snd_kcov_is_interesting =
+            self.snd_kcov_feedback.is_interesting().with_context(|| {
+                format!(
+                    "failed to get second kcov feedback for '{}'",
+                    self.snd_fs_name
+                )
+            })?;
         if fst_kcov_is_interesting || snd_kcov_is_interesting {
             self.add_to_corpus(input);
             self.show_stats();
@@ -261,66 +285,96 @@ impl Fuzzer {
         workload
     }
 
-    fn report_crash(&mut self, input: Workload, input_path: &Path) -> io::Result<()> {
+    fn report_crash(&mut self, input: Workload, input_path: &Path) -> anyhow::Result<()> {
         let name = input.generate_name();
         debug!("report crash '{}'", name);
 
         let crash_dir = self.crashes_path.join(name);
-        debug!(
-            "creating testcase crash directory at '{}'",
-            crash_dir.display()
-        );
-        if fs::exists(crash_dir.as_path())? {
+        if fs::exists(crash_dir.as_path()).with_context(|| {
+            format!(
+                "failed to determine existence of crash directory at '{}'",
+                crash_dir.display()
+            )
+        })? {
             return Ok(());
         }
-        fs::create_dir(crash_dir.as_path())?;
+        fs::create_dir(crash_dir.as_path()).with_context(|| {
+            format!(
+                "failed to create crash directory at '{}'",
+                crash_dir.display()
+            )
+        })?;
 
         let source_path = crash_dir.join(TEST_SOURCE_FILENAME);
-        debug!("saving source code at '{}'", source_path.display());
-        fs::write(source_path, input.clone().encode_c())?;
+        fs::write(&source_path, input.clone().encode_c()).with_context(|| {
+            format!("failed to save source file to '{}'", source_path.display())
+        })?;
 
         let exe_path = crash_dir.join(TEST_EXE_FILENAME);
-        debug!(
-            "copying executable from '{}' to '{}'",
-            input_path.display(),
-            exe_path.display()
-        );
-        fs::copy(input_path, exe_path)?;
+        fs::copy(&input_path, &exe_path).with_context(|| {
+            format!(
+                "failed to copy executable from '{}' to '{}'",
+                input_path.display(),
+                exe_path.display()
+            )
+        })?;
 
         let json_path = crash_dir.join("test").with_extension("json");
-        debug!("saving workload as json at '{}'", json_path.display());
-        let json = serde_json::to_string_pretty(&input)?;
+        let json = serde_json::to_string_pretty(&input).with_context(|| {
+            format!(
+                "failed to copy workload as json at '{}'",
+                json_path.display()
+            )
+        })?;
         fs::write(json_path, json)?;
 
         let fst_trace_path = crash_dir.join(format!("{}.{}", &self.fst_fs_name, TRACE_FILENAME));
         let snd_trace_path = crash_dir.join(format!("{}.{}", &self.snd_fs_name, TRACE_FILENAME));
-        debug!(
-            "saving traces at '{}' and '{}'",
-            fst_trace_path.display(),
-            snd_trace_path.display()
-        );
-        fs::copy(self.fst_trace_path.as_ref(), fst_trace_path)?;
-        fs::copy(self.snd_trace_path.as_ref(), snd_trace_path)?;
+        fs::copy(&self.fst_trace_path, &fst_trace_path).with_context(|| {
+            format!(
+                "failed to copy first trace from '{}' to '{}'",
+                self.fst_trace_path.display(),
+                fst_trace_path.display()
+            )
+        })?;
+        fs::copy(&self.snd_trace_path, &snd_trace_path).with_context(|| {
+            format!(
+                "failed to copy second trace from '{}' to '{}'",
+                self.snd_trace_path.display(),
+                snd_trace_path.display()
+            )
+        })?;
 
         let fst_stdout_path = crash_dir.join(format!("{}.stdout.txt", &self.fst_fs_name));
         let snd_stdout_path = crash_dir.join(format!("{}.stdout.txt", &self.snd_fs_name));
-        debug!(
-            "saving stdout at '{}' and '{}'",
-            fst_stdout_path.display(),
-            snd_stdout_path.display()
-        );
-        fs::write(fst_stdout_path, self.fst_stdout.borrow().clone())?;
-        fs::write(snd_stdout_path, self.snd_stdout.borrow().clone())?;
+
+        fs::write(&fst_stdout_path, self.fst_stdout.borrow().clone()).with_context(|| {
+            format!(
+                "failed to save first stdout at '{}'",
+                fst_stdout_path.display()
+            )
+        })?;
+        fs::write(&snd_stdout_path, self.snd_stdout.borrow().clone()).with_context(|| {
+            format!(
+                "failed to save second stdout at '{}'",
+                fst_stdout_path.display()
+            )
+        })?;
 
         let fst_stderr_path = crash_dir.join(format!("{}.stderr.txt", &self.fst_fs_name));
         let snd_stderr_path = crash_dir.join(format!("{}.stderr.txt", &self.snd_fs_name));
-        debug!(
-            "saving stderr at '{}' and '{}'",
-            fst_stderr_path.display(),
-            snd_stderr_path.display()
-        );
-        fs::write(fst_stderr_path, self.fst_stderr.borrow().clone())?;
-        fs::write(snd_stderr_path, self.snd_stderr.borrow().clone())?;
+        fs::write(&fst_stderr_path, self.fst_stderr.borrow().clone()).with_context(|| {
+            format!(
+                "failed to save first stderr at '{}'",
+                fst_stderr_path.display()
+            )
+        })?;
+        fs::write(&snd_stderr_path, self.snd_stderr.borrow().clone()).with_context(|| {
+            format!(
+                "failed to save second stdout at '{}'",
+                snd_stderr_path.display()
+            )
+        })?;
 
         self.stats.crashes += 1;
         Ok(())

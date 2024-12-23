@@ -1,6 +1,7 @@
-use std::{error::Error, fmt::Display, num::ParseIntError};
+use std::num::ParseIntError;
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 #[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 pub struct Trace {
@@ -17,10 +18,13 @@ pub struct TraceRow {
 
 type Result<T> = std::result::Result<T, TraceError>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq)]
 pub enum TraceError {
-    EmptyTrace,
-    InvalidColumnsCount,
+    #[error("invalid trace, must not be empty")]
+    Empty,
+    #[error("invalid column number")]
+    InvalidColumnNumber,
+    #[error("invalid integer format")]
     IntParse(ParseIntError),
 }
 
@@ -30,25 +34,11 @@ impl From<ParseIntError> for TraceError {
     }
 }
 
-impl Display for TraceError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TraceError::EmptyTrace => write!(f, "EmptyTraceError"),
-            TraceError::InvalidColumnsCount => write!(f, "InvalidColumnsCountError"),
-            TraceError::IntParse(parse_int_error) => {
-                write!(f, "IntParseError: {}", parse_int_error)
-            }
-        }
-    }
-}
-
-impl Error for TraceError {}
-
 impl Trace {
     pub fn try_parse(trace: String) -> Result<Trace> {
         let lines: Vec<&str> = trace.split('\n').collect();
         if lines.len() <= 1 {
-            return Err(TraceError::EmptyTrace);
+            return Err(TraceError::Empty);
         }
         let mut trace = Trace { rows: vec![] };
         for line in &lines[1..] {
@@ -57,7 +47,7 @@ impl Trace {
             }
             let columns: Vec<&str> = line.split(",").collect();
             if columns.len() != 4 {
-                return Err(TraceError::InvalidColumnsCount);
+                return Err(TraceError::InvalidColumnNumber);
             }
             let index = columns[0].trim().parse()?;
             let command = columns[1].trim().to_owned();
@@ -83,7 +73,7 @@ mod tests {
 
     #[test]
     fn test_empty_trace() {
-        assert_eq!(Err(TraceError::EmptyTrace), Trace::try_parse("".to_owned()))
+        assert_eq!(Err(TraceError::Empty), Trace::try_parse("".to_owned()))
     }
 
     #[test]
@@ -103,7 +93,7 @@ Index,Command,ReturnCode,Errno
 "#
         .trim();
         assert_eq!(
-            Err(TraceError::InvalidColumnsCount),
+            Err(TraceError::InvalidColumnNumber),
             Trace::try_parse(trace.to_owned())
         )
     }

@@ -1,10 +1,6 @@
 use std::path::Path;
 
-use crate::{
-    abstract_fs::types::ConsolePipe,
-    harness::{harness, HarnessError},
-    mount::mount::FileSystemMount,
-};
+use crate::{abstract_fs::types::ConsolePipe, harness::harness, mount::mount::FileSystemMount};
 
 pub struct Harness<T: FileSystemMount> {
     fs_mount: T,
@@ -30,7 +26,7 @@ impl<T: FileSystemMount> Harness<T> {
             stderr,
         }
     }
-    pub fn run(&self, input_path: &Path) -> Result<bool, HarnessError> {
+    pub fn run(&self, input_path: &Path) -> anyhow::Result<bool> {
         harness(
             input_path,
             &self.fs_mount,
