@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.95"
+base64 = "0.22.1"
 bincode = "1.3.3"
 clap = { version = "4.5.23", features = ["derive"] }
 log = "0.4.22"
