@@ -1,6 +1,6 @@
 use std::{fs, path::Path, process::Command};
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 
 use super::types::Workload;
 
@@ -16,13 +16,19 @@ impl Workload {
             .with_context(|| format!("failed to write test source at '{}'", test_path.display()))?;
         let mut make = Command::new("make");
         make.arg("-C").arg(dir.as_os_str());
-        make.output().with_context(|| {
+        let output = make.output().with_context(|| {
             format!(
                 "failed to run makefile command at '{}': '{:?}'",
                 dir.display(),
                 make
             )
         })?;
+        if !output.status.success() {
+            bail!(
+                "compilation failed with code {}",
+                output.status.code().unwrap_or(-1)
+            );
+        }
         Ok(test_exec.into_boxed_path())
     }
 }
