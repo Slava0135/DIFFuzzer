@@ -1,59 +1,90 @@
 use std::{fmt::Display, fs, io, path::Path, process::Command};
 
+use anyhow::{bail, Context};
 use log::debug;
 
 const RAM_DISK_SIZE: usize = 1_000_000;
 const DEVICE: &str = "/dev/ram0";
 
 pub trait FileSystemMount: Display {
-    fn setup(&self, path: &Path) -> io::Result<()> {
+    fn setup(&self, path: &Path) -> anyhow::Result<()> {
         debug!("setting up '{}' filesystem at '{}'", self, path.display());
 
-        debug!("creating mountpoint at '{}'", path.display());
-        fs::create_dir_all(path)?;
+        fs::create_dir_all(path)
+            .with_context(|| format!("failed to create mountpoint at '{}'", path.display()))?;
 
         let mut modprobe = Command::new("modprobe");
         modprobe
             .arg("brd")
             .arg("rd_nr=1")
             .arg(format!("rd_size={RAM_DISK_SIZE}"));
-        debug!(
-            "loading block ram device module: {}",
-            format!("{:?}", modprobe)
-        );
-        modprobe.output()?;
+        let output = modprobe
+            .output()
+            .with_context(|| format!("failed to load block ram device module: {:?}", modprobe))?;
+        if !output.status.success() {
+            bail!(
+                "failed to load block ram device module: {:?}\n{}",
+                modprobe,
+                String::from_utf8(output.stderr)
+                    .with_context(|| format!("failed to read stderr (brd)"))?,
+            );
+        }
 
         let mut mkfs = Command::new(Self::mkfs_cmd());
         mkfs.arg(DEVICE);
-        debug!("creating fs: {}", format!("{:?}", mkfs));
-        mkfs.output()?;
+        let output = mkfs.output()?;
+        if !output.status.success() {
+            bail!(
+                "failed to create fs: {:?}\n{}",
+                mkfs,
+                String::from_utf8(output.stderr)
+                    .with_context(|| format!("failed to read stderr (mkfs)"))?,
+            );
+        }
 
         let mut mount = Command::new("mount");
         mount.arg("-t").arg(Self::mount_t()).arg(DEVICE).arg(path);
-        debug!("mounting fs: {}", format!("{:?}", mount));
-        mount.output()?;
-
+        let output = mount.output()?;
+        if !output.status.success() {
+            bail!(
+                "failed to mount fs: {:?}\n{}",
+                mount,
+                String::from_utf8(output.stderr)
+                    .with_context(|| format!("failed to read stderr (mount)"))?,
+            );
+        }
         Ok(())
     }
 
-    fn teardown(&self, path: &Path) -> io::Result<()> {
+    fn teardown(&self, path: &Path) -> anyhow::Result<()> {
         debug!("tearing down '{}' filesystem at '{}'", self, path.display());
 
         let mut umount = Command::new("umount");
         umount.arg("-fl").arg(path);
-        debug!("unmounting fs: {}", format!("{:?}", umount));
-        umount.output()?;
+        let output = umount.output()?;
+        if !output.status.success() {
+            bail!(
+                "failed to unmount fs: {:?}\n{}",
+                umount,
+                String::from_utf8(output.stderr)
+                    .with_context(|| format!("failed to read stderr (umount)"))?,
+            );
+        }
 
         let mut rmmod = Command::new("rmmod");
         rmmod.arg("brd").output()?;
-        debug!(
-            "removing block ram device module: {}",
-            format!("{:?}", rmmod)
-        );
-        rmmod.output()?;
+        let output = rmmod.output()?;
+        if !output.status.success() {
+            bail!(
+                "failed to remove block ram device module fs: {:?}\n{}",
+                rmmod,
+                String::from_utf8(output.stderr)
+                    .with_context(|| format!("failed to read stderr (umount)"))?,
+            );
+        }
 
-        debug!("removing mountpoint at '{}'", path.display());
-        fs::remove_dir_all(path)?;
+        fs::remove_dir_all(path)
+            .with_context(|| format!("failed to remove mountpoint at '{}'", path.display()))?;
 
         Ok(())
     }
