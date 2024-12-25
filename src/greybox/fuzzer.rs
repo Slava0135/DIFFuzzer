@@ -14,10 +14,16 @@ use crate::{
     abstract_fs::{
         trace::TRACE_FILENAME,
         types::{ConsolePipe, Workload},
-    }, config::Config, greybox::{
+    },
+    config::Config,
+    greybox::{
         feedback::kcov::KCOV_FILENAME,
         objective::{console::ConsoleObjective, trace::TraceObjective},
-    }, harness::Harness, mount::{btrfs::Btrfs, ext4::Ext4}, save::{save_output, save_testcase}, temp_dir::setup_temp_dir
+    },
+    harness::Harness,
+    mount::{btrfs::Btrfs, ext4::Ext4},
+    save::{save_output, save_testcase},
+    temp_dir::setup_temp_dir,
 };
 
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
@@ -192,7 +198,10 @@ impl Fuzzer {
         self.stats.start = Instant::now();
         loop {
             match self.fuzz_one() {
-                Err(err) => error!("{:?}", err),
+                Err(err) => {
+                    error!("{:?}", err);
+                    return;
+                }
                 _ => self.stats.executions += 1,
             }
             if Instant::now()
