@@ -17,6 +17,7 @@ mod mount;
 mod save;
 mod single;
 mod temp_dir;
+mod hasher;
 
 fn main() {
     let args = Args::parse();
