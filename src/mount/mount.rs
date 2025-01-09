@@ -72,7 +72,7 @@ pub trait FileSystemMount: Display {
         }
 
         let mut rmmod = Command::new("rmmod");
-        rmmod.arg("brd").output()?;
+        rmmod.arg("brd");
         let output = rmmod.output()?;
         if !output.status.success() {
             bail!(
