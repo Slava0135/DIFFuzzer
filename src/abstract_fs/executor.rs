@@ -7,7 +7,7 @@ type Result<T> = std::result::Result<T, ExecutorError>;
 #[derive(Debug)]
 pub enum ExecutorError {
     NotADir,
-    SameName,
+    NameAlreadyExists,
     RemoveRoot,
     NotFound,
 }
@@ -58,7 +58,7 @@ impl AbstractExecutor {
 
     pub fn mkdir(&mut self, parent: &DirIndex, name: Name, mode: Mode) -> Result<DirIndex> {
         if self.name_exists(&parent, &name) {
-            return Err(ExecutorError::SameName);
+            return Err(ExecutorError::NameAlreadyExists);
         }
         let dir = Dir {
             parent: Some(parent.clone()),
@@ -79,7 +79,7 @@ impl AbstractExecutor {
 
     pub fn create(&mut self, parent: &DirIndex, name: Name, mode: Mode) -> Result<FileIndex> {
         if self.name_exists(&parent, &name) {
-            return Err(ExecutorError::SameName);
+            return Err(ExecutorError::NameAlreadyExists);
         }
         let file = File {
             parent: parent.clone(),
@@ -95,6 +95,13 @@ impl AbstractExecutor {
         });
         self.nodes_created += 1;
         Ok(file_idx)
+    }
+
+    pub fn hardlink(&mut self, old_node: &FileIndex, parent: &DirIndex, name: Name) -> Result<()> {
+        if self.name_exists(&parent, &name) {
+            return Err(ExecutorError::NameAlreadyExists);
+        }
+        Ok(())
     }
 
     pub fn replay(&mut self, workload: &Workload) -> Result<()> {
@@ -415,6 +422,20 @@ mod tests {
         );
         assert_eq!(2, exec.nodes_created);
         test_replay(exec.recording);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_hardlink_name_exists() {
+        let mut exec = AbstractExecutor::new();
+        let foo = exec
+            .create(&AbstractExecutor::root_index(), "foo".to_owned(), vec![])
+            .unwrap();
+        let bar = exec
+            .create(&AbstractExecutor::root_index(), "bar".to_owned(), vec![])
+            .unwrap();
+        exec.hardlink(&bar, &AbstractExecutor::root_index(), "foo".to_owned())
+            .unwrap();
     }
 
     #[test]
