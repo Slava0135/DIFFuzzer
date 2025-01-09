@@ -46,11 +46,13 @@ impl AbstractExecutor {
                     path: self.resolve_path(node),
                 });
                 let file = self.file(&to_remove).clone();
-                let parent = self.dir_mut(&file.parent);
-                parent.children.retain(|_, n| match n {
-                    Node::FILE(idx) => idx != to_remove,
-                    Node::DIR(_) => true,
-                });
+                for parent in file.parents {
+                    let parent = self.dir_mut(&parent);
+                    parent.children.retain(|_, n| match n {
+                        Node::FILE(idx) => idx != to_remove,
+                        Node::DIR(_) => true,
+                    });
+                }
             }
         }
         Ok(())
@@ -82,7 +84,7 @@ impl AbstractExecutor {
             return Err(ExecutorError::NameAlreadyExists);
         }
         let file = File {
-            parent: parent.clone(),
+            parents: vec![parent.clone()],
         };
         let file_idx = FileIndex(self.files.len());
         self.files.push(file);
@@ -106,6 +108,8 @@ impl AbstractExecutor {
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists);
         }
+        let file = self.file_mut(old_file);
+        file.parents.push(parent.to_owned());
         let parent = self.dir_mut(parent);
         parent
             .children
@@ -234,14 +238,15 @@ impl AbstractExecutor {
                 }
                 Node::FILE(idx) => {
                     let file = self.file(&idx);
-                    let parent = self.dir(&file.parent);
+                    let parent_idx = file.parents.first().unwrap();
+                    let parent = self.dir(parent_idx);
                     let (name, _) = parent
                         .children
                         .iter()
                         .find(|(_, node)| next == **node)
                         .unwrap();
                     segments.push(name.clone());
-                    next = Node::DIR(file.parent.clone()).clone();
+                    next = Node::DIR(parent_idx.to_owned()).clone();
                 }
             }
         }
@@ -441,30 +446,38 @@ mod tests {
             .create(&AbstractExecutor::root_index(), "foo".to_owned(), vec![])
             .unwrap();
         let bar = exec
-            .hardlink(&foo, &AbstractExecutor::root_index(), "bar".to_owned())
+            .mkdir(&AbstractExecutor::root_index(), "bar".to_owned(), vec![])
+            .unwrap();
+        let boo = exec
+            .hardlink(&foo, &bar, "boo".to_owned())
             .unwrap();
 
-        assert_eq!(foo.0, bar.0);
+        assert_eq!(foo, boo);
         let mut expected = vec![
             Node::DIR(AbstractExecutor::root_index()),
+            Node::DIR(bar),
             Node::FILE(foo),
-            Node::FILE(bar),
+            Node::FILE(boo),
         ];
         let mut actual = exec.alive();
         expected.sort();
         actual.sort();
         assert_eq!(expected, actual);
 
-        assert_eq!(2, exec.root().children.len());
+        let root = exec.root();
+        let bar_dir = exec.dir(&bar);
+        assert_eq!(2, root.children.len());
+        assert_eq!(1, bar_dir.children.len());
         assert_eq!(
-            exec.root().children.get("foo").unwrap(),
-            exec.root().children.get("bar").unwrap()
+            root.children.get("foo").unwrap(),
+            bar_dir.children.get("boo").unwrap()
         );
 
-        assert_eq!(AbstractExecutor::root_index(), exec.file(&foo).parent);
-        assert_eq!(AbstractExecutor::root_index(), exec.file(&bar).parent);
+        let parents = vec![AbstractExecutor::root_index(), bar];
+        assert_eq!(parents, exec.file(&foo).parents);
+        assert_eq!(parents, exec.file(&boo).parents);
 
-        assert_eq!(2, exec.nodes_created);
+        assert_eq!(3, exec.nodes_created);
         test_replay(exec.recording);
     }
 

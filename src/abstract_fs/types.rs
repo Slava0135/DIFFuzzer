@@ -153,7 +153,7 @@ pub struct FileDescriptor(usize);
 
 #[derive(Debug, Clone)]
 pub struct File {
-    pub parent: DirIndex,
+    pub parents: Vec<DirIndex>,
 }
 
 #[derive(Debug, Clone)]
