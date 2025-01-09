@@ -107,6 +107,9 @@ impl AbstractExecutor {
                     self.replay_create(path.clone(), mode.clone())?;
                 }
                 Operation::REMOVE { path } => self.replay_remove(path.clone())?,
+                Operation::HARDLINK { old_path, new_path } => {
+                    self.replay_hardlink(old_path.clone(), new_path.clone())?;
+                }
             };
         }
         Ok(())
@@ -136,6 +139,10 @@ impl AbstractExecutor {
             _ => return Err(ExecutorError::NotADir),
         };
         self.create(&parent, name.to_owned(), mode)
+    }
+
+    pub fn replay_hardlink(&mut self, old_path: PathName, new_path: PathName) -> Result<()> {
+        Ok(())
     }
 
     fn name_exists(&self, idx: &DirIndex, name: &Name) -> bool {

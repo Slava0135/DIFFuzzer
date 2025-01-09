@@ -170,9 +170,21 @@ pub enum Node {
 
 #[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
 pub enum Operation {
-    MKDIR { path: PathName, mode: Mode },
-    CREATE { path: PathName, mode: Mode },
-    REMOVE { path: PathName },
+    MKDIR {
+        path: PathName,
+        mode: Mode,
+    },
+    CREATE {
+        path: PathName,
+        mode: Mode,
+    },
+    REMOVE {
+        path: PathName,
+    },
+    HARDLINK {
+        old_path: PathName,
+        new_path: PathName,
+    },
 }
 
 #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Copy)]
