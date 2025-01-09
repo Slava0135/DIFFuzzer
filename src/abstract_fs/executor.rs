@@ -97,11 +97,21 @@ impl AbstractExecutor {
         Ok(file_idx)
     }
 
-    pub fn hardlink(&mut self, old_node: &FileIndex, parent: &DirIndex, name: Name) -> Result<()> {
+    pub fn hardlink(
+        &mut self,
+        old_file: &FileIndex,
+        parent: &DirIndex,
+        name: Name,
+    ) -> Result<FileIndex> {
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists);
         }
-        Ok(())
+        let parent = self.dir_mut(parent);
+        parent
+            .children
+            .insert(name, Node::FILE(old_file.to_owned()));
+        self.nodes_created += 1;
+        Ok(old_file.to_owned())
     }
 
     pub fn replay(&mut self, workload: &Workload) -> Result<()> {
@@ -425,11 +435,44 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn test_hardlink_name_exists() {
+    fn test_hardlink() {
         let mut exec = AbstractExecutor::new();
         let foo = exec
             .create(&AbstractExecutor::root_index(), "foo".to_owned(), vec![])
+            .unwrap();
+        let bar = exec
+            .hardlink(&foo, &AbstractExecutor::root_index(), "bar".to_owned())
+            .unwrap();
+
+        assert_eq!(foo.0, bar.0);
+        let mut expected = vec![
+            Node::DIR(AbstractExecutor::root_index()),
+            Node::FILE(foo),
+            Node::FILE(bar),
+        ];
+        let mut actual = exec.alive();
+        expected.sort();
+        actual.sort();
+        assert_eq!(expected, actual);
+
+        assert_eq!(2, exec.root().children.len());
+        assert_eq!(
+            exec.root().children.get("foo").unwrap(),
+            exec.root().children.get("bar").unwrap()
+        );
+
+        assert_eq!(AbstractExecutor::root_index(), exec.file(&foo).parent);
+        assert_eq!(AbstractExecutor::root_index(), exec.file(&bar).parent);
+
+        assert_eq!(2, exec.nodes_created);
+        test_replay(exec.recording);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_hardlink_name_exists() {
+        let mut exec = AbstractExecutor::new();
+        exec.create(&AbstractExecutor::root_index(), "foo".to_owned(), vec![])
             .unwrap();
         let bar = exec
             .create(&AbstractExecutor::root_index(), "bar".to_owned(), vec![])
