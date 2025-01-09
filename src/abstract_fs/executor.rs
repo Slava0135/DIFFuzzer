@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_mkdir_same_name() {
+    fn test_mkdir_name_exists() {
         let mut exec = AbstractExecutor::new();
         exec.mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
             .unwrap();
@@ -359,7 +359,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_create_same_name() {
+    fn test_create_name_exists() {
         let mut exec = AbstractExecutor::new();
         exec.create(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
             .unwrap();
