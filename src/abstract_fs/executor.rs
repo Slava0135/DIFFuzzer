@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::types::*;
 
@@ -51,13 +51,14 @@ impl AbstractExecutor {
                 to_remove.parent = None;
             }
             Node::FILE(to_remove) => {
-                let to_remove = self.file_mut(to_remove);
-                let index = to_remove
-                    .parents
-                    .iter()
-                    .position(|it| *it == parent_idx)
-                    .unwrap();
-                to_remove.parents.remove(index);
+                let another_exists = parent.children.iter().any(|(_, node)| match node {
+                    Node::FILE(another) if another == to_remove => true,
+                    _ => false,
+                });
+                if !another_exists {
+                    let to_remove = self.file_mut(to_remove);
+                    to_remove.parents.remove(&parent_idx);
+                }
             }
         }
         Ok(())
@@ -88,9 +89,9 @@ impl AbstractExecutor {
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists);
         }
-        let file = File {
-            parents: vec![parent.clone()],
-        };
+        let mut parents = HashSet::new();
+        parents.insert(parent.to_owned());
+        let file = File { parents };
         let file_idx = FileIndex(self.files.len());
         self.files.push(file);
         self.dir_mut(&parent)
@@ -116,7 +117,7 @@ impl AbstractExecutor {
         let node = &Node::FILE(old_file.to_owned());
         let old_path = self.resolve_path(node);
         let file = self.file_mut(old_file);
-        file.parents.push(parent.to_owned());
+        file.parents.insert(parent.to_owned());
         let parent_dir = self.dir_mut(parent);
         parent_dir
             .children
@@ -258,7 +259,7 @@ impl AbstractExecutor {
                 }
                 Node::FILE(idx) => {
                     let file = self.file(&idx);
-                    let parent_idx = file.parents.last().unwrap();
+                    let parent_idx = file.parents.iter().next().unwrap();
                     let parent = self.dir(parent_idx);
                     let (name, _) = parent
                         .children
@@ -490,7 +491,9 @@ mod tests {
             bar_dir.children.get("boo").unwrap()
         );
 
-        let parents = vec![AbstractExecutor::root_index(), bar];
+        let mut parents = HashSet::new();
+        parents.insert(AbstractExecutor::root_index());
+        parents.insert(bar);
         assert_eq!(parents, exec.file(&foo).parents);
         assert_eq!(parents, exec.file(&boo).parents);
 
@@ -535,10 +538,9 @@ mod tests {
 
         assert_eq!(1, exec.root().children.len());
 
-        assert_eq!(
-            vec![AbstractExecutor::root_index()],
-            exec.file(&foo).parents
-        );
+        let mut parents = HashSet::new();
+        parents.insert(AbstractExecutor::root_index());
+        assert_eq!(parents, exec.file(&foo).parents);
 
         assert_eq!(
             Workload {

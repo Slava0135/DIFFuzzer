@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 use std::{collections::HashMap, fmt::Display, vec};
 
@@ -142,10 +143,10 @@ pub type Mode = Vec<ModeFlag>;
 pub type PathName = String;
 pub type Name = String;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FileIndex(pub usize);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DirIndex(pub usize);
 
 #[derive(Debug)]
@@ -153,7 +154,7 @@ pub struct FileDescriptor(usize);
 
 #[derive(Debug, Clone)]
 pub struct File {
-    pub parents: Vec<DirIndex>,
+    pub parents: HashSet<DirIndex>,
 }
 
 #[derive(Debug, Clone)]
