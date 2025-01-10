@@ -10,6 +10,7 @@ pub enum ExecutorError {
     NameAlreadyExists,
     RemoveRoot,
     NotFound,
+    NotAFile,
 }
 
 impl AbstractExecutor {
@@ -108,12 +109,17 @@ impl AbstractExecutor {
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists);
         }
+        let node = &Node::FILE(old_file.to_owned());
+        let old_path = self.resolve_path(node);
         let file = self.file_mut(old_file);
         file.parents.push(parent.to_owned());
         let parent = self.dir_mut(parent);
         parent
             .children
             .insert(name, Node::FILE(old_file.to_owned()));
+        let new_path = self.resolve_path(node);
+        self.recording
+            .push(Operation::HARDLINK { old_path, new_path });
         self.nodes_created += 1;
         Ok(old_file.to_owned())
     }
@@ -162,8 +168,19 @@ impl AbstractExecutor {
         self.create(&parent, name.to_owned(), mode)
     }
 
-    pub fn replay_hardlink(&mut self, old_path: PathName, new_path: PathName) -> Result<()> {
-        Ok(())
+    pub fn replay_hardlink(&mut self, old_path: PathName, new_path: PathName) -> Result<FileIndex> {
+        let old_file = match self.resolve_node(old_path)? {
+            Node::FILE(file_index) => file_index,
+            _ => return Err(ExecutorError::NotAFile),
+        };
+        let split_at = new_path.rfind('/').unwrap();
+        let parent_path = &new_path[..split_at];
+        let name = &new_path[split_at + 1..];
+        let parent = match self.resolve_node(parent_path.to_owned())? {
+            Node::DIR(dir_index) => dir_index,
+            _ => return Err(ExecutorError::NotADir),
+        };
+        self.hardlink(&old_file, &parent, name.to_owned())
     }
 
     fn name_exists(&self, idx: &DirIndex, name: &Name) -> bool {
@@ -238,7 +255,7 @@ impl AbstractExecutor {
                 }
                 Node::FILE(idx) => {
                     let file = self.file(&idx);
-                    let parent_idx = file.parents.first().unwrap();
+                    let parent_idx = file.parents.last().unwrap();
                     let parent = self.dir(parent_idx);
                     let (name, _) = parent
                         .children
@@ -448,9 +465,7 @@ mod tests {
         let bar = exec
             .mkdir(&AbstractExecutor::root_index(), "bar".to_owned(), vec![])
             .unwrap();
-        let boo = exec
-            .hardlink(&foo, &bar, "boo".to_owned())
-            .unwrap();
+        let boo = exec.hardlink(&foo, &bar, "boo".to_owned()).unwrap();
 
         assert_eq!(foo, boo);
         let mut expected = vec![
@@ -477,6 +492,25 @@ mod tests {
         assert_eq!(parents, exec.file(&foo).parents);
         assert_eq!(parents, exec.file(&boo).parents);
 
+        assert_eq!(
+            Workload {
+                ops: vec![
+                    Operation::CREATE {
+                        path: "/foo".to_owned(),
+                        mode: vec![],
+                    },
+                    Operation::MKDIR {
+                        path: "/bar".to_owned(),
+                        mode: vec![],
+                    },
+                    Operation::HARDLINK {
+                        old_path: "/foo".to_owned(),
+                        new_path: "/bar/boo".to_owned(),
+                    }
+                ],
+            },
+            exec.recording
+        );
         assert_eq!(3, exec.nodes_created);
         test_replay(exec.recording);
     }
