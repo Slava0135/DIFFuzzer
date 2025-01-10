@@ -13,6 +13,11 @@ pub enum ExecutorError {
     NotAFile,
 }
 
+fn split_path(path: &str) -> (&str, &str) {
+    let split_at = path.rfind('/').unwrap();
+    (&path[..split_at], &path[split_at + 1..])
+}
+
 impl AbstractExecutor {
     pub fn new() -> Self {
         AbstractExecutor {
@@ -26,34 +31,33 @@ impl AbstractExecutor {
         }
     }
 
-    pub fn remove(&mut self, node: &Node) -> Result<()> {
+    pub fn remove(&mut self, path: PathName) -> Result<()> {
+        let (parent_path, name) = split_path(&path);
+        let node = &self.resolve_node(path.clone())?;
+        let parent_idx = match self.resolve_node(parent_path.to_owned())? {
+            Node::DIR(dir_index) => dir_index,
+            _ => return Err(ExecutorError::NotADir),
+        };
+        self.recording
+            .push(Operation::REMOVE { path: path.clone() });
+        let parent = self.dir_mut(&parent_idx);
+        parent.children.remove(name);
         match node {
             Node::DIR(to_remove) => {
                 if *to_remove == AbstractExecutor::root_index() {
                     return Err(ExecutorError::RemoveRoot);
                 }
-                self.recording.push(Operation::REMOVE {
-                    path: self.resolve_path(node),
-                });
-                let dir = self.dir(&to_remove).clone();
-                let parent = self.dir_mut(&dir.parent.unwrap());
-                parent.children.retain(|_, n| match n {
-                    Node::FILE(_) => true,
-                    Node::DIR(idx) => idx != to_remove,
-                });
+                let to_remove = self.dir_mut(to_remove);
+                to_remove.parent = None;
             }
             Node::FILE(to_remove) => {
-                self.recording.push(Operation::REMOVE {
-                    path: self.resolve_path(node),
-                });
-                let file = self.file(&to_remove).clone();
-                for parent in file.parents {
-                    let parent = self.dir_mut(&parent);
-                    parent.children.retain(|_, n| match n {
-                        Node::FILE(idx) => idx != to_remove,
-                        Node::DIR(_) => true,
-                    });
-                }
+                let to_remove = self.file_mut(to_remove);
+                let index = to_remove
+                    .parents
+                    .iter()
+                    .position(|it| *it == parent_idx)
+                    .unwrap();
+                to_remove.parents.remove(index);
             }
         }
         Ok(())
@@ -113,11 +117,16 @@ impl AbstractExecutor {
         let old_path = self.resolve_path(node);
         let file = self.file_mut(old_file);
         file.parents.push(parent.to_owned());
-        let parent = self.dir_mut(parent);
-        parent
+        let parent_dir = self.dir_mut(parent);
+        parent_dir
             .children
-            .insert(name, Node::FILE(old_file.to_owned()));
-        let new_path = self.resolve_path(node);
+            .insert(name.clone(), Node::FILE(old_file.to_owned()));
+        let parent_path = self.resolve_path(&Node::DIR(parent.to_owned()));
+        let new_path = if *parent == AbstractExecutor::root_index() {
+            format!("/{}", name)
+        } else {
+            format!("{}/{}", parent_path, name)
+        };
         self.recording
             .push(Operation::HARDLINK { old_path, new_path });
         self.nodes_created += 1;
@@ -143,13 +152,11 @@ impl AbstractExecutor {
     }
 
     pub fn replay_remove(&mut self, path: PathName) -> Result<()> {
-        self.remove(&self.resolve_node(path)?)
+        self.remove(path)
     }
 
     pub fn replay_mkdir(&mut self, path: PathName, mode: Mode) -> Result<DirIndex> {
-        let split_at = path.rfind('/').unwrap();
-        let parent_path = &path[..split_at];
-        let name = &path[split_at + 1..];
+        let (parent_path, name) = split_path(&path);
         let parent = match self.resolve_node(parent_path.to_owned())? {
             Node::DIR(dir_index) => dir_index,
             _ => return Err(ExecutorError::NotADir),
@@ -158,9 +165,7 @@ impl AbstractExecutor {
     }
 
     pub fn replay_create(&mut self, path: PathName, mode: Mode) -> Result<FileIndex> {
-        let split_at = path.rfind('/').unwrap();
-        let parent_path = &path[..split_at];
-        let name = &path[split_at + 1..];
+        let (parent_path, name) = split_path(&path);
         let parent = match self.resolve_node(parent_path.to_owned())? {
             Node::DIR(dir_index) => dir_index,
             _ => return Err(ExecutorError::NotADir),
@@ -173,9 +178,7 @@ impl AbstractExecutor {
             Node::FILE(file_index) => file_index,
             _ => return Err(ExecutorError::NotAFile),
         };
-        let split_at = new_path.rfind('/').unwrap();
-        let parent_path = &new_path[..split_at];
-        let name = &new_path[split_at + 1..];
+        let (parent_path, name) = split_path(&new_path);
         let parent = match self.resolve_node(parent_path.to_owned())? {
             Node::DIR(dir_index) => dir_index,
             _ => return Err(ExecutorError::NotADir),
@@ -313,8 +316,7 @@ mod tests {
     #[should_panic]
     fn test_remove_root() {
         let mut exec = AbstractExecutor::new();
-        exec.remove(&Node::DIR(AbstractExecutor::root_index()))
-            .unwrap();
+        exec.remove("/".to_owned()).unwrap();
     }
 
     #[test]
@@ -418,7 +420,7 @@ mod tests {
         actual.sort();
         assert_eq!(expected, actual);
 
-        exec.remove(&Node::FILE(foo)).unwrap();
+        exec.remove("/foobar".to_owned()).unwrap();
 
         assert_eq!(1, exec.root().children.len());
         match exec.root().children.get("boo").unwrap() {
@@ -516,6 +518,51 @@ mod tests {
     }
 
     #[test]
+    fn test_remove_hardlink() {
+        let mut exec = AbstractExecutor::new();
+        let foo = exec
+            .create(&AbstractExecutor::root_index(), "foo".to_owned(), vec![])
+            .unwrap();
+        exec.hardlink(&foo, &AbstractExecutor::root_index(), "bar".to_owned())
+            .unwrap();
+        exec.remove("/bar".to_owned()).unwrap();
+
+        let mut expected = vec![Node::DIR(AbstractExecutor::root_index()), Node::FILE(foo)];
+        let mut actual = exec.alive();
+        expected.sort();
+        actual.sort();
+        assert_eq!(expected, actual);
+
+        assert_eq!(1, exec.root().children.len());
+
+        assert_eq!(
+            vec![AbstractExecutor::root_index()],
+            exec.file(&foo).parents
+        );
+
+        assert_eq!(
+            Workload {
+                ops: vec![
+                    Operation::CREATE {
+                        path: "/foo".to_owned(),
+                        mode: vec![],
+                    },
+                    Operation::HARDLINK {
+                        old_path: "/foo".to_owned(),
+                        new_path: "/bar".to_owned(),
+                    },
+                    Operation::REMOVE {
+                        path: "/bar".to_owned(),
+                    }
+                ],
+            },
+            exec.recording
+        );
+        assert_eq!(2, exec.nodes_created);
+        test_replay(exec.recording);
+    }
+
+    #[test]
     #[should_panic]
     fn test_hardlink_name_exists() {
         let mut exec = AbstractExecutor::new();
@@ -547,7 +594,7 @@ mod tests {
         actual.sort();
         assert_eq!(expected, actual);
 
-        exec.remove(&Node::DIR(foo)).unwrap();
+        exec.remove("/foobar".to_owned()).unwrap();
 
         assert_eq!(1, exec.root().children.len());
         match exec.root().children.get("boo").unwrap() {

@@ -70,7 +70,7 @@ pub fn append_one(
                 })
                 .choose(rng)
                 .unwrap();
-            executor.remove(node).unwrap();
+            executor.remove(executor.resolve_path(node)).unwrap();
         }
     }
 }
