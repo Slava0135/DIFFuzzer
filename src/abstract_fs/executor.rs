@@ -78,7 +78,7 @@ impl AbstractExecutor {
             .children
             .insert(name, Node::DIR(dir_idx));
         self.recording.push(Operation::MKDIR {
-            path: self.resolve_path(&Node::DIR(dir_idx)),
+            path: self.resolve_dir_path(&dir_idx),
             mode,
         });
         self.nodes_created += 1;
@@ -96,9 +96,9 @@ impl AbstractExecutor {
         self.files.push(file);
         self.dir_mut(&parent)
             .children
-            .insert(name, Node::FILE(file_idx));
+            .insert(name.clone(), Node::FILE(file_idx));
         self.recording.push(Operation::CREATE {
-            path: self.resolve_path(&Node::FILE(file_idx)),
+            path: self.make_path(parent, &name),
             mode,
         });
         self.nodes_created += 1;
@@ -115,19 +115,14 @@ impl AbstractExecutor {
             return Err(ExecutorError::NameAlreadyExists);
         }
         let node = &Node::FILE(old_file.to_owned());
-        let old_path = self.resolve_path(node);
+        let old_path = self.resolve_path(node).pop().unwrap();
         let file = self.file_mut(old_file);
         file.parents.insert(parent.to_owned());
         let parent_dir = self.dir_mut(parent);
         parent_dir
             .children
             .insert(name.clone(), Node::FILE(old_file.to_owned()));
-        let parent_path = self.resolve_path(&Node::DIR(parent.to_owned()));
-        let new_path = if *parent == AbstractExecutor::root_index() {
-            format!("/{}", name)
-        } else {
-            format!("{}/{}", parent_path, name)
-        };
+        let new_path = self.make_path(&parent, &name);
         self.recording
             .push(Operation::HARDLINK { old_path, new_path });
         self.nodes_created += 1;
@@ -236,43 +231,57 @@ impl AbstractExecutor {
         DirIndex(0)
     }
 
-    pub fn resolve_path(&self, node: &Node) -> PathName {
+    fn make_path(&self, parent: &DirIndex, name: &Name) -> PathName {
+        if *parent == AbstractExecutor::root_index() {
+            format!("/{}", name)
+        } else {
+            let parent_path = self.resolve_dir_path(&parent);
+            format!("{}/{}", parent_path, name)
+        }
+    }
+
+    pub fn resolve_file_path(&self, file_idx: &FileIndex) -> Vec<PathName> {
+        let mut paths = vec![];
+        let file = self.file(file_idx);
+        for dir in file.parents.iter() {
+            self.dir(dir)
+                .children
+                .iter()
+                .filter(|(_, node)| **node == Node::FILE(file_idx.to_owned()))
+                .for_each(|(name, _)| paths.push(self.make_path(dir, name)));
+        }
+        paths.sort();
+        paths
+    }
+
+    pub fn resolve_dir_path(&self, dir_idx: &DirIndex) -> PathName {
         let mut segments: Vec<String> = vec![];
-        let mut next = node.clone();
+        let mut next = dir_idx.to_owned();
         loop {
-            match next {
-                Node::DIR(idx) => {
-                    let dir = self.dir(&idx);
-                    match dir.parent {
-                        Some(parent) => {
-                            let parent_dir = self.dir(&parent);
-                            let (name, _) = parent_dir
-                                .children
-                                .iter()
-                                .find(|(_, node)| next == **node)
-                                .unwrap();
-                            segments.push(name.clone());
-                            next = Node::DIR(parent.clone());
-                        }
-                        None => break,
-                    }
-                }
-                Node::FILE(idx) => {
-                    let file = self.file(&idx);
-                    let parent_idx = file.parents.iter().next().unwrap();
-                    let parent = self.dir(parent_idx);
-                    let (name, _) = parent
+            let dir = self.dir(&next);
+            match dir.parent {
+                Some(parent) => {
+                    let parent_dir = self.dir(&parent);
+                    let (name, _) = parent_dir
                         .children
                         .iter()
-                        .find(|(_, node)| next == **node)
+                        .find(|(_, node)| **node == Node::DIR(next))
                         .unwrap();
                     segments.push(name.clone());
-                    next = Node::DIR(parent_idx.to_owned()).clone();
+                    next = parent;
                 }
+                None => break,
             }
         }
         segments.reverse();
         "/".to_owned() + segments.join("/").as_str()
+    }
+
+    pub fn resolve_path(&self, node: &Node) -> Vec<PathName> {
+        match node {
+            Node::FILE(file) => self.resolve_file_path(file),
+            Node::DIR(dir) => vec![self.resolve_dir_path(dir)],
+        }
     }
 
     pub fn alive(&self) -> Vec<Node> {
@@ -642,10 +651,18 @@ mod tests {
             .unwrap();
         let bar = exec.mkdir(&foo, "bar".to_owned(), vec![]).unwrap();
         let boo = exec.create(&bar, "boo".to_owned(), vec![]).unwrap();
-        assert_eq!("/foo", exec.resolve_path(&Node::DIR(foo)));
-        assert_eq!("/foo/bar", exec.resolve_path(&Node::DIR(bar)));
-        assert_eq!("/foo/bar/boo", exec.resolve_path(&Node::FILE(boo)));
-        assert_eq!(3, exec.nodes_created);
+        exec.hardlink(&boo, &AbstractExecutor::root_index(), "zoo".to_owned())
+            .unwrap();
+        exec.hardlink(&boo, &bar, "moo".to_owned())
+            .unwrap();
+        assert_eq!(vec!["/foo"], exec.resolve_path(&Node::DIR(foo)));
+        assert_eq!(vec!["/foo/bar"], exec.resolve_path(&Node::DIR(bar)));
+        let mut expected = vec!["/foo/bar/boo", "/foo/bar/moo", "/zoo"];
+        let mut actual = exec.resolve_path(&Node::FILE(boo));
+        expected.sort();
+        actual.sort();
+        assert_eq!(expected, actual);
+        assert_eq!(5, exec.nodes_created);
         test_replay(exec.recording);
     }
 
