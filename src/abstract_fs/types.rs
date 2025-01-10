@@ -193,6 +193,7 @@ pub enum OperationKind {
     MKDIR,
     CREATE,
     REMOVE,
+    HARDLINK,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -211,6 +212,7 @@ impl OperationWeights {
                 (OperationKind::CREATE, 100),
                 (OperationKind::MKDIR, 100),
                 (OperationKind::REMOVE, 100),
+                (OperationKind::HARDLINK, 100),
             ],
         }
     }
