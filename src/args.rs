@@ -40,4 +40,15 @@ pub enum Mode {
         #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
         filesystem: String,
     },
+    //Run blackbox fuzzing
+    Blackbox {
+        #[arg(short, long)]
+        first_filesystem: String,
+        #[arg(short, long)]
+        second_filesystem: String,
+        #[arg(short, long)]
+        count: usize,
+        #[arg(short, long)]
+        trace_len: usize,
+    }
 }
