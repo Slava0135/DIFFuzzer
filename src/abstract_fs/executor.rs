@@ -9,7 +9,7 @@ pub enum ExecutorError {
     NotADir,
     NameAlreadyExists,
     RemoveRoot,
-    NotFound,
+    NotFound(PathName),
     NotAFile,
 }
 
@@ -49,6 +49,7 @@ impl AbstractExecutor {
                 }
                 let to_remove = self.dir_mut(to_remove);
                 to_remove.parent = None;
+                to_remove.children.clear();
             }
             Node::FILE(to_remove) => {
                 let another_exists = parent.children.iter().any(|(_, node)| match node {
@@ -221,7 +222,7 @@ impl AbstractExecutor {
             last = dir
                 .children
                 .get(segment.to_owned())
-                .ok_or(ExecutorError::NotFound)?
+                .ok_or(ExecutorError::NotFound(path.clone()))?
                 .clone();
         }
         Ok(last)
@@ -574,6 +575,21 @@ mod tests {
     }
 
     #[test]
+    fn test_remove_hardlink_dir() {
+        let mut exec = AbstractExecutor::new();
+        let zero = exec
+            .create(&AbstractExecutor::root_index(), "0".to_owned(), vec![])
+            .unwrap();
+        let one = exec
+            .mkdir(&AbstractExecutor::root_index(), "1".to_owned(), vec![])
+            .unwrap();
+        let two = exec.mkdir(&one, "2".to_owned(), vec![]).unwrap();
+        exec.hardlink(&zero, &two, "3".to_owned()).unwrap();
+        exec.remove(exec.resolve_dir_path(&one)).unwrap();
+        assert_eq!(vec!["/0"], exec.resolve_file_path(&zero));
+    }
+
+    #[test]
     #[should_panic]
     fn test_hardlink_name_exists() {
         let mut exec = AbstractExecutor::new();
@@ -653,8 +669,7 @@ mod tests {
         let boo = exec.create(&bar, "boo".to_owned(), vec![]).unwrap();
         exec.hardlink(&boo, &AbstractExecutor::root_index(), "zoo".to_owned())
             .unwrap();
-        exec.hardlink(&boo, &bar, "moo".to_owned())
-            .unwrap();
+        exec.hardlink(&boo, &bar, "moo".to_owned()).unwrap();
         assert_eq!(vec!["/foo"], exec.resolve_path(&Node::DIR(foo)));
         assert_eq!(vec!["/foo/bar"], exec.resolve_path(&Node::DIR(bar)));
         let mut expected = vec!["/foo/bar/boo", "/foo/bar/moo", "/zoo"];
