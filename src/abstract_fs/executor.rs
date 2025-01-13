@@ -184,17 +184,13 @@ impl AbstractExecutor {
                 Operation::CREATE { path, mode } => {
                     self.replay_create(path.clone(), mode.clone())?;
                 }
-                Operation::REMOVE { path } => self.replay_remove(path.clone())?,
+                Operation::REMOVE { path } => self.remove(path.clone())?,
                 Operation::HARDLINK { old_path, new_path } => {
                     self.replay_hardlink(old_path.clone(), new_path.clone())?;
                 }
             };
         }
         Ok(())
-    }
-
-    pub fn replay_remove(&mut self, path: PathName) -> Result<()> {
-        self.remove(path)
     }
 
     pub fn replay_create(&mut self, path: PathName, mode: Mode) -> Result<FileIndex> {
