@@ -3,10 +3,12 @@ use std::{
     fs, io,
     path::Path,
     rc::Rc,
+    sync::mpsc::channel,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
 use anyhow::Context;
+use crossbeam::{channel::unbounded, select};
 use log::{debug, error, info};
 use rand::{rngs::StdRng, SeedableRng};
 
@@ -193,7 +195,24 @@ impl Fuzzer {
     pub fn fuzz(&mut self) {
         info!("starting fuzzing loop");
         self.stats.start = Instant::now();
+
+        let (interrupt_tx, interrupt_rx) = unbounded();
+        ctrlc::set_handler(move || {
+            interrupt_tx
+                .send(())
+                .expect("could not send signal on interrupt channel")
+        })
+        .expect("error setting Ctrl-C handler");
+
         loop {
+            select! {
+                recv(interrupt_rx) -> _ => {
+                    println!();
+                    println!("Goodbye!");
+                    break;
+                }
+                default => {}
+            }
             match self.fuzz_one() {
                 Err(err) => {
                     error!("{:?}", err);
