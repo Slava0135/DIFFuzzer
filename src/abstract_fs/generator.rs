@@ -5,7 +5,7 @@ use rand::{
 
 use crate::abstract_fs::types::{AbstractExecutor, DirIndex, ModeFlag, Node, Workload};
 
-use super::types::{Name, OperationKind, OperationWeights};
+use super::types::{FileIndex, Name, OperationKind, OperationWeights};
 
 pub fn generate_new(rng: &mut impl Rng, size: usize, weights: &OperationWeights) -> Workload {
     let mut executor = AbstractExecutor::new();
@@ -38,7 +38,14 @@ pub fn append_one(
         .iter()
         .filter_map(|n| match n {
             Node::DIR(dir) => Some(dir.clone()),
-            Node::FILE(_) => None,
+            _ => None,
+        })
+        .collect();
+    let alive_files: Vec<FileIndex> = alive
+        .iter()
+        .filter_map(|n| match n {
+            Node::FILE(file) => Some(file.clone()),
+            _ => None,
         })
         .collect();
     let alive_dirs_except_root: Vec<DirIndex> = alive_dirs
@@ -49,6 +56,9 @@ pub fn append_one(
     let mut ops = weights.clone();
     if alive_dirs_except_root.is_empty() {
         ops.weights.retain(|(op, _)| *op != OperationKind::REMOVE);
+    }
+    if alive_files.is_empty() {
+        ops.weights.retain(|(op, _)| *op != OperationKind::HARDLINK);
     }
     match ops.weights.choose_weighted(rng, |item| item.1).unwrap().0 {
         OperationKind::MKDIR => {
@@ -70,7 +80,18 @@ pub fn append_one(
                 })
                 .choose(rng)
                 .unwrap();
-            executor.remove(node).unwrap();
+            executor
+                .remove(executor.resolve_path(node).pop().unwrap())
+                .unwrap();
+        }
+        OperationKind::HARDLINK => {
+            executor
+                .hardlink(
+                    alive_files.choose(rng).unwrap(),
+                    alive_dirs.choose(rng).unwrap(),
+                    gen_name(),
+                )
+                .unwrap();
         }
     }
 }

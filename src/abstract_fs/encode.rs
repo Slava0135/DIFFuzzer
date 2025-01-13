@@ -26,6 +26,11 @@ impl Workload {
                 Operation::REMOVE { path } => {
                     result.push_str(format!("do_remove(\"{}\");\n", path).as_str());
                 }
+                Operation::HARDLINK { old_path, new_path } => {
+                    result.push_str(
+                        format!("do_hardlink(\"{}\", \"{}\");\n", old_path, new_path).as_str(),
+                    );
+                }
             }
         }
         result.push_str("}");
@@ -56,6 +61,7 @@ void test_workload()
 {
 do_mkdir("/foo", 0);
 do_create("/foo/bar", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+do_hardlink("/foo/bar", "/baz");
 do_remove("/foo");
 }
 "#
@@ -75,6 +81,10 @@ do_remove("/foo");
                 Operation::CREATE {
                     path: "/foo/bar".to_owned(),
                     mode: mode.clone(),
+                },
+                Operation::HARDLINK {
+                    old_path: "/foo/bar".to_owned(),
+                    new_path: "/baz".to_owned(),
                 },
                 Operation::REMOVE {
                     path: "/foo".to_owned(),

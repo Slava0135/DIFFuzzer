@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 use std::{collections::HashMap, fmt::Display, vec};
 
@@ -142,10 +143,10 @@ pub type Mode = Vec<ModeFlag>;
 pub type PathName = String;
 pub type Name = String;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FileIndex(pub usize);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DirIndex(pub usize);
 
 #[derive(Debug)]
@@ -153,7 +154,7 @@ pub struct FileDescriptor(usize);
 
 #[derive(Debug, Clone)]
 pub struct File {
-    pub parent: DirIndex,
+    pub parents: HashSet<DirIndex>,
 }
 
 #[derive(Debug, Clone)]
@@ -170,9 +171,21 @@ pub enum Node {
 
 #[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
 pub enum Operation {
-    MKDIR { path: PathName, mode: Mode },
-    CREATE { path: PathName, mode: Mode },
-    REMOVE { path: PathName },
+    MKDIR {
+        path: PathName,
+        mode: Mode,
+    },
+    CREATE {
+        path: PathName,
+        mode: Mode,
+    },
+    REMOVE {
+        path: PathName,
+    },
+    HARDLINK {
+        old_path: PathName,
+        new_path: PathName,
+    },
 }
 
 #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Copy)]
@@ -180,6 +193,7 @@ pub enum OperationKind {
     MKDIR,
     CREATE,
     REMOVE,
+    HARDLINK,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -198,6 +212,7 @@ impl OperationWeights {
                 (OperationKind::CREATE, 100),
                 (OperationKind::MKDIR, 100),
                 (OperationKind::REMOVE, 100),
+                (OperationKind::HARDLINK, 100),
             ],
         }
     }

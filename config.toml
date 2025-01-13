@@ -18,6 +18,10 @@ weights = [
     "REMOVE",
     100,
   ],
+  [
+    "HARDLINK",
+    100,
+  ],
 ]
 
 [mutation_weights]

@@ -38,6 +38,14 @@ pub fn insert(
                 }
             }
             Operation::REMOVE { path: _ } => {}
+            Operation::HARDLINK { old_path, new_path } => {
+                for segment in old_path.split("/") {
+                    used_names.insert(segment);
+                }
+                for segment in new_path.split("/") {
+                    used_names.insert(segment);
+                }
+            }
         }
     }
 
