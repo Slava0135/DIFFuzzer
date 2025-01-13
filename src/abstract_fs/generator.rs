@@ -103,7 +103,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_generate_new() {
+    fn smoke_test_generate_new() {
         for i in 0..1000 {
             let mut rng = StdRng::seed_from_u64(i);
             generate_new(&mut rng, 1000, &OperationWeights::uniform());
