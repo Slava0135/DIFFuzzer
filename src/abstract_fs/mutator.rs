@@ -1,11 +1,26 @@
 use std::collections::HashSet;
 
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 
-use super::{
-    generator::append_one,
-    types::{AbstractExecutor, Operation, OperationWeights, Workload},
-};
+use super::{executor::AbstractExecutor, generator::append_one, operation::{Operation, OperationWeights}, workload::Workload};
+
+#[derive(PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
+pub enum MutationKind {
+    INSERT,
+    REMOVE,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct MutationWeights {
+    pub weights: Vec<(MutationKind, u32)>,
+}
+
+impl MutationWeights {
+    pub fn new(weights: Vec<(MutationKind, u32)>) -> Self {
+        Self { weights }
+    }
+}
 
 pub fn remove(workload: &Workload, index: usize) -> Option<Workload> {
     let mut ops = workload.ops.clone();
@@ -85,10 +100,7 @@ pub fn insert(
 mod tests {
     use rand::{rngs::StdRng, SeedableRng};
 
-    use crate::abstract_fs::{
-        generator::generate_new,
-        types::{Operation, OperationKind},
-    };
+    use crate::abstract_fs::{generator::generate_new, operation::OperationKind};
 
     use super::*;
 

@@ -1,8 +1,11 @@
 pub mod compile;
 pub mod encode;
 pub mod executor;
+pub mod flags;
 pub mod generator;
 pub mod mutator;
+pub mod node;
+pub mod operation;
 pub mod output;
 pub mod trace;
-pub mod types;
+pub mod workload;

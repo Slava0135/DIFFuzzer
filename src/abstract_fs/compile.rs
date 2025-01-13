@@ -2,7 +2,7 @@ use std::{fs, path::Path, process::Command};
 
 use anyhow::{bail, Context};
 
-use super::types::Workload;
+use super::workload::Workload;
 
 pub const TEST_SOURCE_FILENAME: &str = "test.c";
 pub const TEST_EXE_FILENAME: &str = "test.out";

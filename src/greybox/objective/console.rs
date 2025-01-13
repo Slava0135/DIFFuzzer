@@ -1,8 +1,7 @@
 use anyhow::Context;
 use log::debug;
 
-use crate::abstract_fs::output::Output;
-use crate::abstract_fs::types::ConsolePipe;
+use crate::{abstract_fs::output::Output, harness::ConsolePipe};
 
 pub struct ConsoleObjective {
     fst_stdout: ConsolePipe,

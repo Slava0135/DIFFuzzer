@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use super::types::*;
+use super::{flags::Mode, node::{Dir, DirIndex, File, FileIndex, Name, Node, PathName}, operation::Operation, workload::Workload};
 
 type Result<T> = std::result::Result<T, ExecutorError>;
 
@@ -16,6 +16,13 @@ pub enum ExecutorError {
 fn split_path(path: &str) -> (&str, &str) {
     let split_at = path.rfind('/').unwrap();
     (&path[..split_at], &path[split_at + 1..])
+}
+
+pub struct AbstractExecutor {
+    pub dirs: Vec<Dir>,
+    pub files: Vec<File>,
+    pub nodes_created: usize,
+    pub recording: Workload,
 }
 
 impl AbstractExecutor {

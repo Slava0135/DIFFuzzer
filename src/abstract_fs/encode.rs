@@ -1,7 +1,4 @@
-use crate::abstract_fs::{
-    self,
-    types::{Mode, Operation, Workload},
-};
+use super::{flags::Mode, operation::Operation, workload::Workload};
 
 impl Workload {
     pub fn encode_c(&self) -> String {
@@ -49,7 +46,7 @@ fn encode_mode(mode: &Mode) -> String {
 
 #[cfg(test)]
 mod tests {
-    use abstract_fs::types::ModeFlag;
+    use crate::abstract_fs::flags::ModeFlag;
 
     use super::*;
 

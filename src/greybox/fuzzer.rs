@@ -11,16 +11,13 @@ use log::{debug, error, info};
 use rand::{rngs::StdRng, SeedableRng};
 
 use crate::{
-    abstract_fs::{
-        trace::TRACE_FILENAME,
-        types::{ConsolePipe, Workload},
-    },
+    abstract_fs::{trace::TRACE_FILENAME, workload::Workload},
     config::Config,
     greybox::{
         feedback::kcov::KCOV_FILENAME,
         objective::{console::ConsoleObjective, trace::TraceObjective},
     },
-    harness::Harness,
+    harness::{ConsolePipe, Harness},
     mount::{btrfs::Btrfs, ext4::Ext4},
     save::{save_output, save_testcase},
     temp_dir::setup_temp_dir,

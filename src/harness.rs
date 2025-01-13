@@ -1,9 +1,10 @@
-use std::{path::Path, process::Command};
+use std::{cell::RefCell, path::Path, process::Command, rc::Rc};
 
 use anyhow::Context;
 
-use crate::abstract_fs::types::ConsolePipe;
 use crate::mount::mount::FileSystemMount;
+
+pub type ConsolePipe = Rc<RefCell<String>>;
 
 pub struct Harness<T: FileSystemMount> {
     fs_mount: T,

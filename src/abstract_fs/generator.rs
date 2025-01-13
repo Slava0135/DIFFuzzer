@@ -1,11 +1,6 @@
-use rand::{
-    seq::{IteratorRandom, SliceRandom},
-    Rng,
-};
+use rand::{seq::{IteratorRandom, SliceRandom}, Rng};
 
-use crate::abstract_fs::types::{AbstractExecutor, DirIndex, ModeFlag, Node, Workload};
-
-use super::types::{FileIndex, Name, OperationKind, OperationWeights};
+use super::{executor::AbstractExecutor, flags::ModeFlag, node::{DirIndex, FileIndex, Name, Node}, operation::{OperationKind, OperationWeights}, workload::Workload};
 
 pub fn generate_new(rng: &mut impl Rng, size: usize, weights: &OperationWeights) -> Workload {
     let mut executor = AbstractExecutor::new();

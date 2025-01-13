@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::abstract_fs::types::{MutationWeights, OperationWeights};
+use crate::abstract_fs::{mutator::MutationWeights, operation::OperationWeights};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
