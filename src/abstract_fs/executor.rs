@@ -11,7 +11,7 @@ use super::{
 
 type Result<T> = std::result::Result<T, ExecutorError>;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum ExecutorError {
     #[error("'{0}' is not a file")]
     NotAFile(PathName),
@@ -372,10 +372,12 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_remove_root() {
         let mut exec = AbstractExecutor::new();
-        exec.remove("/".to_owned()).unwrap();
+        assert_eq!(
+            Err(ExecutorError::RootRemovalForbidden),
+            exec.remove("/".to_owned())
+        );
     }
 
     #[test]
@@ -384,14 +386,7 @@ mod tests {
         let foo = exec
             .mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
             .unwrap();
-        match exec.root().children.get("foobar").unwrap() {
-            Node::DIR(idx) => {
-                assert_eq!(foo, *idx)
-            }
-            _ => {
-                assert!(false, "not a dir")
-            }
-        }
+        assert_eq!(Node::DIR(foo), *exec.root().children.get("foobar").unwrap());
         assert_eq!(
             Workload {
                 ops: vec![Operation::MKDIR {
@@ -410,13 +405,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_mkdir_name_exists() {
         let mut exec = AbstractExecutor::new();
         exec.mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
             .unwrap();
-        exec.mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
-            .unwrap();
+        assert_eq!(
+            Err(ExecutorError::NameAlreadyExists("/foobar".to_owned())),
+            exec.mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
+        );
     }
 
     #[test]
@@ -425,14 +421,10 @@ mod tests {
         let foo = exec
             .create(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
             .unwrap();
-        match exec.root().children.get("foobar").unwrap() {
-            Node::FILE(idx) => {
-                assert_eq!(foo, *idx)
-            }
-            _ => {
-                assert!(false, "not a file")
-            }
-        }
+        assert_eq!(
+            Node::FILE(foo),
+            *exec.root().children.get("foobar").unwrap()
+        );
         assert_eq!(
             vec![Node::DIR(AbstractExecutor::root_index()), Node::FILE(foo)],
             exec.alive()
@@ -451,13 +443,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_create_name_exists() {
         let mut exec = AbstractExecutor::new();
         exec.create(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
             .unwrap();
-        exec.create(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
-            .unwrap();
+        assert_eq!(
+            Err(ExecutorError::NameAlreadyExists("/foobar".to_owned())),
+            exec.create(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
+        );
     }
 
     #[test]
@@ -482,14 +475,8 @@ mod tests {
         exec.remove("/foobar".to_owned()).unwrap();
 
         assert_eq!(1, exec.root().children.len());
-        match exec.root().children.get("boo").unwrap() {
-            Node::FILE(idx) => {
-                assert_eq!(boo, *idx);
-            }
-            _ => {
-                assert!(false, "not a file")
-            }
-        }
+        assert_eq!(Node::FILE(boo), *exec.root().children.get("boo").unwrap());
+
         let mut expected = vec![Node::DIR(AbstractExecutor::root_index()), Node::FILE(boo)];
         let mut actual = exec.alive();
         expected.sort();
@@ -638,7 +625,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_hardlink_name_exists() {
         let mut exec = AbstractExecutor::new();
         exec.create(&AbstractExecutor::root_index(), "foo".to_owned(), vec![])
@@ -646,8 +632,10 @@ mod tests {
         let bar = exec
             .create(&AbstractExecutor::root_index(), "bar".to_owned(), vec![])
             .unwrap();
-        exec.hardlink(&bar, &AbstractExecutor::root_index(), "foo".to_owned())
-            .unwrap();
+        assert_eq!(
+            Err(ExecutorError::NameAlreadyExists("/foo".to_owned())),
+            exec.hardlink(&bar, &AbstractExecutor::root_index(), "foo".to_owned())
+        );
     }
 
     #[test]
@@ -672,14 +660,8 @@ mod tests {
         exec.remove("/foobar".to_owned()).unwrap();
 
         assert_eq!(1, exec.root().children.len());
-        match exec.root().children.get("boo").unwrap() {
-            Node::DIR(idx) => {
-                assert_eq!(boo, *idx);
-            }
-            _ => {
-                assert!(false, "not a dir")
-            }
-        }
+        assert_eq!(Node::DIR(boo), *exec.root().children.get("boo").unwrap());
+
         let mut expected = vec![Node::DIR(AbstractExecutor::root_index()), Node::DIR(boo)];
         let mut actual = exec.alive();
         expected.sort();
