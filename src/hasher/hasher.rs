@@ -33,7 +33,7 @@ impl Display for FileInfo {
 }
 
 // if nlink = True, include nlink to hash. Same for mode.
-pub fn get_hash_for_dir(path: &Path, seed: u64, nlink: bool, mode: bool) -> u64 {
+pub fn calc_hash_for_dir(path: &Path, seed: u64, nlink: bool, mode: bool) -> u64 {
     let mut hasher = XxHash64::with_seed(seed);
 
     for entry in WalkDir::new(path).sort_by(|a, b| a.file_name().cmp(b.file_name())) {
@@ -73,8 +73,8 @@ pub fn get_diff<T: Write>(path_a: &Path, path_b: &Path, mut output: T, nlink: bo
         match cmp_res {
             Ordering::Equal => {
                 let seed = random();
-                let hash_a = get_hash_for_dir(vec_a[i_a].abs_path.as_ref(), seed, nlink, mode);
-                let hash_b = get_hash_for_dir(vec_b[i_b].abs_path.as_ref(), seed, nlink, mode);
+                let hash_a = calc_hash_for_dir(vec_a[i_a].abs_path.as_ref(), seed, nlink, mode);
+                let hash_b = calc_hash_for_dir(vec_b[i_b].abs_path.as_ref(), seed, nlink, mode);
                 if hash_a != hash_b {
                     write!(output, "========Diff hash for files:========\n")
                         .expect("panic at write msg");
@@ -167,5 +167,5 @@ fn get_nfs_internal_dirs() -> &'static HashSet<&'static str> {
 }
 
 fn is_nfs_tmp(path: &str) -> bool {
-    return get_ntfs_internal_dirs().contains(path) || path.starts_with("/.nfs");
+    return get_nfs_internal_dirs().contains(path) || path.starts_with("/.nfs");
 }
