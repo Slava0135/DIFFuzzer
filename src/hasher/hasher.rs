@@ -40,9 +40,10 @@ pub fn get_hash_for_dir(path: &Path, seed: u64, nlink: bool, mode: bool) -> u64 
         let entry = entry.unwrap();
         let rel_path = entry.path().strip_prefix(path).unwrap().to_str().unwrap();
 
-        if is_nfs_tmp(rel_path) {
-            continue;
-        }
+        //todo: uncomment after adding nfs support
+        // if is_nfs_tmp(rel_path) {
+        //     continue;
+        // }
 
         let metadata = entry.metadata().unwrap();
         hasher.write(rel_path.as_bytes());
