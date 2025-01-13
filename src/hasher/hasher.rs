@@ -154,7 +154,7 @@ fn get_dir_content(path: &Path) -> Vec<FileInfo> {
     return v;
 }
 
-fn get_ntfs_internal_dirs() -> &'static HashSet<&'static str> {
+fn get_nfs_internal_dirs() -> &'static HashSet<&'static str> {
     static HASHSET: OnceLock<HashSet<&str>> = OnceLock::new();
     HASHSET.get_or_init(|| {
         let mut m = HashSet::new();
