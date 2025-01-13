@@ -47,9 +47,9 @@ pub fn calc_hash_for_dir(path: &Path, seed: u64, nlink: bool, mode: bool) -> u64
 
         let metadata = entry.metadata().unwrap();
         hasher.write(rel_path.as_bytes());
-        hasher.write(&metadata.gid().to_le_bytes());
-        hasher.write(&metadata.uid().to_le_bytes());
-        hasher.write(&metadata.size().to_le_bytes());
+        hasher.write_u32(metadata.gid());
+        hasher.write_u32(metadata.uid());
+        hasher.write_u64(metadata.size());
         if nlink {
             hasher.write(&metadata.nlink().to_le_bytes());
         }
