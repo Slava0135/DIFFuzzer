@@ -1,6 +1,10 @@
 use rand::{rngs::StdRng, seq::SliceRandom, Rng};
 
-use crate::abstract_fs::{mutator::{insert, remove, MutationKind, MutationWeights}, operation::OperationWeights, workload::Workload};
+use crate::abstract_fs::{
+    mutator::{insert, remove, MutationKind, MutationWeights},
+    operation::OperationWeights,
+    workload::Workload,
+};
 
 pub struct Mutator {
     rng: StdRng,

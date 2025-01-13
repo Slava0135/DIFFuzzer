@@ -3,7 +3,12 @@ use std::collections::HashSet;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use super::{executor::AbstractExecutor, generator::append_one, operation::{Operation, OperationWeights}, workload::Workload};
+use super::{
+    executor::AbstractExecutor,
+    generator::append_one,
+    operation::{Operation, OperationWeights},
+    workload::Workload,
+};
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
 pub enum MutationKind {

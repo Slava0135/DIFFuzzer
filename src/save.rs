@@ -4,7 +4,8 @@ use anyhow::Context;
 
 use crate::abstract_fs::{
     compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME},
-    trace::TRACE_FILENAME, workload::Workload,
+    trace::TRACE_FILENAME,
+    workload::Workload,
 };
 
 pub fn save_testcase(dir: &Path, input_path: &Path, input: &Workload) -> anyhow::Result<()> {
