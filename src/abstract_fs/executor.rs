@@ -23,11 +23,18 @@ pub enum ExecutorError {
     RootRemovalForbidden,
     #[error("node at path '{0}' not found")]
     NotFound(PathName),
+    #[error("invalid path '{0}'")]
+    InvalidPath(PathName),
 }
 
 fn split_path(path: &str) -> (&str, &str) {
     let split_at = path.rfind('/').unwrap();
-    (&path[..split_at], &path[split_at + 1..])
+    let (parent, name) = (&path[..split_at], &path[split_at + 1..]);
+    if parent.is_empty() {
+        ("/", name)
+    } else {
+        (parent, name)
+    }
 }
 
 pub struct AbstractExecutor {
@@ -232,8 +239,11 @@ impl AbstractExecutor {
     }
 
     pub fn resolve_node(&self, path: PathName) -> Result<Node> {
-        let mut last = Node::DIR(AbstractExecutor::root_index());
+        if path.is_empty() || !path.starts_with('/') || (path != "/" && path.ends_with('/')) {
+            return Err(ExecutorError::InvalidPath(path));
+        }
         let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+        let mut last = Node::DIR(AbstractExecutor::root_index());
         let mut path = String::new();
         for segment in &segments {
             path.push_str("/");
@@ -682,28 +692,28 @@ mod tests {
         let bar = exec.mkdir("/foo/bar".to_owned(), vec![]).unwrap();
         let boo = exec.create("/foo/bar/boo".to_owned(), vec![]).unwrap();
         assert_eq!(
-            Node::DIR(foo),
-            exec.resolve_node("/foo".to_owned()).unwrap()
+            Err(ExecutorError::InvalidPath("".to_owned())),
+            exec.resolve_node("".to_owned())
+        );
+        assert_eq!(
+            Err(ExecutorError::InvalidPath("foo".to_owned())),
+            exec.resolve_node("foo".to_owned())
+        );
+        assert_eq!(
+            Err(ExecutorError::InvalidPath("/foo/".to_owned())),
+            exec.resolve_node("/foo/".to_owned())
         );
         assert_eq!(
             Node::DIR(foo),
-            exec.resolve_node("/foo/".to_owned()).unwrap()
+            exec.resolve_node("/foo".to_owned()).unwrap()
         );
         assert_eq!(
             Node::DIR(bar),
             exec.resolve_node("/foo/bar".to_owned()).unwrap()
         );
         assert_eq!(
-            Node::DIR(bar),
-            exec.resolve_node("/foo/bar/".to_owned()).unwrap()
-        );
-        assert_eq!(
             Node::FILE(boo),
             exec.resolve_node("/foo/bar/boo".to_owned()).unwrap()
-        );
-        assert_eq!(
-            Node::FILE(boo),
-            exec.resolve_node("/foo/bar/boo/".to_owned()).unwrap()
         );
         assert_eq!(3, exec.nodes_created);
         test_replay(exec.recording);
