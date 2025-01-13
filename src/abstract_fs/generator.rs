@@ -91,11 +91,12 @@ pub fn append_one(
                 .unwrap();
         }
         OperationKind::HARDLINK => {
+            let file = alive_files.choose(rng).unwrap();
+            let dir = alive_dirs.choose(rng).unwrap();
             executor
                 .hardlink(
-                    alive_files.choose(rng).unwrap(),
-                    alive_dirs.choose(rng).unwrap(),
-                    gen_name(),
+                    executor.resolve_file_path(file).pop().unwrap(),
+                    executor.make_path(dir, &gen_name()),
                 )
                 .unwrap();
         }

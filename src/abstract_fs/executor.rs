@@ -159,22 +159,21 @@ impl AbstractExecutor {
         Ok(file_idx)
     }
 
-    pub fn hardlink(
-        &mut self,
-        old_file: &FileIndex,
-        parent: &DirIndex,
-        name: Name,
-    ) -> Result<FileIndex> {
+    pub fn hardlink(&mut self, old_path: PathName, new_path: PathName) -> Result<FileIndex> {
+        let old_file = self.resolve_file(old_path)?;
+        let (parent_path, name) = split_path(&new_path);
+        let name = name.to_owned();
+        let parent = self.resolve_dir(parent_path.to_owned())?;
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists(
-                self.make_path(parent, &name),
+                self.make_path(&parent, &name),
             ));
         }
         let node = &Node::FILE(old_file.to_owned());
         let old_path = self.resolve_path(node).pop().unwrap();
-        let file = self.file_mut(old_file);
+        let file = self.file_mut(&old_file);
         file.parents.insert(parent.to_owned());
-        let parent_dir = self.dir_mut(parent);
+        let parent_dir = self.dir_mut(&parent);
         parent_dir
             .children
             .insert(name.clone(), Node::FILE(old_file.to_owned()));
@@ -196,18 +195,11 @@ impl AbstractExecutor {
                 }
                 Operation::REMOVE { path } => self.remove(path.clone())?,
                 Operation::HARDLINK { old_path, new_path } => {
-                    self.replay_hardlink(old_path.clone(), new_path.clone())?;
+                    self.hardlink(old_path.clone(), new_path.clone())?;
                 }
             };
         }
         Ok(())
-    }
-
-    pub fn replay_hardlink(&mut self, old_path: PathName, new_path: PathName) -> Result<FileIndex> {
-        let old_file = self.resolve_file(old_path)?;
-        let (parent_path, name) = split_path(&new_path);
-        let parent = self.resolve_dir(parent_path.to_owned())?;
-        self.hardlink(&old_file, &parent, name.to_owned())
     }
 
     fn name_exists(&self, idx: &DirIndex, name: &Name) -> bool {
@@ -498,7 +490,9 @@ mod tests {
         let mut exec = AbstractExecutor::new();
         let foo = exec.create("/foo".to_owned(), vec![]).unwrap();
         let bar = exec.mkdir("/bar".to_owned(), vec![]).unwrap();
-        let boo = exec.hardlink(&foo, &bar, "boo".to_owned()).unwrap();
+        let boo = exec
+            .hardlink("/foo".to_owned(), "/bar/boo".to_owned())
+            .unwrap();
 
         assert_eq!(foo, boo);
         let mut expected = vec![
@@ -554,8 +548,7 @@ mod tests {
     fn test_remove_hardlink() {
         let mut exec = AbstractExecutor::new();
         let foo = exec.create("/foo".to_owned(), vec![]).unwrap();
-        exec.hardlink(&foo, &AbstractExecutor::root_index(), "bar".to_owned())
-            .unwrap();
+        exec.hardlink("/foo".to_owned(), "/bar".to_owned()).unwrap();
         exec.remove("/bar".to_owned()).unwrap();
 
         let mut expected = vec![Node::DIR(AbstractExecutor::root_index()), Node::FILE(foo)];
@@ -596,10 +589,10 @@ mod tests {
     fn test_remove_hardlink_dir() {
         let mut exec = AbstractExecutor::new();
         let zero = exec.create("/0".to_owned(), vec![]).unwrap();
-        let one = exec.mkdir("/1".to_owned(), vec![]).unwrap();
-        let two = exec.mkdir("/1/2".to_owned(), vec![]).unwrap();
-        exec.hardlink(&zero, &two, "3".to_owned()).unwrap();
-        exec.remove(exec.resolve_dir_path(&one)).unwrap();
+        exec.mkdir("/1".to_owned(), vec![]).unwrap();
+        exec.mkdir("/1/2".to_owned(), vec![]).unwrap();
+        exec.hardlink("/0".to_owned(), "/1/2/3".to_owned()).unwrap();
+        exec.remove("/1".to_owned()).unwrap();
         assert_eq!(vec!["/0"], exec.resolve_file_path(&zero));
     }
 
@@ -610,7 +603,7 @@ mod tests {
         let bar = exec.create("/bar".to_owned(), vec![]).unwrap();
         assert_eq!(
             Err(ExecutorError::NameAlreadyExists("/foo".to_owned())),
-            exec.hardlink(&bar, &AbstractExecutor::root_index(), "foo".to_owned())
+            exec.hardlink("/bar".to_owned(), "/foo".to_owned())
         );
     }
 
@@ -667,9 +660,10 @@ mod tests {
         let foo = exec.mkdir("/foo".to_owned(), vec![]).unwrap();
         let bar = exec.mkdir("/foo/bar".to_owned(), vec![]).unwrap();
         let boo = exec.create("/foo/bar/boo".to_owned(), vec![]).unwrap();
-        exec.hardlink(&boo, &AbstractExecutor::root_index(), "zoo".to_owned())
+        exec.hardlink("/foo/bar/boo".to_owned(), "/zoo".to_owned())
             .unwrap();
-        exec.hardlink(&boo, &bar, "moo".to_owned()).unwrap();
+        exec.hardlink("/foo/bar/boo".to_owned(), "/foo/bar/moo".to_owned())
+            .unwrap();
         assert_eq!(vec!["/foo"], exec.resolve_path(&Node::DIR(foo)));
         assert_eq!(vec!["/foo/bar"], exec.resolve_path(&Node::DIR(bar)));
         let mut expected = vec!["/foo/bar/boo", "/foo/bar/moo", "/zoo"];
