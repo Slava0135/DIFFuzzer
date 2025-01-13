@@ -61,6 +61,7 @@ const char *CREATE = "CREATE";
 const char *CLOSE = "CLOSE";
 const char *UNLINK = "UNLINK";
 const char *STAT = "STAT";
+const char *HARDLINK = "HARDLINK";
 
 enum ExitCode : int {
   OK = 0,
@@ -239,6 +240,14 @@ static void failure(int status, const char *cmd, const char *path) {
   failure_n += 1;
 }
 
+static void failure2(int status, const char *cmd, const char *fst_path,
+                     const char *snd_path) {
+  append_trace(idx, cmd, status, errno);
+  DPRINTF("[WARNING] %s('%s', '%s') FAIL(%s)", cmd, fst_path, snd_path,
+          strerror(errno));
+  failure_n += 1;
+}
+
 static void minor_failure(const char *cmd, const char *path) {
   DPRINTF("[WARNING] %s('%s') FAIL(%s) <minor>", cmd, path, strerror(errno));
 }
@@ -343,5 +352,16 @@ int do_remove(const char *p) {
     }
   }
 
+  return status;
+}
+
+int do_hardlink(const char *old_path, const char *new_path) {
+  idx++;
+  int status = link(patch_path(old_path).c_str(), patch_path(new_path).c_str());
+  if (status == -1) {
+    failure2(status, HARDLINK, old_path, new_path);
+  } else {
+    success(status, HARDLINK);
+  }
   return status;
 }
