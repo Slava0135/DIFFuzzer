@@ -104,10 +104,16 @@ impl AbstractExecutor {
         Ok(())
     }
 
-    pub fn mkdir(&mut self, parent: &DirIndex, name: Name, mode: Mode) -> Result<DirIndex> {
+    pub fn mkdir(&mut self, path: PathName, mode: Mode) -> Result<DirIndex> {
+        let (parent_path, name) = split_path(&path);
+        let parent = match self.resolve_node(parent_path.to_owned())? {
+            Node::DIR(dir_index) => dir_index,
+            _ => return Err(ExecutorError::NotADir(parent_path.to_owned())),
+        };
+        let name = name.to_owned();
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists(
-                self.make_path(parent, &name),
+                self.make_path(&parent, &name),
             ));
         }
         let dir = Dir {
@@ -179,7 +185,7 @@ impl AbstractExecutor {
         for op in &workload.ops {
             match op {
                 Operation::MKDIR { path, mode } => {
-                    self.replay_mkdir(path.clone(), mode.clone())?;
+                    self.mkdir(path.clone(), mode.clone())?;
                 }
                 Operation::CREATE { path, mode } => {
                     self.replay_create(path.clone(), mode.clone())?;
@@ -195,15 +201,6 @@ impl AbstractExecutor {
 
     pub fn replay_remove(&mut self, path: PathName) -> Result<()> {
         self.remove(path)
-    }
-
-    pub fn replay_mkdir(&mut self, path: PathName, mode: Mode) -> Result<DirIndex> {
-        let (parent_path, name) = split_path(&path);
-        let parent = match self.resolve_node(parent_path.to_owned())? {
-            Node::DIR(dir_index) => dir_index,
-            _ => return Err(ExecutorError::NotADir(parent_path.to_owned())),
-        };
-        self.mkdir(&parent, name.to_owned(), mode)
     }
 
     pub fn replay_create(&mut self, path: PathName, mode: Mode) -> Result<FileIndex> {
@@ -280,7 +277,7 @@ impl AbstractExecutor {
         DirIndex(0)
     }
 
-    fn make_path(&self, parent: &DirIndex, name: &Name) -> PathName {
+    pub fn make_path(&self, parent: &DirIndex, name: &Name) -> PathName {
         if *parent == AbstractExecutor::root_index() {
             format!("/{}", name)
         } else {
@@ -383,9 +380,7 @@ mod tests {
     #[test]
     fn test_mkdir() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec
-            .mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
-            .unwrap();
+        let foo = exec.mkdir("/foobar".to_owned(), vec![]).unwrap();
         assert_eq!(Node::DIR(foo), *exec.root().children.get("foobar").unwrap());
         assert_eq!(
             Workload {
@@ -407,11 +402,10 @@ mod tests {
     #[test]
     fn test_mkdir_name_exists() {
         let mut exec = AbstractExecutor::new();
-        exec.mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
-            .unwrap();
+        exec.mkdir("/foobar".to_owned(), vec![]).unwrap();
         assert_eq!(
             Err(ExecutorError::NameAlreadyExists("/foobar".to_owned())),
-            exec.mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
+            exec.mkdir("/foobar".to_owned(), vec![])
         );
     }
 
@@ -510,9 +504,7 @@ mod tests {
         let foo = exec
             .create(&AbstractExecutor::root_index(), "foo".to_owned(), vec![])
             .unwrap();
-        let bar = exec
-            .mkdir(&AbstractExecutor::root_index(), "bar".to_owned(), vec![])
-            .unwrap();
+        let bar = exec.mkdir("/bar".to_owned(), vec![]).unwrap();
         let boo = exec.hardlink(&foo, &bar, "boo".to_owned()).unwrap();
 
         assert_eq!(foo, boo);
@@ -615,10 +607,8 @@ mod tests {
         let zero = exec
             .create(&AbstractExecutor::root_index(), "0".to_owned(), vec![])
             .unwrap();
-        let one = exec
-            .mkdir(&AbstractExecutor::root_index(), "1".to_owned(), vec![])
-            .unwrap();
-        let two = exec.mkdir(&one, "2".to_owned(), vec![]).unwrap();
+        let one = exec.mkdir("/1".to_owned(), vec![]).unwrap();
+        let two = exec.mkdir("/1/2".to_owned(), vec![]).unwrap();
         exec.hardlink(&zero, &two, "3".to_owned()).unwrap();
         exec.remove(exec.resolve_dir_path(&one)).unwrap();
         assert_eq!(vec!["/0"], exec.resolve_file_path(&zero));
@@ -642,10 +632,10 @@ mod tests {
     fn test_remove_dir() {
         let mut exec = AbstractExecutor::new();
         let foo = exec
-            .mkdir(&AbstractExecutor::root_index(), "foobar".to_owned(), vec![])
+            .mkdir("/foobar".to_owned(), vec![])
             .unwrap();
         let boo = exec
-            .mkdir(&AbstractExecutor::root_index(), "boo".to_owned(), vec![])
+            .mkdir("/boo".to_owned(), vec![])
             .unwrap();
         let mut expected = vec![
             Node::DIR(AbstractExecutor::root_index()),
@@ -693,9 +683,9 @@ mod tests {
     fn test_resolve_path() {
         let mut exec = AbstractExecutor::new();
         let foo = exec
-            .mkdir(&AbstractExecutor::root_index(), "foo".to_owned(), vec![])
+            .mkdir("/foo".to_owned(), vec![])
             .unwrap();
-        let bar = exec.mkdir(&foo, "bar".to_owned(), vec![]).unwrap();
+        let bar = exec.mkdir("/foo/bar".to_owned(), vec![]).unwrap();
         let boo = exec.create(&bar, "boo".to_owned(), vec![]).unwrap();
         exec.hardlink(&boo, &AbstractExecutor::root_index(), "zoo".to_owned())
             .unwrap();
@@ -719,9 +709,9 @@ mod tests {
             exec.resolve_node("/".to_owned()).unwrap()
         );
         let foo = exec
-            .mkdir(&AbstractExecutor::root_index(), "foo".to_owned(), vec![])
+            .mkdir("/foo".to_owned(), vec![])
             .unwrap();
-        let bar = exec.mkdir(&foo, "bar".to_owned(), vec![]).unwrap();
+        let bar = exec.mkdir("/foo/bar".to_owned(), vec![]).unwrap();
         let boo = exec.create(&bar, "boo".to_owned(), vec![]).unwrap();
         assert_eq!(
             Node::DIR(foo),

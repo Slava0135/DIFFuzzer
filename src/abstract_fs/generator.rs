@@ -66,8 +66,9 @@ pub fn append_one(
     }
     match ops.weights.choose_weighted(rng, |item| item.1).unwrap().0 {
         OperationKind::MKDIR => {
+            let dir = alive_dirs.choose(rng).unwrap();
             executor
-                .mkdir(alive_dirs.choose(rng).unwrap(), gen_name(), mode.clone())
+                .mkdir(executor.make_path(dir, &gen_name()), mode.clone())
                 .unwrap();
         }
         OperationKind::CREATE => {
