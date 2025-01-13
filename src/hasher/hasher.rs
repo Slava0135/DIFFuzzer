@@ -11,6 +11,7 @@ use rand::random;
 use twox_hash::XxHash64;
 use walkdir::WalkDir;
 
+#[derive(Clone)]
 struct FileInfo {
     abs_path: String,
     rel_path: String,
@@ -20,6 +21,16 @@ struct FileInfo {
     size: u64,
     nlink: u64,
     mode: u32,
+}
+
+struct DirDiff {
+    kind: DiffKind,
+    files: Vec<FileInfo>, //vec or different types
+}
+
+pub enum DiffKind {
+    DifferentHash,
+    Existence,
 }
 
 impl Display for FileInfo {
@@ -61,12 +72,12 @@ pub fn calc_hash_for_dir(path: &Path, seed: u64, nlink: bool, mode: bool) -> u64
     return hasher.finish();
 }
 
-pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, mut output: T, nlink: bool, mode: bool) {
+pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, nlink: bool, mode: bool) -> Box<Vec<DirDiff>> {
     let vec_fst = get_dir_content(path_fst);
     let vec_snd = get_dir_content(path_snd);
     let mut i_fst = vec_fst.len() - 1;
     let mut i_snd = vec_snd.len() - 1;
-
+    let mut res: Vec<DirDiff> = Vec::new();
     // break when iterated over all elements in at least one directory
     loop {
         let cmp_res = vec_fst[i_fst].rel_path.cmp(&vec_snd[i_snd].rel_path);
@@ -76,10 +87,8 @@ pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, mut output: T, nlink
                 let hash_fst = calc_hash_for_dir(vec_fst[i_fst].abs_path.as_ref(), seed, nlink, mode);
                 let hash_snd = calc_hash_for_dir(vec_snd[i_snd].abs_path.as_ref(), seed, nlink, mode);
                 if hash_fst != hash_snd {
-                    write!(output, "========Diff hash for files:========\n")
-                        .expect("panic at write msg");
-                    write!(output, "{}\n", vec_fst[i_fst].to_string()).expect("panic at write 1st");
-                    write!(output, "{}\n", vec_snd[i_snd].to_string()).expect("panic at write 2nd");
+                    res.push(DirDiff { kind: DiffKind::DifferentHash, files: vec![vec_fst[i_fst].clone(), vec_snd[i_snd].clone()] });
+                    //warning: maybe link instead of copy
                 }
                 if i_fst == 0 || i_snd == 0 {
                     break;
@@ -88,16 +97,14 @@ pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, mut output: T, nlink
                 i_snd -= 1;
             }
             Ordering::Greater => {
-                write!(output, "File exist only in 1st seq:\n").expect("panic at write greater 1st");
-                write!(output, "{}\n", vec_fst[i_fst].to_string()).expect("panic at write greater 1st");
+                res.push(DirDiff { kind: DiffKind::Existence, files: vec![vec_fst[i_fst].clone()] });
                 if i_fst == 0 {
                     break;
                 }
                 i_fst -= 1;
             }
             Ordering::Less => {
-                write!(output, "File exist only in 2nd seq:\n").expect("panic at write greater 2nd");
-                write!(output, "{}\n", vec_snd[i_snd].to_string()).expect("panic at write greater 2nd");
+                res.push(DirDiff { kind: DiffKind::Existence, files: vec![vec_snd[i_snd].clone()] });
                 if i_snd == 0 {
                     break;
                 }
@@ -105,25 +112,21 @@ pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, mut output: T, nlink
             }
         }
     }
-    if i_fst > 0 {
-        loop {
-            write!(output, "File exist only in 1st seq:\n").expect("panic at write greater a");
-            write!(output, "{}\n", vec_fst[i_fst].to_string()).expect("panic at write greater a");
-            if i_fst == 0 {
-                break;
-            }
-            i_fst -= 1;
-        }
-    }
 
-    if i_snd > 0 {
+    handle_last_diff(i_fst, vec_fst, &mut res);
+    handle_last_diff(i_snd, vec_snd, &mut res);
+
+    Box::new(res)
+}
+
+fn handle_last_diff(mut i: usize, vec_data: Vec<FileInfo>, res: &mut Vec<DirDiff>) {
+    if i > 0 {
         loop {
-            write!(output, "File exist only in 2nd seq:\n").expect("panic at write greater b");
-            write!(output, "{}\n", vec_snd[i_snd].to_string()).expect("panic at write greater b");
-            if i_snd == 0 {
+            res.push(DirDiff { kind: DiffKind::Existence, files: vec![vec_data[i].clone()] });
+            if i == 0 {
                 break;
             }
-            i_snd -= 1;
+            i -= 1;
         }
     }
 }
