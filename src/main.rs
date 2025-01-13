@@ -13,11 +13,11 @@ mod blackbox;
 mod config;
 mod greybox;
 mod harness;
+mod hasher;
 mod mount;
 mod save;
 mod single;
 mod temp_dir;
-mod hasher;
 
 fn main() {
     let args = Args::parse();
