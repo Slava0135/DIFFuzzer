@@ -1,16 +1,28 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use super::{flags::Mode, node::{Dir, DirIndex, File, FileIndex, Name, Node, PathName}, operation::Operation, workload::Workload};
+use thiserror::Error;
+
+use super::{
+    flags::Mode,
+    node::{Dir, DirIndex, File, FileIndex, Name, Node, PathName},
+    operation::Operation,
+    workload::Workload,
+};
 
 type Result<T> = std::result::Result<T, ExecutorError>;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum ExecutorError {
-    NotADir,
-    NameAlreadyExists,
-    RemoveRoot,
+    #[error("'{0}' is not a file")]
+    NotAFile(PathName),
+    #[error("'{0}' is not a dir")]
+    NotADir(PathName),
+    #[error("node at '{0}' already exists")]
+    NameAlreadyExists(PathName),
+    #[error("removing root is forbidden")]
+    RootRemovalForbidden,
+    #[error("node at path '{0}' not found")]
     NotFound(PathName),
-    NotAFile,
 }
 
 fn split_path(path: &str) -> (&str, &str) {
@@ -43,7 +55,7 @@ impl AbstractExecutor {
         let node = &self.resolve_node(path.clone())?;
         let parent_idx = match self.resolve_node(parent_path.to_owned())? {
             Node::DIR(dir_index) => dir_index,
-            _ => return Err(ExecutorError::NotADir),
+            _ => return Err(ExecutorError::NotADir(path)),
         };
         self.recording
             .push(Operation::REMOVE { path: path.clone() });
@@ -52,7 +64,7 @@ impl AbstractExecutor {
         match node {
             Node::DIR(to_remove_idx) => {
                 if *to_remove_idx == AbstractExecutor::root_index() {
-                    return Err(ExecutorError::RemoveRoot);
+                    return Err(ExecutorError::RootRemovalForbidden);
                 }
                 let mut queue: VecDeque<(DirIndex, Node)> = VecDeque::new();
                 let to_remove = self.dir_mut(to_remove_idx);
@@ -94,7 +106,9 @@ impl AbstractExecutor {
 
     pub fn mkdir(&mut self, parent: &DirIndex, name: Name, mode: Mode) -> Result<DirIndex> {
         if self.name_exists(&parent, &name) {
-            return Err(ExecutorError::NameAlreadyExists);
+            return Err(ExecutorError::NameAlreadyExists(
+                self.make_path(parent, &name),
+            ));
         }
         let dir = Dir {
             parent: Some(parent.clone()),
@@ -115,7 +129,9 @@ impl AbstractExecutor {
 
     pub fn create(&mut self, parent: &DirIndex, name: Name, mode: Mode) -> Result<FileIndex> {
         if self.name_exists(&parent, &name) {
-            return Err(ExecutorError::NameAlreadyExists);
+            return Err(ExecutorError::NameAlreadyExists(
+                self.make_path(parent, &name),
+            ));
         }
         let mut parents = HashSet::new();
         parents.insert(parent.to_owned());
@@ -140,7 +156,9 @@ impl AbstractExecutor {
         name: Name,
     ) -> Result<FileIndex> {
         if self.name_exists(&parent, &name) {
-            return Err(ExecutorError::NameAlreadyExists);
+            return Err(ExecutorError::NameAlreadyExists(
+                self.make_path(parent, &name),
+            ));
         }
         let node = &Node::FILE(old_file.to_owned());
         let old_path = self.resolve_path(node).pop().unwrap();
@@ -183,7 +201,7 @@ impl AbstractExecutor {
         let (parent_path, name) = split_path(&path);
         let parent = match self.resolve_node(parent_path.to_owned())? {
             Node::DIR(dir_index) => dir_index,
-            _ => return Err(ExecutorError::NotADir),
+            _ => return Err(ExecutorError::NotADir(parent_path.to_owned())),
         };
         self.mkdir(&parent, name.to_owned(), mode)
     }
@@ -192,20 +210,20 @@ impl AbstractExecutor {
         let (parent_path, name) = split_path(&path);
         let parent = match self.resolve_node(parent_path.to_owned())? {
             Node::DIR(dir_index) => dir_index,
-            _ => return Err(ExecutorError::NotADir),
+            _ => return Err(ExecutorError::NotADir(parent_path.to_owned())),
         };
         self.create(&parent, name.to_owned(), mode)
     }
 
     pub fn replay_hardlink(&mut self, old_path: PathName, new_path: PathName) -> Result<FileIndex> {
-        let old_file = match self.resolve_node(old_path)? {
+        let old_file = match self.resolve_node(old_path.clone())? {
             Node::FILE(file_index) => file_index,
-            _ => return Err(ExecutorError::NotAFile),
+            _ => return Err(ExecutorError::NotAFile(old_path)),
         };
         let (parent_path, name) = split_path(&new_path);
         let parent = match self.resolve_node(parent_path.to_owned())? {
             Node::DIR(dir_index) => dir_index,
-            _ => return Err(ExecutorError::NotADir),
+            _ => return Err(ExecutorError::NotADir(parent_path.to_owned())),
         };
         self.hardlink(&old_file, &parent, name.to_owned())
     }
@@ -241,10 +259,13 @@ impl AbstractExecutor {
     pub fn resolve_node(&self, path: PathName) -> Result<Node> {
         let mut last = Node::DIR(AbstractExecutor::root_index());
         let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+        let mut path = String::new();
         for segment in &segments {
+            path.push_str("/");
+            path.push_str(segment);
             let dir = match last {
                 Node::DIR(dir_index) => self.dir(&dir_index),
-                _ => return Err(ExecutorError::NotADir),
+                _ => return Err(ExecutorError::NotADir(path)),
             };
             last = dir
                 .children
