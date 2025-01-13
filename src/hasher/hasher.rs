@@ -61,69 +61,69 @@ pub fn calc_hash_for_dir(path: &Path, seed: u64, nlink: bool, mode: bool) -> u64
     return hasher.finish();
 }
 
-pub fn get_diff<T: Write>(path_a: &Path, path_b: &Path, mut output: T, nlink: bool, mode: bool) {
-    let vec_a = get_dir_content(path_a);
-    let vec_b = get_dir_content(path_b);
-    let mut i_a = vec_a.len() - 1;
-    let mut i_b = vec_b.len() - 1;
+pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, mut output: T, nlink: bool, mode: bool) {
+    let vec_fst = get_dir_content(path_fst);
+    let vec_snd = get_dir_content(path_snd);
+    let mut i_fst = vec_fst.len() - 1;
+    let mut i_snd = vec_snd.len() - 1;
 
     // break when iterated over all elements in at least one directory
     loop {
-        let cmp_res = vec_a[i_a].rel_path.cmp(&vec_b[i_b].rel_path);
+        let cmp_res = vec_fst[i_fst].rel_path.cmp(&vec_snd[i_snd].rel_path);
         match cmp_res {
             Ordering::Equal => {
                 let seed = random();
-                let hash_a = calc_hash_for_dir(vec_a[i_a].abs_path.as_ref(), seed, nlink, mode);
-                let hash_b = calc_hash_for_dir(vec_b[i_b].abs_path.as_ref(), seed, nlink, mode);
-                if hash_a != hash_b {
+                let hash_fst = calc_hash_for_dir(vec_fst[i_fst].abs_path.as_ref(), seed, nlink, mode);
+                let hash_snd = calc_hash_for_dir(vec_snd[i_snd].abs_path.as_ref(), seed, nlink, mode);
+                if hash_fst != hash_snd {
                     write!(output, "========Diff hash for files:========\n")
                         .expect("panic at write msg");
-                    write!(output, "{}\n", vec_a[i_a].to_string()).expect("panic at write a");
-                    write!(output, "{}\n", vec_b[i_b].to_string()).expect("panic at write b");
+                    write!(output, "{}\n", vec_fst[i_fst].to_string()).expect("panic at write 1st");
+                    write!(output, "{}\n", vec_snd[i_snd].to_string()).expect("panic at write 2nd");
                 }
-                if i_a == 0 || i_b == 0 {
+                if i_fst == 0 || i_snd == 0 {
                     break;
                 }
-                i_a -= 1;
-                i_b -= 1;
+                i_fst -= 1;
+                i_snd -= 1;
             }
             Ordering::Greater => {
-                write!(output, "File exist only in 1st seq:\n").expect("panic at write greater a");
-                write!(output, "{}\n", vec_a[i_a].to_string()).expect("panic at write greater a");
-                if i_a == 0 {
+                write!(output, "File exist only in 1st seq:\n").expect("panic at write greater 1st");
+                write!(output, "{}\n", vec_fst[i_fst].to_string()).expect("panic at write greater 1st");
+                if i_fst == 0 {
                     break;
                 }
-                i_a -= 1;
+                i_fst -= 1;
             }
             Ordering::Less => {
-                write!(output, "File exist only in 2nd seq:\n").expect("panic at write greater b");
-                write!(output, "{}\n", vec_b[i_b].to_string()).expect("panic at write greater b");
-                if i_b == 0 {
+                write!(output, "File exist only in 2nd seq:\n").expect("panic at write greater 2nd");
+                write!(output, "{}\n", vec_snd[i_snd].to_string()).expect("panic at write greater 2nd");
+                if i_snd == 0 {
                     break;
                 }
-                i_b -= 1;
+                i_snd -= 1;
             }
         }
     }
-    if i_a > 0 {
+    if i_fst > 0 {
         loop {
             write!(output, "File exist only in 1st seq:\n").expect("panic at write greater a");
-            write!(output, "{}\n", vec_a[i_a].to_string()).expect("panic at write greater a");
-            if i_a == 0 {
+            write!(output, "{}\n", vec_fst[i_fst].to_string()).expect("panic at write greater a");
+            if i_fst == 0 {
                 break;
             }
-            i_a -= 1;
+            i_fst -= 1;
         }
     }
 
-    if i_b > 0 {
+    if i_snd > 0 {
         loop {
             write!(output, "File exist only in 2nd seq:\n").expect("panic at write greater b");
-            write!(output, "{}\n", vec_b[i_b].to_string()).expect("panic at write greater b");
-            if i_b == 0 {
+            write!(output, "{}\n", vec_snd[i_snd].to_string()).expect("panic at write greater b");
+            if i_snd == 0 {
                 break;
             }
-            i_b -= 1;
+            i_snd -= 1;
         }
     }
 }
