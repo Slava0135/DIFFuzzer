@@ -72,8 +72,9 @@ pub fn append_one(
                 .unwrap();
         }
         OperationKind::CREATE => {
+            let dir = alive_dirs.choose(rng).unwrap();
             executor
-                .create(alive_dirs.choose(rng).unwrap(), gen_name(), mode.clone())
+                .create(executor.make_path(dir, &gen_name()), mode.clone())
                 .unwrap();
         }
         OperationKind::REMOVE => {
