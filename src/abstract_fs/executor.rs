@@ -43,13 +43,33 @@ impl AbstractExecutor {
         let parent = self.dir_mut(&parent_idx);
         parent.children.remove(name);
         match node {
-            Node::DIR(to_remove) => {
-                if *to_remove == AbstractExecutor::root_index() {
+            Node::DIR(to_remove_idx) => {
+                if *to_remove_idx == AbstractExecutor::root_index() {
                     return Err(ExecutorError::RemoveRoot);
                 }
-                let to_remove = self.dir_mut(to_remove);
+                let mut queue: VecDeque<(DirIndex, Node)> = VecDeque::new();
+                let to_remove = self.dir_mut(to_remove_idx);
+                for (_, node) in to_remove.children.iter() {
+                    queue.push_back((to_remove_idx.clone(), node.clone()));
+                }
                 to_remove.parent = None;
                 to_remove.children.clear();
+                while let Some((parent, node)) = queue.pop_front() {
+                    match node {
+                        Node::DIR(to_remove_idx) => {
+                            let to_remove = self.dir_mut(&to_remove_idx);
+                            for (_, node) in to_remove.children.iter() {
+                                queue.push_back((to_remove_idx.clone(), node.clone()));
+                            }
+                            to_remove.parent = None;
+                            to_remove.children.clear();
+                        }
+                        Node::FILE(file_idx) => {
+                            let file = self.file_mut(&file_idx);
+                            file.parents.remove(&parent);
+                        }
+                    }
+                }
             }
             Node::FILE(to_remove) => {
                 let another_exists = parent.children.iter().any(|(_, node)| match node {
