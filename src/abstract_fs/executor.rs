@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 
 use thiserror::Error;
 
@@ -74,33 +74,8 @@ impl AbstractExecutor {
                 }
                 to_remove.parent = None;
                 to_remove.children.clear();
-                while let Some((parent, node)) = queue.pop_front() {
-                    match node {
-                        Node::DIR(to_remove_idx) => {
-                            let to_remove = self.dir_mut(&to_remove_idx);
-                            for (_, node) in to_remove.children.iter() {
-                                queue.push_back((to_remove_idx.clone(), node.clone()));
-                            }
-                            to_remove.parent = None;
-                            to_remove.children.clear();
-                        }
-                        Node::FILE(file_idx) => {
-                            let file = self.file_mut(&file_idx);
-                            file.parents.remove(&parent);
-                        }
-                    }
-                }
             }
-            Node::FILE(to_remove) => {
-                let another_exists = parent.children.iter().any(|(_, node)| match node {
-                    Node::FILE(another) if another == to_remove => true,
-                    _ => false,
-                });
-                if !another_exists {
-                    let to_remove = self.file_mut(to_remove);
-                    to_remove.parents.remove(&parent_idx);
-                }
-            }
+            Node::FILE(_) => {}
         }
         Ok(())
     }
@@ -131,9 +106,7 @@ impl AbstractExecutor {
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists(path));
         }
-        let mut parents = HashSet::new();
-        parents.insert(parent.to_owned());
-        let file = File { parents };
+        let file = File {};
         let file_idx = FileIndex(self.files.len());
         self.files.push(file);
         self.dir_mut(&parent)
@@ -151,8 +124,6 @@ impl AbstractExecutor {
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists(new_path));
         }
-        let file = self.file_mut(&old_file);
-        file.parents.insert(parent.to_owned());
         let parent_dir = self.dir_mut(&parent);
         parent_dir
             .children
@@ -471,12 +442,6 @@ mod tests {
             bar_dir.children.get("boo").unwrap()
         );
 
-        let mut parents = HashSet::new();
-        parents.insert(AbstractExecutor::root_index());
-        parents.insert(bar);
-        assert_eq!(parents, exec.file(&foo).parents);
-        assert_eq!(parents, exec.file(&boo).parents);
-
         assert_eq!(
             Workload {
                 ops: vec![
@@ -503,7 +468,7 @@ mod tests {
     #[test]
     fn test_remove_hardlink() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.create("/foo".into(), vec![]).unwrap();
+        exec.create("/foo".into(), vec![]).unwrap();
         exec.hardlink("/foo".into(), "/bar".into()).unwrap();
         exec.remove("/bar".into()).unwrap();
 
@@ -516,10 +481,6 @@ mod tests {
         );
 
         assert_eq!(1, exec.root().children.len());
-
-        let mut parents = HashSet::new();
-        parents.insert(AbstractExecutor::root_index());
-        assert_eq!(parents, exec.file(&foo).parents);
 
         assert_eq!(
             Workload {

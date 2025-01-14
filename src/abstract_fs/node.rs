@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use super::pathname::Name;
 
@@ -12,9 +12,7 @@ pub struct DirIndex(pub usize);
 pub struct FileDescriptor(usize);
 
 #[derive(Debug, Clone)]
-pub struct File {
-    pub parents: HashSet<DirIndex>,
-}
+pub struct File;
 
 #[derive(Debug, Clone)]
 pub struct Dir {
