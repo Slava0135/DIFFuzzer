@@ -72,19 +72,19 @@ do_remove("/foo");
         let actual = Workload {
             ops: vec![
                 Operation::MKDIR {
-                    path: "/foo".to_owned(),
+                    path: "/foo".into(),
                     mode: vec![],
                 },
                 Operation::CREATE {
-                    path: "/foo/bar".to_owned(),
+                    path: "/foo/bar".into(),
                     mode: mode.clone(),
                 },
                 Operation::HARDLINK {
-                    old_path: "/foo/bar".to_owned(),
-                    new_path: "/baz".to_owned(),
+                    old_path: "/foo/bar".into(),
+                    new_path: "/baz".into(),
                 },
                 Operation::REMOVE {
-                    path: "/foo".to_owned(),
+                    path: "/foo".into(),
                 },
             ],
         }

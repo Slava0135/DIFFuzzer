@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{flags::Mode, node::PathName};
+use super::{flags::Mode, pathname::PathName};
 
 #[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
 pub enum Operation {

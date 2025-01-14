@@ -1,13 +1,10 @@
-use rand::{
-    seq::{IteratorRandom, SliceRandom},
-    Rng,
-};
+use rand::{seq::SliceRandom, Rng};
 
 use super::{
     executor::AbstractExecutor,
     flags::ModeFlag,
-    node::{DirIndex, FileIndex, Name, Node},
     operation::{OperationKind, OperationWeights},
+    pathname::{Name, PathName},
     workload::Workload,
 };
 
@@ -38,63 +35,43 @@ pub fn append_one(
         ModeFlag::S_IXOTH,
     ];
     let alive = executor.alive();
-    let alive_dirs: Vec<DirIndex> = alive
+    let alive_dirs_except_root: Vec<PathName> = alive
+        .dirs
         .iter()
-        .filter_map(|n| match n {
-            Node::DIR(dir) => Some(dir.clone()),
-            _ => None,
-        })
-        .collect();
-    let alive_files: Vec<FileIndex> = alive
-        .iter()
-        .filter_map(|n| match n {
-            Node::FILE(file) => Some(file.clone()),
-            _ => None,
-        })
-        .collect();
-    let alive_dirs_except_root: Vec<DirIndex> = alive_dirs
-        .iter()
-        .filter(|&&d| d != AbstractExecutor::root_index())
+        .filter(|d| **d != "/".into())
         .map(|d| d.clone())
         .collect();
     let mut ops = weights.clone();
     if alive_dirs_except_root.is_empty() {
         ops.weights.retain(|(op, _)| *op != OperationKind::REMOVE);
     }
-    if alive_files.is_empty() {
+    if alive.files.is_empty() {
         ops.weights.retain(|(op, _)| *op != OperationKind::HARDLINK);
     }
     match ops.weights.choose_weighted(rng, |item| item.1).unwrap().0 {
         OperationKind::MKDIR => {
-            executor
-                .mkdir(alive_dirs.choose(rng).unwrap(), gen_name(), mode.clone())
-                .unwrap();
+            let path = alive.dirs.choose(rng).unwrap().to_owned();
+            executor.mkdir(path.join(gen_name()), mode.clone()).unwrap();
         }
         OperationKind::CREATE => {
+            let path = alive.dirs.choose(rng).unwrap().to_owned();
             executor
-                .create(alive_dirs.choose(rng).unwrap(), gen_name(), mode.clone())
+                .create(path.join(gen_name()), mode.clone())
                 .unwrap();
         }
         OperationKind::REMOVE => {
-            let node = alive
-                .iter()
-                .filter(|n| match n {
-                    Node::FILE(_) => true,
-                    Node::DIR(dir) => *dir != AbstractExecutor::root_index(),
-                })
+            let path = [alive_dirs_except_root, alive.files]
+                .concat()
                 .choose(rng)
-                .unwrap();
-            executor
-                .remove(executor.resolve_path(node).pop().unwrap())
-                .unwrap();
+                .unwrap()
+                .to_owned();
+            executor.remove(path).unwrap();
         }
         OperationKind::HARDLINK => {
+            let file_path = alive.files.choose(rng).unwrap().to_owned();
+            let dir_path = alive.dirs.choose(rng).unwrap().to_owned();
             executor
-                .hardlink(
-                    alive_files.choose(rng).unwrap(),
-                    alive_dirs.choose(rng).unwrap(),
-                    gen_name(),
-                )
+                .hardlink(file_path, dir_path.join(gen_name()))
                 .unwrap();
         }
     }

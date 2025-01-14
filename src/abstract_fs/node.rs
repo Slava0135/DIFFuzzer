@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-pub type PathName = String;
-pub type Name = String;
+use super::pathname::Name;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FileIndex(pub usize);
