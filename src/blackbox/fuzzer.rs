@@ -1,4 +1,4 @@
-use log::info;
+use log::{debug, info};
 use std::cell::RefCell;
 use std::{fs, io};
 use std::path::Path;
@@ -9,7 +9,10 @@ use rand::prelude::StdRng;
 use rand::SeedableRng;
 
 use crate::abstract_fs::generator::generate_new;
+use crate::abstract_fs::trace::TRACE_FILENAME;
 use crate::config::Config;
+use crate::greybox::objective::console::ConsoleObjective;
+use crate::greybox::objective::trace::TraceObjective;
 use crate::harness::Harness;
 use crate::hasher::hasher::{get_diff, get_hash_for_dir};
 use crate::mount::mount::FileSystemMount;
@@ -42,6 +45,20 @@ pub fn fuzz<FS1: FileSystemMount, FS2: FileSystemMount>(
 
     let fst_fs_name = fst_fs.to_string();
     let snd_fs_name = snd_fs.to_string();
+
+    let fst_trace_path = fst_exec_dir.join(TRACE_FILENAME);
+    let snd_trace_path = snd_exec_dir.join(TRACE_FILENAME);
+
+    let mut trace_objective = TraceObjective::new(
+        fst_trace_path.clone().into_boxed_path(),
+        snd_trace_path.clone().into_boxed_path(),
+    );
+    let mut console_objective = ConsoleObjective::new(
+        fst_stdout.clone(),
+        fst_stderr.clone(),
+        snd_stdout.clone(),
+        snd_stderr.clone(),
+    );
 
     let fst_harness = Harness::new(
         fst_fs,
@@ -78,8 +95,15 @@ pub fn fuzz<FS1: FileSystemMount, FS2: FileSystemMount>(
         let fst_hash = get_hash_for_dir(&fst_exec_dir, seed, false, false); //todo: options
         let snd_hash = get_hash_for_dir(&snd_exec_dir, seed, false, false); //todo: options
 
-        //todo: cmp abstract state, traces and output
+        //todo: report crash
         if fst_hash != snd_hash { get_diff(&fst_exec_dir, &snd_exec_dir, io::stdout(), false, false) }
+        debug!("doing objectives");
+        let console_is_interesting = console_objective
+            .is_interesting()
+            .with_context(|| format!("failed to do console objective"))?;
+        let trace_is_interesting = trace_objective
+            .is_interesting()
+            .with_context(|| format!("failed to do trace objective"))?;
     }
 }
 
