@@ -26,6 +26,8 @@ pub enum ExecutorError {
     NotFound(PathName),
     #[error("invalid path '{0}'")]
     InvalidPath(PathName),
+    #[error("directory '{0}' is not empty")]
+    DirNotEmpty(PathName),
 }
 
 pub struct AbstractExecutor {
@@ -122,15 +124,23 @@ impl AbstractExecutor {
     }
 
     pub fn rename(&mut self, old_path: PathName, new_path: PathName) -> Result<Node> {
+        if let Ok(dir_idx) = self.resolve_dir(new_path.clone()) {
+            if !self.dir(&dir_idx).children.is_empty() {
+                return Err(ExecutorError::DirNotEmpty(new_path));
+            }
+        }
         let node = self.resolve_node(old_path.clone())?;
-        let (parent_path, name) = old_path.split();
-        let parent = self.resolve_dir(parent_path.to_owned())?;
-        let parent_dir = self.dir_mut(&parent);
-        parent_dir.children.remove(&name);
+
         let (parent_path, name) = new_path.split();
         let parent = self.resolve_dir(parent_path.to_owned())?;
         let parent_dir = self.dir_mut(&parent);
         parent_dir.children.insert(name.clone(), node.clone());
+
+        let (parent_path, name) = old_path.split();
+        let parent = self.resolve_dir(parent_path.to_owned())?;
+        let parent_dir = self.dir_mut(&parent);
+        parent_dir.children.remove(&name);
+
         self.recording
             .push(Operation::RENAME { old_path, new_path });
         self.nodes_created += 1;
@@ -623,6 +633,20 @@ mod tests {
         );
         assert_eq!(2, exec.nodes_created);
         test_replay(exec.recording);
+    }
+
+    #[test]
+    fn test_rename_dir_non_empty() {
+        let mut exec = AbstractExecutor::new();
+        exec.mkdir("/foo".into(), vec![]).unwrap();
+        exec.mkdir("/bar".into(), vec![]).unwrap();
+        exec.create("/bar/baz".into(), vec![]).unwrap();
+        assert_eq!(
+            Err(ExecutorError::DirNotEmpty("/bar".into())),
+            exec.rename("/foo".into(), "/bar".into())
+        );
+        exec.remove("/bar/baz".into()).unwrap();
+        exec.rename("/foo".into(), "/bar".into()).unwrap();
     }
 
     #[test]
