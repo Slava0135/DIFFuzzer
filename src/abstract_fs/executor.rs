@@ -134,8 +134,8 @@ impl AbstractExecutor {
         Ok(old_file.to_owned())
     }
 
-    pub fn rename(&mut self, old_path: PathName, new_path: PathName) -> Result<FileIndex> {
-        let old_file = self.resolve_file(old_path.clone())?;
+    pub fn rename(&mut self, old_path: PathName, new_path: PathName) -> Result<Node> {
+        let node = self.resolve_node(old_path.clone())?;
         let (parent_path, name) = old_path.split();
         let parent = self.resolve_dir(parent_path.to_owned())?;
         let parent_dir = self.dir_mut(&parent);
@@ -143,13 +143,11 @@ impl AbstractExecutor {
         let (parent_path, name) = new_path.split();
         let parent = self.resolve_dir(parent_path.to_owned())?;
         let parent_dir = self.dir_mut(&parent);
-        parent_dir
-            .children
-            .insert(name.clone(), Node::FILE(old_file.to_owned()));
+        parent_dir.children.insert(name.clone(), node.clone());
         self.recording
             .push(Operation::RENAME { old_path, new_path });
         self.nodes_created += 1;
-        Ok(old_file.to_owned())
+        Ok(node)
     }
 
     pub fn replay(&mut self, workload: &Workload) -> Result<()> {
@@ -594,6 +592,37 @@ mod tests {
             Workload {
                 ops: vec![
                     Operation::CREATE {
+                        path: "/foo".into(),
+                        mode: vec![]
+                    },
+                    Operation::RENAME {
+                        old_path: "/foo".into(),
+                        new_path: "/bar".into(),
+                    }
+                ]
+            },
+            exec.recording
+        );
+        assert_eq!(2, exec.nodes_created);
+        test_replay(exec.recording);
+    }
+
+    #[test]
+    fn test_rename_dir() {
+        let mut exec = AbstractExecutor::new();
+        exec.mkdir("/foo".into(), vec![]).unwrap();
+        exec.rename("/foo".into(), "/bar".into()).unwrap();
+        assert_eq!(
+            AliveNodes {
+                dirs: vec!["/".into(), "/bar".into()],
+                files: vec![]
+            },
+            exec.alive()
+        );
+        assert_eq!(
+            Workload {
+                ops: vec![
+                    Operation::MKDIR {
                         path: "/foo".into(),
                         mode: vec![]
                     },
