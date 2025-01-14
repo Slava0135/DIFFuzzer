@@ -10,6 +10,8 @@ use std::sync::OnceLock;
 use rand::random;
 use twox_hash::XxHash64;
 use walkdir::WalkDir;
+use crate::hasher::hasher::FileDiff::DifferentHash;
+use crate::hasher::hasher::FileDiff::OneExists;
 
 #[derive(Clone)]
 struct FileInfo {
@@ -23,14 +25,9 @@ struct FileInfo {
     mode: u32,
 }
 
-struct DirDiff {
-    kind: DiffKind,
-    files: Vec<FileInfo>, //vec or different types
-}
-
-pub enum DiffKind {
-    DifferentHash,
-    Existence,
+pub enum FileDiff {
+    DifferentHash{fst: FileInfo, snd: FileInfo},
+    OneExists(FileInfo),
 }
 
 impl Display for FileInfo {
@@ -72,12 +69,12 @@ pub fn calc_hash_for_dir(path: &Path, seed: u64, nlink: bool, mode: bool) -> u64
     return hasher.finish();
 }
 
-pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, nlink: bool, mode: bool) -> Box<Vec<DirDiff>> {
+pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, nlink: bool, mode: bool) -> Box<Vec<FileDiff>> {
     let vec_fst = get_dir_content(path_fst);
     let vec_snd = get_dir_content(path_snd);
     let mut i_fst = vec_fst.len() - 1;
     let mut i_snd = vec_snd.len() - 1;
-    let mut res: Vec<DirDiff> = Vec::new();
+    let mut res: Vec<FileDiff> = Vec::new();
     // break when iterated over all elements in at least one directory
     loop {
         let cmp_res = vec_fst[i_fst].rel_path.cmp(&vec_snd[i_snd].rel_path);
@@ -87,7 +84,7 @@ pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, nlink: bool, mode: b
                 let hash_fst = calc_hash_for_dir(vec_fst[i_fst].abs_path.as_ref(), seed, nlink, mode);
                 let hash_snd = calc_hash_for_dir(vec_snd[i_snd].abs_path.as_ref(), seed, nlink, mode);
                 if hash_fst != hash_snd {
-                    res.push(DirDiff { kind: DiffKind::DifferentHash, files: vec![vec_fst[i_fst].clone(), vec_snd[i_snd].clone()] });
+                    res.push(DifferentHash{fst: vec_fst[i_fst].clone(), snd: vec_snd[i_snd].clone()});
                     //warning: maybe link instead of copy
                 }
                 if i_fst == 0 || i_snd == 0 {
@@ -97,14 +94,14 @@ pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, nlink: bool, mode: b
                 i_snd -= 1;
             }
             Ordering::Greater => {
-                res.push(DirDiff { kind: DiffKind::Existence, files: vec![vec_fst[i_fst].clone()] });
+                res.push(OneExists(vec_fst[i_fst].clone()));
                 if i_fst == 0 {
                     break;
                 }
                 i_fst -= 1;
             }
             Ordering::Less => {
-                res.push(DirDiff { kind: DiffKind::Existence, files: vec![vec_snd[i_snd].clone()] });
+                res.push(OneExists(vec_snd[i_snd].clone()));
                 if i_snd == 0 {
                     break;
                 }
@@ -119,10 +116,10 @@ pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, nlink: bool, mode: b
     Box::new(res)
 }
 
-fn handle_last_diff(mut i: usize, vec_data: Vec<FileInfo>, res: &mut Vec<DirDiff>) {
+fn handle_last_diff(mut i: usize, vec_data: Vec<FileInfo>, res: &mut Vec<FileDiff>) {
     if i > 0 {
         loop {
-            res.push(DirDiff { kind: DiffKind::Existence, files: vec![vec_data[i].clone()] });
+            res.push(OneExists(vec_data[i].clone()));
             if i == 0 {
                 break;
             }
