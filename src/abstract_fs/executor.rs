@@ -37,11 +37,25 @@ fn split_path(path: &str) -> (&str, &str) {
     }
 }
 
+pub fn join_path(path: PathName, name: Name) -> PathName {
+    if path == "/" {
+        format!("/{}", name)
+    } else {
+        format!("{}/{}", path, name)
+    }
+}
+
 pub struct AbstractExecutor {
     pub dirs: Vec<Dir>,
     pub files: Vec<File>,
     pub nodes_created: usize,
     pub recording: Workload,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct AliveNodes {
+    pub dirs: Vec<PathName>,
+    pub files: Vec<PathName>,
 }
 
 impl AbstractExecutor {
@@ -324,28 +338,33 @@ impl AbstractExecutor {
         }
     }
 
-    pub fn alive(&self) -> Vec<Node> {
+    pub fn alive(&self) -> AliveNodes {
         let root = AbstractExecutor::root_index();
-        let mut visited = vec![];
-        let mut queue = VecDeque::new();
-        queue.push_back(&root);
-        visited.push(Node::DIR(root));
-        while !queue.is_empty() {
-            let next = queue.pop_front().unwrap();
-            let dir = self.dir(&next);
-            for (_, node) in dir.children.iter() {
+        let mut alive = AliveNodes {
+            dirs: vec![],
+            files: vec![],
+        };
+        let mut queue: VecDeque<(PathName, &DirIndex)> = VecDeque::new();
+        queue.push_back(("/".to_owned(), &root));
+        alive.dirs.push("/".to_owned());
+        while let Some((path, idx)) = queue.pop_front() {
+            let dir = self.dir(idx);
+            for (name, node) in dir.children.iter() {
                 match node {
                     Node::DIR(idx) => {
-                        queue.push_back(idx);
-                        visited.push(Node::DIR(idx.clone()));
+                        let path = join_path(path.clone(), name.to_owned());
+                        queue.push_back((path.clone(), idx));
+                        alive.dirs.push(path.clone());
                     }
-                    Node::FILE(idx) => {
-                        visited.push(Node::FILE(idx.clone()));
+                    Node::FILE(_) => {
+                        alive.files.push(join_path(path.clone(), name.to_owned()));
                     }
                 }
             }
         }
-        visited
+        alive.dirs.sort();
+        alive.files.sort();
+        alive
     }
 }
 
@@ -357,7 +376,10 @@ mod tests {
     fn test_init_root() {
         let exec = AbstractExecutor::new();
         assert_eq!(
-            vec![Node::DIR(AbstractExecutor::root_index())],
+            AliveNodes {
+                dirs: vec!["/".to_owned()],
+                files: vec![]
+            },
             exec.alive()
         )
     }
@@ -386,7 +408,10 @@ mod tests {
             exec.recording
         );
         assert_eq!(
-            vec![Node::DIR(AbstractExecutor::root_index()), Node::DIR(foo)],
+            AliveNodes {
+                dirs: vec!["/".to_owned(), "/foobar".to_owned()],
+                files: vec![]
+            },
             exec.alive()
         );
         assert_eq!(1, exec.nodes_created);
@@ -412,7 +437,10 @@ mod tests {
             *exec.root().children.get("foobar").unwrap()
         );
         assert_eq!(
-            vec![Node::DIR(AbstractExecutor::root_index()), Node::FILE(foo)],
+            AliveNodes {
+                dirs: vec!["/".to_owned()],
+                files: vec!["/foobar".to_owned()]
+            },
             exec.alive()
         );
         assert_eq!(
@@ -441,28 +469,28 @@ mod tests {
     #[test]
     fn test_remove_file() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.create("/foobar".to_owned(), vec![]).unwrap();
+        exec.create("/foobar".to_owned(), vec![]).unwrap();
         let boo = exec.create("/boo".to_owned(), vec![]).unwrap();
-        let mut expected = vec![
-            Node::DIR(AbstractExecutor::root_index()),
-            Node::FILE(foo),
-            Node::FILE(boo),
-        ];
-        let mut actual = exec.alive();
-        expected.sort();
-        actual.sort();
-        assert_eq!(expected, actual);
+
+        assert_eq!(
+            AliveNodes {
+                dirs: vec!["/".to_owned()],
+                files: vec!["/boo".to_owned(), "/foobar".to_owned()]
+            },
+            exec.alive()
+        );
 
         exec.remove("/foobar".to_owned()).unwrap();
 
         assert_eq!(1, exec.root().children.len());
         assert_eq!(Node::FILE(boo), *exec.root().children.get("boo").unwrap());
-
-        let mut expected = vec![Node::DIR(AbstractExecutor::root_index()), Node::FILE(boo)];
-        let mut actual = exec.alive();
-        expected.sort();
-        actual.sort();
-        assert_eq!(expected, actual);
+        assert_eq!(
+            AliveNodes {
+                dirs: vec!["/".to_owned()],
+                files: vec!["/boo".to_owned()]
+            },
+            exec.alive()
+        );
         assert_eq!(
             Workload {
                 ops: vec![
@@ -495,16 +523,13 @@ mod tests {
             .unwrap();
 
         assert_eq!(foo, boo);
-        let mut expected = vec![
-            Node::DIR(AbstractExecutor::root_index()),
-            Node::DIR(bar),
-            Node::FILE(foo),
-            Node::FILE(boo),
-        ];
-        let mut actual = exec.alive();
-        expected.sort();
-        actual.sort();
-        assert_eq!(expected, actual);
+        assert_eq!(
+            AliveNodes {
+                dirs: vec!["/".to_owned(), "/bar".to_owned()],
+                files: vec!["/bar/boo".to_owned(), "/foo".to_owned()]
+            },
+            exec.alive()
+        );
 
         let root = exec.root();
         let bar_dir = exec.dir(&bar);
@@ -551,11 +576,13 @@ mod tests {
         exec.hardlink("/foo".to_owned(), "/bar".to_owned()).unwrap();
         exec.remove("/bar".to_owned()).unwrap();
 
-        let mut expected = vec![Node::DIR(AbstractExecutor::root_index()), Node::FILE(foo)];
-        let mut actual = exec.alive();
-        expected.sort();
-        actual.sort();
-        assert_eq!(expected, actual);
+        assert_eq!(
+            AliveNodes {
+                dirs: vec!["/".to_owned()],
+                files: vec!["/foo".to_owned()]
+            },
+            exec.alive()
+        );
 
         assert_eq!(1, exec.root().children.len());
 
@@ -600,7 +627,7 @@ mod tests {
     fn test_hardlink_name_exists() {
         let mut exec = AbstractExecutor::new();
         exec.create("/foo".to_owned(), vec![]).unwrap();
-        let bar = exec.create("/bar".to_owned(), vec![]).unwrap();
+        exec.create("/bar".to_owned(), vec![]).unwrap();
         assert_eq!(
             Err(ExecutorError::NameAlreadyExists("/foo".to_owned())),
             exec.hardlink("/bar".to_owned(), "/foo".to_owned())
@@ -610,28 +637,28 @@ mod tests {
     #[test]
     fn test_remove_dir() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.mkdir("/foobar".to_owned(), vec![]).unwrap();
+        exec.mkdir("/foobar".to_owned(), vec![]).unwrap();
         let boo = exec.mkdir("/boo".to_owned(), vec![]).unwrap();
-        let mut expected = vec![
-            Node::DIR(AbstractExecutor::root_index()),
-            Node::DIR(foo),
-            Node::DIR(boo),
-        ];
-        let mut actual = exec.alive();
-        expected.sort();
-        actual.sort();
-        assert_eq!(expected, actual);
+
+        assert_eq!(
+            AliveNodes {
+                dirs: vec!["/".to_owned(), "/boo".to_owned(), "/foobar".to_owned()],
+                files: vec![]
+            },
+            exec.alive()
+        );
 
         exec.remove("/foobar".to_owned()).unwrap();
 
         assert_eq!(1, exec.root().children.len());
         assert_eq!(Node::DIR(boo), *exec.root().children.get("boo").unwrap());
-
-        let mut expected = vec![Node::DIR(AbstractExecutor::root_index()), Node::DIR(boo)];
-        let mut actual = exec.alive();
-        expected.sort();
-        actual.sort();
-        assert_eq!(expected, actual);
+        assert_eq!(
+            AliveNodes {
+                dirs: vec!["/".to_owned(), "/boo".to_owned()],
+                files: vec![]
+            },
+            exec.alive()
+        );
         assert_eq!(
             Workload {
                 ops: vec![
@@ -664,13 +691,13 @@ mod tests {
             .unwrap();
         exec.hardlink("/foo/bar/boo".to_owned(), "/foo/bar/moo".to_owned())
             .unwrap();
+
         assert_eq!(vec!["/foo"], exec.resolve_path(&Node::DIR(foo)));
         assert_eq!(vec!["/foo/bar"], exec.resolve_path(&Node::DIR(bar)));
-        let mut expected = vec!["/foo/bar/boo", "/foo/bar/moo", "/zoo"];
-        let mut actual = exec.resolve_path(&Node::FILE(boo));
-        expected.sort();
-        actual.sort();
-        assert_eq!(expected, actual);
+        assert_eq!(
+            vec!["/foo/bar/boo", "/foo/bar/moo", "/zoo"],
+            exec.resolve_path(&Node::FILE(boo))
+        );
         assert_eq!(5, exec.nodes_created);
         test_replay(exec.recording);
     }
