@@ -33,7 +33,6 @@ pub enum ExecutorError {
 pub struct AbstractExecutor {
     pub dirs: Vec<Dir>,
     pub files: Vec<File>,
-    pub nodes_created: usize,
     pub recording: Workload,
 }
 
@@ -51,7 +50,6 @@ impl AbstractExecutor {
                 children: HashMap::new(),
             }],
             files: vec![],
-            nodes_created: 0,
             recording: Workload::new(),
         }
     }
@@ -85,7 +83,6 @@ impl AbstractExecutor {
             .children
             .insert(name, Node::DIR(dir_idx));
         self.recording.push(Operation::MKDIR { path, mode });
-        self.nodes_created += 1;
         Ok(dir_idx)
     }
 
@@ -102,7 +99,6 @@ impl AbstractExecutor {
             .children
             .insert(name.clone(), Node::FILE(file_idx));
         self.recording.push(Operation::CREATE { path, mode });
-        self.nodes_created += 1;
         Ok(file_idx)
     }
 
@@ -119,7 +115,6 @@ impl AbstractExecutor {
             .insert(name.clone(), Node::FILE(old_file.to_owned()));
         self.recording
             .push(Operation::HARDLINK { old_path, new_path });
-        self.nodes_created += 1;
         Ok(old_file.to_owned())
     }
 
@@ -143,7 +138,6 @@ impl AbstractExecutor {
 
         self.recording
             .push(Operation::RENAME { old_path, new_path });
-        self.nodes_created += 1;
         Ok(node)
     }
 
@@ -313,7 +307,6 @@ mod tests {
             },
             exec.alive()
         );
-        assert_eq!(1, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -351,7 +344,6 @@ mod tests {
             },
             exec.recording
         );
-        assert_eq!(1, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -408,7 +400,6 @@ mod tests {
             },
             exec.recording
         );
-        assert_eq!(2, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -456,7 +447,6 @@ mod tests {
             },
             exec.recording
         );
-        assert_eq!(3, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -495,7 +485,6 @@ mod tests {
             },
             exec.recording
         );
-        assert_eq!(2, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -569,7 +558,6 @@ mod tests {
             },
             exec.recording
         );
-        assert_eq!(2, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -600,7 +588,6 @@ mod tests {
             },
             exec.recording
         );
-        assert_eq!(2, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -631,7 +618,6 @@ mod tests {
             },
             exec.recording
         );
-        assert_eq!(2, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -680,7 +666,6 @@ mod tests {
             Node::FILE(boo),
             exec.resolve_node("/foo/bar/boo".into()).unwrap()
         );
-        assert_eq!(3, exec.nodes_created);
         test_replay(exec.recording);
     }
 
