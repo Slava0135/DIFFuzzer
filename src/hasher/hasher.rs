@@ -69,7 +69,7 @@ pub fn calc_hash_for_dir(path: &Path, seed: u64, nlink: bool, mode: bool) -> u64
     return hasher.finish();
 }
 
-pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, nlink: bool, mode: bool) -> Box<Vec<FileDiff>> {
+pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, nlink: bool, mode: bool) -> Vec<FileDiff> {
     let vec_fst = get_dir_content(path_fst);
     let vec_snd = get_dir_content(path_snd);
     let mut i_fst = vec_fst.len() - 1;
@@ -85,7 +85,6 @@ pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, nlink: bool, mode: b
                 let hash_snd = calc_hash_for_dir(vec_snd[i_snd].abs_path.as_ref(), seed, nlink, mode);
                 if hash_fst != hash_snd {
                     res.push(DifferentHash{fst: vec_fst[i_fst].clone(), snd: vec_snd[i_snd].clone()});
-                    //warning: maybe link instead of copy
                 }
                 if i_fst == 0 || i_snd == 0 {
                     break;
@@ -113,7 +112,7 @@ pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, nlink: bool, mode: b
     handle_last_diff(i_fst, vec_fst, &mut res);
     handle_last_diff(i_snd, vec_snd, &mut res);
 
-    Box::new(res)
+    res
 }
 
 fn handle_last_diff(mut i: usize, vec_data: Vec<FileInfo>, res: &mut Vec<FileDiff>) {
