@@ -7,11 +7,11 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::sync::OnceLock;
 
+use crate::hasher::hasher::FileDiff::DifferentHash;
+use crate::hasher::hasher::FileDiff::OneExists;
 use rand::random;
 use twox_hash::XxHash64;
 use walkdir::WalkDir;
-use crate::hasher::hasher::FileDiff::DifferentHash;
-use crate::hasher::hasher::FileDiff::OneExists;
 
 #[derive(Clone)]
 struct FileInfo {
@@ -26,7 +26,7 @@ struct FileInfo {
 }
 
 pub enum FileDiff {
-    DifferentHash{fst: FileInfo, snd: FileInfo},
+    DifferentHash { fst: FileInfo, snd: FileInfo },
     OneExists(FileInfo),
 }
 
@@ -69,7 +69,7 @@ pub fn calc_hash_for_dir(path: &Path, seed: u64, nlink: bool, mode: bool) -> u64
     return hasher.finish();
 }
 
-pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, nlink: bool, mode: bool) -> Vec<FileDiff> {
+pub fn get_diff(path_fst: &Path, path_snd: &Path, nlink: bool, mode: bool) -> Vec<FileDiff> {
     let vec_fst = get_dir_content(path_fst);
     let vec_snd = get_dir_content(path_snd);
     let mut i_fst = vec_fst.len() - 1;
@@ -81,10 +81,15 @@ pub fn get_diff<T: Write>(path_fst: &Path, path_snd: &Path, nlink: bool, mode: b
         match cmp_res {
             Ordering::Equal => {
                 let seed = random();
-                let hash_fst = calc_hash_for_dir(vec_fst[i_fst].abs_path.as_ref(), seed, nlink, mode);
-                let hash_snd = calc_hash_for_dir(vec_snd[i_snd].abs_path.as_ref(), seed, nlink, mode);
+                let hash_fst =
+                    calc_hash_for_dir(vec_fst[i_fst].abs_path.as_ref(), seed, nlink, mode);
+                let hash_snd =
+                    calc_hash_for_dir(vec_snd[i_snd].abs_path.as_ref(), seed, nlink, mode);
                 if hash_fst != hash_snd {
-                    res.push(DifferentHash{fst: vec_fst[i_fst].clone(), snd: vec_snd[i_snd].clone()});
+                    res.push(DifferentHash {
+                        fst: vec_fst[i_fst].clone(),
+                        snd: vec_snd[i_snd].clone(),
+                    });
                 }
                 if i_fst == 0 || i_snd == 0 {
                     break;
