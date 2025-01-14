@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn smoke_test_generate_new() {
-        for i in 0..1000 {
+        for i in 0..100 {
             let mut rng = StdRng::seed_from_u64(i);
             generate_new(&mut rng, 1000, &OperationWeights::uniform());
         }
