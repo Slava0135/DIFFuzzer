@@ -108,12 +108,7 @@ impl Fuzzer {
             fst_trace_path.clone().into_boxed_path(),
             snd_trace_path.clone().into_boxed_path(),
         );
-        let console_objective = ConsoleObjective::new(
-            fst_stdout.clone(),
-            fst_stderr.clone(),
-            snd_stdout.clone(),
-            snd_stderr.clone(),
-        );
+        let console_objective = ConsoleObjective::new(fst_stdout.clone(), snd_stdout.clone());
 
         let fst_mount = Ext4::new();
         let fst_fs_name = fst_mount.to_string();

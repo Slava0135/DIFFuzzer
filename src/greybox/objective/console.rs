@@ -5,23 +5,14 @@ use crate::{abstract_fs::output::Output, harness::ConsolePipe};
 
 pub struct ConsoleObjective {
     fst_stdout: ConsolePipe,
-    fst_stderr: ConsolePipe,
     snd_stdout: ConsolePipe,
-    snd_stderr: ConsolePipe,
 }
 
 impl ConsoleObjective {
-    pub fn new(
-        fst_stdout: ConsolePipe,
-        fst_stderr: ConsolePipe,
-        snd_stdout: ConsolePipe,
-        snd_stderr: ConsolePipe,
-    ) -> Self {
+    pub fn new(fst_stdout: ConsolePipe, snd_stdout: ConsolePipe) -> Self {
         Self {
             fst_stdout,
-            fst_stderr,
             snd_stdout,
-            snd_stderr,
         }
     }
     pub fn is_interesting(&mut self) -> anyhow::Result<bool> {
