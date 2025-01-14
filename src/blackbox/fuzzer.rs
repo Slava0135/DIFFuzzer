@@ -95,8 +95,9 @@ pub fn fuzz<FS1: FileSystemMount, FS2: FileSystemMount>(
         let fst_hash = get_hash_for_dir(&fst_exec_dir, seed, false, false); //todo: options
         let snd_hash = get_hash_for_dir(&snd_exec_dir, seed, false, false); //todo: options
 
-        //todo: report crash
-        if fst_hash != snd_hash { get_diff(&fst_exec_dir, &snd_exec_dir, io::stdout(), false, false) }
+
+        let hash_diff_interesting = fst_hash != snd_hash;
+        // { get_diff(&fst_exec_dir, &snd_exec_dir, io::stdout(), false, false) }
         debug!("doing objectives");
         let console_is_interesting = console_objective
             .is_interesting()
@@ -104,6 +105,10 @@ pub fn fuzz<FS1: FileSystemMount, FS2: FileSystemMount>(
         let trace_is_interesting = trace_objective
             .is_interesting()
             .with_context(|| format!("failed to do trace objective"))?;
+
+        if console_is_interesting || trace_is_interesting || hash_diff_interesting {
+            //todo: report crash
+        }
     }
 }
 
