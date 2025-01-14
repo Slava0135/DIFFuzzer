@@ -155,7 +155,7 @@ impl AbstractExecutor {
     }
 
     pub fn hardlink(&mut self, old_path: PathName, new_path: PathName) -> Result<FileIndex> {
-        let old_file = self.resolve_file(old_path)?;
+        let old_file = self.resolve_file(old_path.clone())?;
         let (parent_path, name) = new_path.split();
         let name = name.to_owned();
         let parent = self.resolve_dir(parent_path.to_owned())?;
@@ -164,8 +164,6 @@ impl AbstractExecutor {
                 self.resolve_dir_path(&parent).join(name),
             ));
         }
-        let node = &Node::FILE(old_file.to_owned());
-        let old_path = self.resolve_path(node).pop().unwrap();
         let file = self.file_mut(&old_file);
         file.parents.insert(parent.to_owned());
         let parent_dir = self.dir_mut(&parent);
