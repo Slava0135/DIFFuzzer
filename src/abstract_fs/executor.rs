@@ -55,28 +55,15 @@ impl AbstractExecutor {
     }
 
     pub fn remove(&mut self, path: PathName) -> Result<()> {
+        if path.is_root() {
+            return Err(ExecutorError::RootRemovalForbidden);
+        }
         let (parent_path, name) = path.split();
-        let node = &self.resolve_node(path.clone())?;
         let parent_idx = self.resolve_dir(parent_path.to_owned())?;
-        self.recording
-            .push(Operation::REMOVE { path: path.clone() });
         let parent = self.dir_mut(&parent_idx);
         parent.children.remove(&name);
-        match node {
-            Node::DIR(to_remove_idx) => {
-                if *to_remove_idx == AbstractExecutor::root_index() {
-                    return Err(ExecutorError::RootRemovalForbidden);
-                }
-                let mut queue: VecDeque<(DirIndex, Node)> = VecDeque::new();
-                let to_remove = self.dir_mut(to_remove_idx);
-                for (_, node) in to_remove.children.iter() {
-                    queue.push_back((to_remove_idx.clone(), node.clone()));
-                }
-                to_remove.parent = None;
-                to_remove.children.clear();
-            }
-            Node::FILE(_) => {}
-        }
+        self.recording
+            .push(Operation::REMOVE { path: path.clone() });
         Ok(())
     }
 
