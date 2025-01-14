@@ -28,6 +28,11 @@ impl Workload {
                         format!("do_hardlink(\"{}\", \"{}\");\n", old_path, new_path).as_str(),
                     );
                 }
+                Operation::RENAME { old_path, new_path } => {
+                    result.push_str(
+                        format!("do_rename(\"{}\", \"{}\");\n", old_path, new_path).as_str(),
+                    );
+                }
             }
         }
         result.push_str("}");
@@ -59,6 +64,7 @@ void test_workload()
 do_mkdir("/foo", 0);
 do_create("/foo/bar", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 do_hardlink("/foo/bar", "/baz");
+do_rename("/baz", "/gaz");
 do_remove("/foo");
 }
 "#
@@ -82,6 +88,10 @@ do_remove("/foo");
                 Operation::HARDLINK {
                     old_path: "/foo/bar".into(),
                     new_path: "/baz".into(),
+                },
+                Operation::RENAME {
+                    old_path: "/baz".into(),
+                    new_path: "/gaz".into(),
                 },
                 Operation::REMOVE {
                     path: "/foo".into(),

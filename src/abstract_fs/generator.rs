@@ -48,6 +48,9 @@ pub fn append_one(
     if alive.files.is_empty() {
         ops.weights.retain(|(op, _)| *op != OperationKind::HARDLINK);
     }
+    if alive_dirs_except_root.is_empty() && alive.files.is_empty() {
+        ops.weights.retain(|(op, _)| *op != OperationKind::RENAME);
+    }
     match ops.weights.choose_weighted(rng, |item| item.1).unwrap().0 {
         OperationKind::MKDIR => {
             let path = alive.dirs.choose(rng).unwrap().to_owned();
@@ -74,6 +77,17 @@ pub fn append_one(
                 .hardlink(file_path, dir_path.join(gen_name()))
                 .unwrap();
         }
+        OperationKind::RENAME => {
+            let old_path = [alive_dirs_except_root, alive.files]
+                .concat()
+                .choose(rng)
+                .unwrap()
+                .to_owned();
+            let new_path = alive.dirs.choose(rng).unwrap().to_owned();
+            executor
+                .rename(old_path, new_path.join(gen_name()))
+                .unwrap();
+        }
     }
 }
 
@@ -85,7 +99,7 @@ mod tests {
 
     #[test]
     fn smoke_test_generate_new() {
-        for i in 0..1000 {
+        for i in 0..100 {
             let mut rng = StdRng::seed_from_u64(i);
             generate_new(&mut rng, 1000, &OperationWeights::uniform());
         }

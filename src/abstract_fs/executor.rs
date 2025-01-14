@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 
 use thiserror::Error;
 
@@ -26,12 +26,13 @@ pub enum ExecutorError {
     NotFound(PathName),
     #[error("invalid path '{0}'")]
     InvalidPath(PathName),
+    #[error("directory '{0}' is not empty")]
+    DirNotEmpty(PathName),
 }
 
 pub struct AbstractExecutor {
     pub dirs: Vec<Dir>,
     pub files: Vec<File>,
-    pub nodes_created: usize,
     pub recording: Workload,
 }
 
@@ -49,59 +50,20 @@ impl AbstractExecutor {
                 children: HashMap::new(),
             }],
             files: vec![],
-            nodes_created: 0,
             recording: Workload::new(),
         }
     }
 
     pub fn remove(&mut self, path: PathName) -> Result<()> {
+        if path.is_root() {
+            return Err(ExecutorError::RootRemovalForbidden);
+        }
         let (parent_path, name) = path.split();
-        let node = &self.resolve_node(path.clone())?;
         let parent_idx = self.resolve_dir(parent_path.to_owned())?;
-        self.recording
-            .push(Operation::REMOVE { path: path.clone() });
         let parent = self.dir_mut(&parent_idx);
         parent.children.remove(&name);
-        match node {
-            Node::DIR(to_remove_idx) => {
-                if *to_remove_idx == AbstractExecutor::root_index() {
-                    return Err(ExecutorError::RootRemovalForbidden);
-                }
-                let mut queue: VecDeque<(DirIndex, Node)> = VecDeque::new();
-                let to_remove = self.dir_mut(to_remove_idx);
-                for (_, node) in to_remove.children.iter() {
-                    queue.push_back((to_remove_idx.clone(), node.clone()));
-                }
-                to_remove.parent = None;
-                to_remove.children.clear();
-                while let Some((parent, node)) = queue.pop_front() {
-                    match node {
-                        Node::DIR(to_remove_idx) => {
-                            let to_remove = self.dir_mut(&to_remove_idx);
-                            for (_, node) in to_remove.children.iter() {
-                                queue.push_back((to_remove_idx.clone(), node.clone()));
-                            }
-                            to_remove.parent = None;
-                            to_remove.children.clear();
-                        }
-                        Node::FILE(file_idx) => {
-                            let file = self.file_mut(&file_idx);
-                            file.parents.remove(&parent);
-                        }
-                    }
-                }
-            }
-            Node::FILE(to_remove) => {
-                let another_exists = parent.children.iter().any(|(_, node)| match node {
-                    Node::FILE(another) if another == to_remove => true,
-                    _ => false,
-                });
-                if !another_exists {
-                    let to_remove = self.file_mut(to_remove);
-                    to_remove.parents.remove(&parent_idx);
-                }
-            }
-        }
+        self.recording
+            .push(Operation::REMOVE { path: path.clone() });
         Ok(())
     }
 
@@ -109,9 +71,7 @@ impl AbstractExecutor {
         let (parent_path, name) = path.split();
         let parent = self.resolve_dir(parent_path.to_owned())?;
         if self.name_exists(&parent, &name) {
-            return Err(ExecutorError::NameAlreadyExists(
-                self.resolve_dir_path(&parent).join(name),
-            ));
+            return Err(ExecutorError::NameAlreadyExists(path));
         }
         let dir = Dir {
             parent: Some(parent.clone()),
@@ -122,11 +82,7 @@ impl AbstractExecutor {
         self.dir_mut(&parent)
             .children
             .insert(name, Node::DIR(dir_idx));
-        self.recording.push(Operation::MKDIR {
-            path: self.resolve_dir_path(&dir_idx),
-            mode,
-        });
-        self.nodes_created += 1;
+        self.recording.push(Operation::MKDIR { path, mode });
         Ok(dir_idx)
     }
 
@@ -134,47 +90,55 @@ impl AbstractExecutor {
         let (parent_path, name) = path.split();
         let parent = self.resolve_dir(parent_path.to_owned())?;
         if self.name_exists(&parent, &name) {
-            return Err(ExecutorError::NameAlreadyExists(
-                self.resolve_dir_path(&parent).join(name),
-            ));
+            return Err(ExecutorError::NameAlreadyExists(path));
         }
-        let mut parents = HashSet::new();
-        parents.insert(parent.to_owned());
-        let file = File { parents };
+        let file = File {};
         let file_idx = FileIndex(self.files.len());
         self.files.push(file);
         self.dir_mut(&parent)
             .children
             .insert(name.clone(), Node::FILE(file_idx));
-        self.recording.push(Operation::CREATE {
-            path: self.resolve_dir_path(&parent).join(name),
-            mode,
-        });
-        self.nodes_created += 1;
+        self.recording.push(Operation::CREATE { path, mode });
         Ok(file_idx)
     }
 
     pub fn hardlink(&mut self, old_path: PathName, new_path: PathName) -> Result<FileIndex> {
         let old_file = self.resolve_file(old_path.clone())?;
         let (parent_path, name) = new_path.split();
-        let name = name.to_owned();
         let parent = self.resolve_dir(parent_path.to_owned())?;
         if self.name_exists(&parent, &name) {
-            return Err(ExecutorError::NameAlreadyExists(
-                self.resolve_dir_path(&parent).join(name),
-            ));
+            return Err(ExecutorError::NameAlreadyExists(new_path));
         }
-        let file = self.file_mut(&old_file);
-        file.parents.insert(parent.to_owned());
         let parent_dir = self.dir_mut(&parent);
         parent_dir
             .children
             .insert(name.clone(), Node::FILE(old_file.to_owned()));
-        let new_path = self.resolve_dir_path(&parent).join(name);
         self.recording
             .push(Operation::HARDLINK { old_path, new_path });
-        self.nodes_created += 1;
         Ok(old_file.to_owned())
+    }
+
+    pub fn rename(&mut self, old_path: PathName, new_path: PathName) -> Result<Node> {
+        if let Ok(dir_idx) = self.resolve_dir(new_path.clone()) {
+            if !self.dir(&dir_idx).children.is_empty() {
+                return Err(ExecutorError::DirNotEmpty(new_path));
+            }
+        }
+        let node = self.resolve_node(old_path.clone())?;
+
+        let (parent_path, name) = new_path.split();
+        let parent = self.resolve_dir(parent_path.to_owned())?;
+        let parent_dir = self.dir_mut(&parent);
+        parent_dir.children.insert(name.clone(), node.clone());
+
+        let (parent_path, name) = old_path.split();
+        let parent = self.resolve_dir(parent_path.to_owned())?;
+        let parent_dir = self.dir_mut(&parent);
+        parent_dir.children.remove(&name);
+
+        self.recording
+            .push(Operation::RENAME { old_path, new_path });
+        Ok(node)
     }
 
     pub fn replay(&mut self, workload: &Workload) -> Result<()> {
@@ -189,6 +153,9 @@ impl AbstractExecutor {
                 Operation::REMOVE { path } => self.remove(path.clone())?,
                 Operation::HARDLINK { old_path, new_path } => {
                     self.hardlink(old_path.clone(), new_path.clone())?;
+                }
+                Operation::RENAME { old_path, new_path } => {
+                    self.rename(old_path.clone(), new_path.clone())?;
                 }
             };
         }
@@ -262,50 +229,6 @@ impl AbstractExecutor {
 
     pub fn root_index() -> DirIndex {
         DirIndex(0)
-    }
-
-    pub fn resolve_file_path(&self, file_idx: &FileIndex) -> Vec<PathName> {
-        let mut paths = vec![];
-        let file = self.file(file_idx);
-        for dir in file.parents.iter() {
-            self.dir(dir)
-                .children
-                .iter()
-                .filter(|(_, node)| **node == Node::FILE(file_idx.to_owned()))
-                .for_each(|(name, _)| paths.push(self.resolve_dir_path(dir).join(name.clone())));
-        }
-        paths.sort();
-        paths
-    }
-
-    pub fn resolve_dir_path(&self, dir_idx: &DirIndex) -> PathName {
-        let mut segments: Vec<String> = vec![];
-        let mut next = dir_idx.to_owned();
-        loop {
-            let dir = self.dir(&next);
-            match dir.parent {
-                Some(parent) => {
-                    let parent_dir = self.dir(&parent);
-                    let (name, _) = parent_dir
-                        .children
-                        .iter()
-                        .find(|(_, node)| **node == Node::DIR(next))
-                        .unwrap();
-                    segments.push(name.clone());
-                    next = parent;
-                }
-                None => break,
-            }
-        }
-        segments.reverse();
-        ("/".to_owned() + segments.join("/").as_str()).into()
-    }
-
-    pub fn resolve_path(&self, node: &Node) -> Vec<PathName> {
-        match node {
-            Node::FILE(file) => self.resolve_file_path(file),
-            Node::DIR(dir) => vec![self.resolve_dir_path(dir)],
-        }
     }
 
     pub fn alive(&self) -> AliveNodes {
@@ -384,7 +307,6 @@ mod tests {
             },
             exec.alive()
         );
-        assert_eq!(1, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -422,7 +344,6 @@ mod tests {
             },
             exec.recording
         );
-        assert_eq!(1, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -479,7 +400,6 @@ mod tests {
             },
             exec.recording
         );
-        assert_eq!(2, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -508,12 +428,6 @@ mod tests {
             bar_dir.children.get("boo").unwrap()
         );
 
-        let mut parents = HashSet::new();
-        parents.insert(AbstractExecutor::root_index());
-        parents.insert(bar);
-        assert_eq!(parents, exec.file(&foo).parents);
-        assert_eq!(parents, exec.file(&boo).parents);
-
         assert_eq!(
             Workload {
                 ops: vec![
@@ -533,14 +447,13 @@ mod tests {
             },
             exec.recording
         );
-        assert_eq!(3, exec.nodes_created);
         test_replay(exec.recording);
     }
 
     #[test]
     fn test_remove_hardlink() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.create("/foo".into(), vec![]).unwrap();
+        exec.create("/foo".into(), vec![]).unwrap();
         exec.hardlink("/foo".into(), "/bar".into()).unwrap();
         exec.remove("/bar".into()).unwrap();
 
@@ -553,10 +466,6 @@ mod tests {
         );
 
         assert_eq!(1, exec.root().children.len());
-
-        let mut parents = HashSet::new();
-        parents.insert(AbstractExecutor::root_index());
-        assert_eq!(parents, exec.file(&foo).parents);
 
         assert_eq!(
             Workload {
@@ -576,7 +485,6 @@ mod tests {
             },
             exec.recording
         );
-        assert_eq!(2, exec.nodes_created);
         test_replay(exec.recording);
     }
 
@@ -587,8 +495,13 @@ mod tests {
         exec.mkdir("/1".into(), vec![]).unwrap();
         exec.mkdir("/1/2".into(), vec![]).unwrap();
         exec.hardlink("/0".into(), "/1/2/3".into()).unwrap();
+        assert_eq!(Ok(zero), exec.resolve_file("/1/2/3".into()));
         exec.remove("/1".into()).unwrap();
-        assert_eq!(vec![PathName::from("/0")], exec.resolve_file_path(&zero));
+        assert_eq!(
+            Err(ExecutorError::NotFound("/1".into())),
+            exec.resolve_file("/1/2/3".into())
+        );
+        assert_eq!(Ok(zero), exec.resolve_file("/0".into()));
     }
 
     #[test]
@@ -645,38 +558,81 @@ mod tests {
             },
             exec.recording
         );
-        assert_eq!(2, exec.nodes_created);
         test_replay(exec.recording);
     }
 
     #[test]
-    fn test_resolve_path() {
+    fn test_rename_file() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.mkdir("/foo".into(), vec![]).unwrap();
-        let bar = exec.mkdir("/foo/bar".into(), vec![]).unwrap();
-        let boo = exec.create("/foo/bar/boo".into(), vec![]).unwrap();
-        exec.hardlink("/foo/bar/boo".into(), "/zoo".into()).unwrap();
-        exec.hardlink("/foo/bar/boo".into(), "/foo/bar/moo".into())
-            .unwrap();
-
+        exec.create("/foo".into(), vec![]).unwrap();
+        exec.rename("/foo".into(), "/bar".into()).unwrap();
         assert_eq!(
-            vec![PathName::from("/foo")],
-            exec.resolve_path(&Node::DIR(foo))
+            AliveNodes {
+                dirs: vec!["/".into()],
+                files: vec!["/bar".into()]
+            },
+            exec.alive()
         );
         assert_eq!(
-            vec![PathName::from("/foo/bar")],
-            exec.resolve_path(&Node::DIR(bar))
+            Workload {
+                ops: vec![
+                    Operation::CREATE {
+                        path: "/foo".into(),
+                        mode: vec![]
+                    },
+                    Operation::RENAME {
+                        old_path: "/foo".into(),
+                        new_path: "/bar".into(),
+                    }
+                ]
+            },
+            exec.recording
         );
-        assert_eq!(
-            vec![
-                PathName::from("/foo/bar/boo"),
-                PathName::from("/foo/bar/moo"),
-                PathName::from("/zoo")
-            ],
-            exec.resolve_path(&Node::FILE(boo))
-        );
-        assert_eq!(5, exec.nodes_created);
         test_replay(exec.recording);
+    }
+
+    #[test]
+    fn test_rename_dir() {
+        let mut exec = AbstractExecutor::new();
+        exec.mkdir("/foo".into(), vec![]).unwrap();
+        exec.rename("/foo".into(), "/bar".into()).unwrap();
+        assert_eq!(
+            AliveNodes {
+                dirs: vec!["/".into(), "/bar".into()],
+                files: vec![]
+            },
+            exec.alive()
+        );
+        assert_eq!(
+            Workload {
+                ops: vec![
+                    Operation::MKDIR {
+                        path: "/foo".into(),
+                        mode: vec![]
+                    },
+                    Operation::RENAME {
+                        old_path: "/foo".into(),
+                        new_path: "/bar".into(),
+                    }
+                ]
+            },
+            exec.recording
+        );
+        test_replay(exec.recording);
+    }
+
+    #[test]
+    fn test_rename_dir_non_empty() {
+        let mut exec = AbstractExecutor::new();
+        exec.mkdir("/foo".into(), vec![]).unwrap();
+        exec.mkdir("/bar".into(), vec![]).unwrap();
+        exec.create("/bar/baz".into(), vec![]).unwrap();
+        assert_eq!(
+            Err(ExecutorError::DirNotEmpty("/bar".into())),
+            exec.rename("/foo".into(), "/bar".into())
+        );
+        exec.remove("/bar/baz".into()).unwrap();
+        exec.rename("/foo".into(), "/bar".into()).unwrap();
     }
 
     #[test]
@@ -710,7 +666,6 @@ mod tests {
             Node::FILE(boo),
             exec.resolve_node("/foo/bar/boo".into()).unwrap()
         );
-        assert_eq!(3, exec.nodes_created);
         test_replay(exec.recording);
     }
 

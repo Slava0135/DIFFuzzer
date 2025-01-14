@@ -22,6 +22,10 @@ weights = [
     "HARDLINK",
     100,
   ],
+  [
+    "RENAME",
+    100,
+  ],
 ]
 
 [mutation_weights]

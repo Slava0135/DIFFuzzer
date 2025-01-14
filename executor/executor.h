@@ -14,4 +14,5 @@ extern "C" {
     int do_create(const char *path, mode_t param);
     int do_remove(const char *path);
     int do_hardlink(const char *old_path, const char *new_path);
+    int do_rename(const char *old_path, const char *new_path);
 }

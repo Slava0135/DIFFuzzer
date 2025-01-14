@@ -39,7 +39,7 @@ impl PathName {
     }
 
     pub fn join(&self, name: Name) -> PathName {
-        if self.0 == "/" {
+        if self.is_root() {
             format!("/{}", name).into()
         } else {
             format!("{}/{}", self.0, name).into()
@@ -47,7 +47,13 @@ impl PathName {
     }
 
     pub fn is_valid(&self) -> bool {
-        !(self.0.is_empty() || !self.0.starts_with('/') || (self.0 != "/" && self.0.ends_with('/')))
+        !(self.0.is_empty()
+            || !self.0.starts_with('/')
+            || (!self.is_root() && self.0.ends_with('/')))
+    }
+
+    pub fn is_root(&self) -> bool {
+        self.0 == "/"
     }
 }
 

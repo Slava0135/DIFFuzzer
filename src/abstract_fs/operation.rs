@@ -19,6 +19,10 @@ pub enum Operation {
         old_path: PathName,
         new_path: PathName,
     },
+    RENAME {
+        old_path: PathName,
+        new_path: PathName,
+    },
 }
 
 #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Copy)]
@@ -27,6 +31,7 @@ pub enum OperationKind {
     CREATE,
     REMOVE,
     HARDLINK,
+    RENAME,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -46,6 +51,7 @@ impl OperationWeights {
                 (OperationKind::MKDIR, 100),
                 (OperationKind::REMOVE, 100),
                 (OperationKind::HARDLINK, 100),
+                (OperationKind::RENAME, 100),
             ],
         }
     }

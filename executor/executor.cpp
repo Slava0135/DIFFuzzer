@@ -62,6 +62,7 @@ const char *CLOSE = "CLOSE";
 const char *UNLINK = "UNLINK";
 const char *STAT = "STAT";
 const char *HARDLINK = "HARDLINK";
+const char *RENAME = "RENAME";
 
 enum ExitCode : int {
   OK = 0,
@@ -364,4 +365,15 @@ int do_hardlink(const char *old_path, const char *new_path) {
     success(status, HARDLINK);
   }
   return status;
+}
+
+int do_rename(const char *old_path, const char *new_path) {
+    idx++;
+    int status = rename(patch_path(old_path).c_str(), patch_path(new_path).c_str());
+    if (status == -1) {
+        failure2(status, RENAME, old_path, new_path);
+    } else {
+        success(status, RENAME);
+    }
+    return status;
 }
