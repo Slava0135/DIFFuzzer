@@ -66,6 +66,14 @@ pub fn insert(
                     used_names.insert(segment);
                 }
             }
+            Operation::RENAME { old_path, new_path } => {
+                for segment in old_path.segments() {
+                    used_names.insert(segment);
+                }
+                for segment in new_path.segments() {
+                    used_names.insert(segment);
+                }
+            }
         }
     }
 

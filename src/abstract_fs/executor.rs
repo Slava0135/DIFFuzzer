@@ -157,7 +157,6 @@ impl AbstractExecutor {
     pub fn hardlink(&mut self, old_path: PathName, new_path: PathName) -> Result<FileIndex> {
         let old_file = self.resolve_file(old_path.clone())?;
         let (parent_path, name) = new_path.split();
-        let name = name.to_owned();
         let parent = self.resolve_dir(parent_path.to_owned())?;
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists(
@@ -170,9 +169,26 @@ impl AbstractExecutor {
         parent_dir
             .children
             .insert(name.clone(), Node::FILE(old_file.to_owned()));
-        let new_path = self.resolve_dir_path(&parent).join(name);
         self.recording
             .push(Operation::HARDLINK { old_path, new_path });
+        self.nodes_created += 1;
+        Ok(old_file.to_owned())
+    }
+
+    pub fn rename(&mut self, old_path: PathName, new_path: PathName) -> Result<FileIndex> {
+        let old_file = self.resolve_file(old_path.clone())?;
+        let (parent_path, name) = old_path.split();
+        let parent = self.resolve_dir(parent_path.to_owned())?;
+        let parent_dir = self.dir_mut(&parent);
+        parent_dir.children.remove(&name);
+        let (parent_path, name) = new_path.split();
+        let parent = self.resolve_dir(parent_path.to_owned())?;
+        let parent_dir = self.dir_mut(&parent);
+        parent_dir
+            .children
+            .insert(name.clone(), Node::FILE(old_file.to_owned()));
+        self.recording
+            .push(Operation::RENAME { old_path, new_path });
         self.nodes_created += 1;
         Ok(old_file.to_owned())
     }
@@ -189,6 +205,9 @@ impl AbstractExecutor {
                 Operation::REMOVE { path } => self.remove(path.clone())?,
                 Operation::HARDLINK { old_path, new_path } => {
                     self.hardlink(old_path.clone(), new_path.clone())?;
+                }
+                Operation::RENAME { old_path, new_path } => {
+                    self.rename(old_path.clone(), new_path.clone())?;
                 }
             };
         }
@@ -642,6 +661,37 @@ mod tests {
                         path: "/foobar".into(),
                     }
                 ],
+            },
+            exec.recording
+        );
+        assert_eq!(2, exec.nodes_created);
+        test_replay(exec.recording);
+    }
+
+    #[test]
+    fn test_rename_file() {
+        let mut exec = AbstractExecutor::new();
+        exec.create("/foo".into(), vec![]).unwrap();
+        exec.rename("/foo".into(), "/bar".into()).unwrap();
+        assert_eq!(
+            AliveNodes {
+                dirs: vec!["/".into()],
+                files: vec!["/bar".into()]
+            },
+            exec.alive()
+        );
+        assert_eq!(
+            Workload {
+                ops: vec![
+                    Operation::CREATE {
+                        path: "/foo".into(),
+                        mode: vec![]
+                    },
+                    Operation::RENAME {
+                        old_path: "/foo".into(),
+                        new_path: "/bar".into(),
+                    }
+                ]
             },
             exec.recording
         );

@@ -19,6 +19,10 @@ pub enum Operation {
         old_path: PathName,
         new_path: PathName,
     },
+    RENAME {
+        old_path: PathName,
+        new_path: PathName,
+    },
 }
 
 #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Copy)]
