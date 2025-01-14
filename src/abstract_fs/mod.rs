@@ -9,3 +9,4 @@ pub mod operation;
 pub mod output;
 pub mod trace;
 pub mod workload;
+pub mod pathname;

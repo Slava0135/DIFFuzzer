@@ -48,21 +48,21 @@ pub fn insert(
     for op in workload.ops.iter() {
         match op {
             Operation::MKDIR { path, mode: _ } => {
-                for segment in path.split("/") {
+                for segment in path.segments() {
                     used_names.insert(segment);
                 }
             }
             Operation::CREATE { path, mode: _ } => {
-                for segment in path.split("/") {
+                for segment in path.segments() {
                     used_names.insert(segment);
                 }
             }
             Operation::REMOVE { path: _ } => {}
             Operation::HARDLINK { old_path, new_path } => {
-                for segment in old_path.split("/") {
+                for segment in old_path.segments() {
                     used_names.insert(segment);
                 }
-                for segment in new_path.split("/") {
+                for segment in new_path.segments() {
                     used_names.insert(segment);
                 }
             }
@@ -114,15 +114,15 @@ mod tests {
         let w = Workload {
             ops: vec![
                 Operation::MKDIR {
-                    path: "/foobar".to_owned(),
+                    path: "/foobar".into(),
                     mode: vec![],
                 },
                 Operation::CREATE {
-                    path: "/foobar/boo".to_owned(),
+                    path: "/foobar/boo".into(),
                     mode: vec![],
                 },
                 Operation::CREATE {
-                    path: "/foobar/zoo".to_owned(),
+                    path: "/foobar/zoo".into(),
                     mode: vec![],
                 },
             ],
@@ -132,11 +132,11 @@ mod tests {
             Some(Workload {
                 ops: vec![
                     Operation::MKDIR {
-                        path: "/foobar".to_owned(),
+                        path: "/foobar".into(),
                         mode: vec![],
                     },
                     Operation::CREATE {
-                        path: "/foobar/zoo".to_owned(),
+                        path: "/foobar/zoo".into(),
                         mode: vec![],
                     },
                 ],
@@ -151,15 +151,15 @@ mod tests {
         let w = Workload {
             ops: vec![
                 Operation::MKDIR {
-                    path: "/foobar".to_owned(),
+                    path: "/foobar".into(),
                     mode: vec![],
                 },
                 Operation::CREATE {
-                    path: "/foobar/boo".to_owned(),
+                    path: "/foobar/boo".into(),
                     mode: vec![],
                 },
                 Operation::REMOVE {
-                    path: "/foobar/boo".to_owned(),
+                    path: "/foobar/boo".into(),
                 },
             ],
         };
@@ -176,18 +176,18 @@ mod tests {
             Some(Workload {
                 ops: vec![
                     Operation::MKDIR {
-                        path: "/foobar".to_owned(),
+                        path: "/foobar".into(),
                         mode: vec![],
                     },
                     Operation::CREATE {
-                        path: "/foobar/boo".to_owned(),
+                        path: "/foobar/boo".into(),
                         mode: vec![],
                     },
                     Operation::REMOVE {
-                        path: "/foobar/boo".to_owned(),
+                        path: "/foobar/boo".into(),
                     },
                     Operation::REMOVE {
-                        path: "/foobar".to_owned(),
+                        path: "/foobar".into(),
                     },
                 ],
             }),

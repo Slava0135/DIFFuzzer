@@ -4,8 +4,9 @@ use thiserror::Error;
 
 use super::{
     flags::Mode,
-    node::{Dir, DirIndex, File, FileIndex, Name, Node, PathName},
+    node::{Dir, DirIndex, File, FileIndex, Node},
     operation::Operation,
+    pathname::{Name, PathName},
     workload::Workload,
 };
 
@@ -25,24 +26,6 @@ pub enum ExecutorError {
     NotFound(PathName),
     #[error("invalid path '{0}'")]
     InvalidPath(PathName),
-}
-
-fn split_path(path: &str) -> (&str, &str) {
-    let split_at = path.rfind('/').unwrap();
-    let (parent, name) = (&path[..split_at], &path[split_at + 1..]);
-    if parent.is_empty() {
-        ("/", name)
-    } else {
-        (parent, name)
-    }
-}
-
-pub fn join_path(path: PathName, name: Name) -> PathName {
-    if path == "/" {
-        format!("/{}", name)
-    } else {
-        format!("{}/{}", path, name)
-    }
 }
 
 pub struct AbstractExecutor {
@@ -72,13 +55,13 @@ impl AbstractExecutor {
     }
 
     pub fn remove(&mut self, path: PathName) -> Result<()> {
-        let (parent_path, name) = split_path(&path);
+        let (parent_path, name) = path.split();
         let node = &self.resolve_node(path.clone())?;
         let parent_idx = self.resolve_dir(parent_path.to_owned())?;
         self.recording
             .push(Operation::REMOVE { path: path.clone() });
         let parent = self.dir_mut(&parent_idx);
-        parent.children.remove(name);
+        parent.children.remove(&name);
         match node {
             Node::DIR(to_remove_idx) => {
                 if *to_remove_idx == AbstractExecutor::root_index() {
@@ -123,12 +106,11 @@ impl AbstractExecutor {
     }
 
     pub fn mkdir(&mut self, path: PathName, mode: Mode) -> Result<DirIndex> {
-        let (parent_path, name) = split_path(&path);
+        let (parent_path, name) = path.split();
         let parent = self.resolve_dir(parent_path.to_owned())?;
-        let name = name.to_owned();
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists(
-                self.make_path(&parent, &name),
+                self.resolve_dir_path(&parent).join(name),
             ));
         }
         let dir = Dir {
@@ -149,12 +131,11 @@ impl AbstractExecutor {
     }
 
     pub fn create(&mut self, path: PathName, mode: Mode) -> Result<FileIndex> {
-        let (parent_path, name) = split_path(&path);
-        let name = name.to_owned();
+        let (parent_path, name) = path.split();
         let parent = self.resolve_dir(parent_path.to_owned())?;
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists(
-                self.make_path(&parent, &name),
+                self.resolve_dir_path(&parent).join(name),
             ));
         }
         let mut parents = HashSet::new();
@@ -166,7 +147,7 @@ impl AbstractExecutor {
             .children
             .insert(name.clone(), Node::FILE(file_idx));
         self.recording.push(Operation::CREATE {
-            path: self.make_path(&parent, &name),
+            path: self.resolve_dir_path(&parent).join(name),
             mode,
         });
         self.nodes_created += 1;
@@ -175,12 +156,12 @@ impl AbstractExecutor {
 
     pub fn hardlink(&mut self, old_path: PathName, new_path: PathName) -> Result<FileIndex> {
         let old_file = self.resolve_file(old_path)?;
-        let (parent_path, name) = split_path(&new_path);
+        let (parent_path, name) = new_path.split();
         let name = name.to_owned();
         let parent = self.resolve_dir(parent_path.to_owned())?;
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists(
-                self.make_path(&parent, &name),
+                self.resolve_dir_path(&parent).join(name),
             ));
         }
         let node = &Node::FILE(old_file.to_owned());
@@ -191,7 +172,7 @@ impl AbstractExecutor {
         parent_dir
             .children
             .insert(name.clone(), Node::FILE(old_file.to_owned()));
-        let new_path = self.make_path(&parent, &name);
+        let new_path = self.resolve_dir_path(&parent).join(name);
         self.recording
             .push(Operation::HARDLINK { old_path, new_path });
         self.nodes_created += 1;
@@ -245,10 +226,10 @@ impl AbstractExecutor {
     }
 
     pub fn resolve_node(&self, path: PathName) -> Result<Node> {
-        if path.is_empty() || !path.starts_with('/') || (path != "/" && path.ends_with('/')) {
+        if !path.is_valid() {
             return Err(ExecutorError::InvalidPath(path));
         }
-        let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+        let segments: Vec<&str> = path.segments();
         let mut last = Node::DIR(AbstractExecutor::root_index());
         let mut path = String::new();
         for segment in &segments {
@@ -256,12 +237,12 @@ impl AbstractExecutor {
             path.push_str(segment);
             let dir = match last {
                 Node::DIR(dir_index) => self.dir(&dir_index),
-                _ => return Err(ExecutorError::NotADir(path)),
+                _ => return Err(ExecutorError::NotADir(path.into())),
             };
             last = dir
                 .children
                 .get(segment.to_owned())
-                .ok_or(ExecutorError::NotFound(path.clone()))?
+                .ok_or(ExecutorError::NotFound(path.clone().into()))?
                 .clone();
         }
         Ok(last)
@@ -285,15 +266,6 @@ impl AbstractExecutor {
         DirIndex(0)
     }
 
-    pub fn make_path(&self, parent: &DirIndex, name: &Name) -> PathName {
-        if *parent == AbstractExecutor::root_index() {
-            format!("/{}", name)
-        } else {
-            let parent_path = self.resolve_dir_path(&parent);
-            format!("{}/{}", parent_path, name)
-        }
-    }
-
     pub fn resolve_file_path(&self, file_idx: &FileIndex) -> Vec<PathName> {
         let mut paths = vec![];
         let file = self.file(file_idx);
@@ -302,7 +274,7 @@ impl AbstractExecutor {
                 .children
                 .iter()
                 .filter(|(_, node)| **node == Node::FILE(file_idx.to_owned()))
-                .for_each(|(name, _)| paths.push(self.make_path(dir, name)));
+                .for_each(|(name, _)| paths.push(self.resolve_dir_path(dir).join(name.clone())));
         }
         paths.sort();
         paths
@@ -328,7 +300,7 @@ impl AbstractExecutor {
             }
         }
         segments.reverse();
-        "/".to_owned() + segments.join("/").as_str()
+        ("/".to_owned() + segments.join("/").as_str()).into()
     }
 
     pub fn resolve_path(&self, node: &Node) -> Vec<PathName> {
@@ -345,19 +317,19 @@ impl AbstractExecutor {
             files: vec![],
         };
         let mut queue: VecDeque<(PathName, &DirIndex)> = VecDeque::new();
-        queue.push_back(("/".to_owned(), &root));
-        alive.dirs.push("/".to_owned());
+        queue.push_back(("/".into(), &root));
+        alive.dirs.push("/".into());
         while let Some((path, idx)) = queue.pop_front() {
             let dir = self.dir(idx);
             for (name, node) in dir.children.iter() {
                 match node {
                     Node::DIR(idx) => {
-                        let path = join_path(path.clone(), name.to_owned());
+                        let path = path.join(name.to_owned());
                         queue.push_back((path.clone(), idx));
                         alive.dirs.push(path.clone());
                     }
                     Node::FILE(_) => {
-                        alive.files.push(join_path(path.clone(), name.to_owned()));
+                        alive.files.push(path.join(name.to_owned()));
                     }
                 }
             }
@@ -377,7 +349,7 @@ mod tests {
         let exec = AbstractExecutor::new();
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".to_owned()],
+                dirs: vec!["/".into()],
                 files: vec![]
             },
             exec.alive()
@@ -389,19 +361,19 @@ mod tests {
         let mut exec = AbstractExecutor::new();
         assert_eq!(
             Err(ExecutorError::RootRemovalForbidden),
-            exec.remove("/".to_owned())
+            exec.remove("/".into())
         );
     }
 
     #[test]
     fn test_mkdir() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.mkdir("/foobar".to_owned(), vec![]).unwrap();
+        let foo = exec.mkdir("/foobar".into(), vec![]).unwrap();
         assert_eq!(Node::DIR(foo), *exec.root().children.get("foobar").unwrap());
         assert_eq!(
             Workload {
                 ops: vec![Operation::MKDIR {
-                    path: "/foobar".to_owned(),
+                    path: "/foobar".into(),
                     mode: vec![],
                 }],
             },
@@ -409,7 +381,7 @@ mod tests {
         );
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".to_owned(), "/foobar".to_owned()],
+                dirs: vec!["/".into(), "/foobar".into()],
                 files: vec![]
             },
             exec.alive()
@@ -421,32 +393,32 @@ mod tests {
     #[test]
     fn test_mkdir_name_exists() {
         let mut exec = AbstractExecutor::new();
-        exec.mkdir("/foobar".to_owned(), vec![]).unwrap();
+        exec.mkdir("/foobar".into(), vec![]).unwrap();
         assert_eq!(
-            Err(ExecutorError::NameAlreadyExists("/foobar".to_owned())),
-            exec.mkdir("/foobar".to_owned(), vec![])
+            Err(ExecutorError::NameAlreadyExists("/foobar".into())),
+            exec.mkdir("/foobar".into(), vec![])
         );
     }
 
     #[test]
     fn test_create() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.create("/foobar".to_owned(), vec![]).unwrap();
+        let foo = exec.create("/foobar".into(), vec![]).unwrap();
         assert_eq!(
             Node::FILE(foo),
             *exec.root().children.get("foobar").unwrap()
         );
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".to_owned()],
-                files: vec!["/foobar".to_owned()]
+                dirs: vec!["/".into()],
+                files: vec!["/foobar".into()]
             },
             exec.alive()
         );
         assert_eq!(
             Workload {
                 ops: vec![Operation::CREATE {
-                    path: "/foobar".to_owned(),
+                    path: "/foobar".into(),
                     mode: vec![],
                 }]
             },
@@ -459,35 +431,35 @@ mod tests {
     #[test]
     fn test_create_name_exists() {
         let mut exec = AbstractExecutor::new();
-        exec.create("/foobar".to_owned(), vec![]).unwrap();
+        exec.create("/foobar".into(), vec![]).unwrap();
         assert_eq!(
-            Err(ExecutorError::NameAlreadyExists("/foobar".to_owned())),
-            exec.create("/foobar".to_owned(), vec![])
+            Err(ExecutorError::NameAlreadyExists("/foobar".into())),
+            exec.create("/foobar".into(), vec![])
         );
     }
 
     #[test]
     fn test_remove_file() {
         let mut exec = AbstractExecutor::new();
-        exec.create("/foobar".to_owned(), vec![]).unwrap();
-        let boo = exec.create("/boo".to_owned(), vec![]).unwrap();
+        exec.create("/foobar".into(), vec![]).unwrap();
+        let boo = exec.create("/boo".into(), vec![]).unwrap();
 
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".to_owned()],
-                files: vec!["/boo".to_owned(), "/foobar".to_owned()]
+                dirs: vec!["/".into()],
+                files: vec!["/boo".into(), "/foobar".into()]
             },
             exec.alive()
         );
 
-        exec.remove("/foobar".to_owned()).unwrap();
+        exec.remove("/foobar".into()).unwrap();
 
         assert_eq!(1, exec.root().children.len());
         assert_eq!(Node::FILE(boo), *exec.root().children.get("boo").unwrap());
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".to_owned()],
-                files: vec!["/boo".to_owned()]
+                dirs: vec!["/".into()],
+                files: vec!["/boo".into()]
             },
             exec.alive()
         );
@@ -495,15 +467,15 @@ mod tests {
             Workload {
                 ops: vec![
                     Operation::CREATE {
-                        path: "/foobar".to_owned(),
+                        path: "/foobar".into(),
                         mode: vec![],
                     },
                     Operation::CREATE {
-                        path: "/boo".to_owned(),
+                        path: "/boo".into(),
                         mode: vec![],
                     },
                     Operation::REMOVE {
-                        path: "/foobar".to_owned(),
+                        path: "/foobar".into(),
                     }
                 ],
             },
@@ -516,17 +488,15 @@ mod tests {
     #[test]
     fn test_hardlink() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.create("/foo".to_owned(), vec![]).unwrap();
-        let bar = exec.mkdir("/bar".to_owned(), vec![]).unwrap();
-        let boo = exec
-            .hardlink("/foo".to_owned(), "/bar/boo".to_owned())
-            .unwrap();
+        let foo = exec.create("/foo".into(), vec![]).unwrap();
+        let bar = exec.mkdir("/bar".into(), vec![]).unwrap();
+        let boo = exec.hardlink("/foo".into(), "/bar/boo".into()).unwrap();
 
         assert_eq!(foo, boo);
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".to_owned(), "/bar".to_owned()],
-                files: vec!["/bar/boo".to_owned(), "/foo".to_owned()]
+                dirs: vec!["/".into(), "/bar".into()],
+                files: vec!["/bar/boo".into(), "/foo".into()]
             },
             exec.alive()
         );
@@ -550,16 +520,16 @@ mod tests {
             Workload {
                 ops: vec![
                     Operation::CREATE {
-                        path: "/foo".to_owned(),
+                        path: "/foo".into(),
                         mode: vec![],
                     },
                     Operation::MKDIR {
-                        path: "/bar".to_owned(),
+                        path: "/bar".into(),
                         mode: vec![],
                     },
                     Operation::HARDLINK {
-                        old_path: "/foo".to_owned(),
-                        new_path: "/bar/boo".to_owned(),
+                        old_path: "/foo".into(),
+                        new_path: "/bar/boo".into(),
                     }
                 ],
             },
@@ -572,14 +542,14 @@ mod tests {
     #[test]
     fn test_remove_hardlink() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.create("/foo".to_owned(), vec![]).unwrap();
-        exec.hardlink("/foo".to_owned(), "/bar".to_owned()).unwrap();
-        exec.remove("/bar".to_owned()).unwrap();
+        let foo = exec.create("/foo".into(), vec![]).unwrap();
+        exec.hardlink("/foo".into(), "/bar".into()).unwrap();
+        exec.remove("/bar".into()).unwrap();
 
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".to_owned()],
-                files: vec!["/foo".to_owned()]
+                dirs: vec!["/".into()],
+                files: vec!["/foo".into()]
             },
             exec.alive()
         );
@@ -594,15 +564,15 @@ mod tests {
             Workload {
                 ops: vec![
                     Operation::CREATE {
-                        path: "/foo".to_owned(),
+                        path: "/foo".into(),
                         mode: vec![],
                     },
                     Operation::HARDLINK {
-                        old_path: "/foo".to_owned(),
-                        new_path: "/bar".to_owned(),
+                        old_path: "/foo".into(),
+                        new_path: "/bar".into(),
                     },
                     Operation::REMOVE {
-                        path: "/bar".to_owned(),
+                        path: "/bar".into(),
                     }
                 ],
             },
@@ -615,46 +585,46 @@ mod tests {
     #[test]
     fn test_remove_hardlink_dir() {
         let mut exec = AbstractExecutor::new();
-        let zero = exec.create("/0".to_owned(), vec![]).unwrap();
-        exec.mkdir("/1".to_owned(), vec![]).unwrap();
-        exec.mkdir("/1/2".to_owned(), vec![]).unwrap();
-        exec.hardlink("/0".to_owned(), "/1/2/3".to_owned()).unwrap();
-        exec.remove("/1".to_owned()).unwrap();
-        assert_eq!(vec!["/0"], exec.resolve_file_path(&zero));
+        let zero = exec.create("/0".into(), vec![]).unwrap();
+        exec.mkdir("/1".into(), vec![]).unwrap();
+        exec.mkdir("/1/2".into(), vec![]).unwrap();
+        exec.hardlink("/0".into(), "/1/2/3".into()).unwrap();
+        exec.remove("/1".into()).unwrap();
+        assert_eq!(vec![PathName::from("/0")], exec.resolve_file_path(&zero));
     }
 
     #[test]
     fn test_hardlink_name_exists() {
         let mut exec = AbstractExecutor::new();
-        exec.create("/foo".to_owned(), vec![]).unwrap();
-        exec.create("/bar".to_owned(), vec![]).unwrap();
+        exec.create("/foo".into(), vec![]).unwrap();
+        exec.create("/bar".into(), vec![]).unwrap();
         assert_eq!(
-            Err(ExecutorError::NameAlreadyExists("/foo".to_owned())),
-            exec.hardlink("/bar".to_owned(), "/foo".to_owned())
+            Err(ExecutorError::NameAlreadyExists("/foo".into())),
+            exec.hardlink("/bar".into(), "/foo".into())
         );
     }
 
     #[test]
     fn test_remove_dir() {
         let mut exec = AbstractExecutor::new();
-        exec.mkdir("/foobar".to_owned(), vec![]).unwrap();
-        let boo = exec.mkdir("/boo".to_owned(), vec![]).unwrap();
+        exec.mkdir("/foobar".into(), vec![]).unwrap();
+        let boo = exec.mkdir("/boo".into(), vec![]).unwrap();
 
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".to_owned(), "/boo".to_owned(), "/foobar".to_owned()],
+                dirs: vec!["/".into(), "/boo".into(), "/foobar".into()],
                 files: vec![]
             },
             exec.alive()
         );
 
-        exec.remove("/foobar".to_owned()).unwrap();
+        exec.remove("/foobar".into()).unwrap();
 
         assert_eq!(1, exec.root().children.len());
         assert_eq!(Node::DIR(boo), *exec.root().children.get("boo").unwrap());
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".to_owned(), "/boo".to_owned()],
+                dirs: vec!["/".into(), "/boo".into()],
                 files: vec![]
             },
             exec.alive()
@@ -663,15 +633,15 @@ mod tests {
             Workload {
                 ops: vec![
                     Operation::MKDIR {
-                        path: "/foobar".to_owned(),
+                        path: "/foobar".into(),
                         mode: vec![],
                     },
                     Operation::MKDIR {
-                        path: "/boo".to_owned(),
+                        path: "/boo".into(),
                         mode: vec![],
                     },
                     Operation::REMOVE {
-                        path: "/foobar".to_owned(),
+                        path: "/foobar".into(),
                     }
                 ],
             },
@@ -684,18 +654,27 @@ mod tests {
     #[test]
     fn test_resolve_path() {
         let mut exec = AbstractExecutor::new();
-        let foo = exec.mkdir("/foo".to_owned(), vec![]).unwrap();
-        let bar = exec.mkdir("/foo/bar".to_owned(), vec![]).unwrap();
-        let boo = exec.create("/foo/bar/boo".to_owned(), vec![]).unwrap();
-        exec.hardlink("/foo/bar/boo".to_owned(), "/zoo".to_owned())
-            .unwrap();
-        exec.hardlink("/foo/bar/boo".to_owned(), "/foo/bar/moo".to_owned())
+        let foo = exec.mkdir("/foo".into(), vec![]).unwrap();
+        let bar = exec.mkdir("/foo/bar".into(), vec![]).unwrap();
+        let boo = exec.create("/foo/bar/boo".into(), vec![]).unwrap();
+        exec.hardlink("/foo/bar/boo".into(), "/zoo".into()).unwrap();
+        exec.hardlink("/foo/bar/boo".into(), "/foo/bar/moo".into())
             .unwrap();
 
-        assert_eq!(vec!["/foo"], exec.resolve_path(&Node::DIR(foo)));
-        assert_eq!(vec!["/foo/bar"], exec.resolve_path(&Node::DIR(bar)));
         assert_eq!(
-            vec!["/foo/bar/boo", "/foo/bar/moo", "/zoo"],
+            vec![PathName::from("/foo")],
+            exec.resolve_path(&Node::DIR(foo))
+        );
+        assert_eq!(
+            vec![PathName::from("/foo/bar")],
+            exec.resolve_path(&Node::DIR(bar))
+        );
+        assert_eq!(
+            vec![
+                PathName::from("/foo/bar/boo"),
+                PathName::from("/foo/bar/moo"),
+                PathName::from("/zoo")
+            ],
             exec.resolve_path(&Node::FILE(boo))
         );
         assert_eq!(5, exec.nodes_created);
@@ -707,34 +686,31 @@ mod tests {
         let mut exec = AbstractExecutor::new();
         assert_eq!(
             Node::DIR(AbstractExecutor::root_index()),
-            exec.resolve_node("/".to_owned()).unwrap()
+            exec.resolve_node("/".into()).unwrap()
         );
-        let foo = exec.mkdir("/foo".to_owned(), vec![]).unwrap();
-        let bar = exec.mkdir("/foo/bar".to_owned(), vec![]).unwrap();
-        let boo = exec.create("/foo/bar/boo".to_owned(), vec![]).unwrap();
+        let foo = exec.mkdir("/foo".into(), vec![]).unwrap();
+        let bar = exec.mkdir("/foo/bar".into(), vec![]).unwrap();
+        let boo = exec.create("/foo/bar/boo".into(), vec![]).unwrap();
         assert_eq!(
-            Err(ExecutorError::InvalidPath("".to_owned())),
-            exec.resolve_node("".to_owned())
-        );
-        assert_eq!(
-            Err(ExecutorError::InvalidPath("foo".to_owned())),
-            exec.resolve_node("foo".to_owned())
+            Err(ExecutorError::InvalidPath("".into())),
+            exec.resolve_node("".into())
         );
         assert_eq!(
-            Err(ExecutorError::InvalidPath("/foo/".to_owned())),
-            exec.resolve_node("/foo/".to_owned())
+            Err(ExecutorError::InvalidPath("foo".into())),
+            exec.resolve_node("foo".into())
         );
         assert_eq!(
-            Node::DIR(foo),
-            exec.resolve_node("/foo".to_owned()).unwrap()
+            Err(ExecutorError::InvalidPath("/foo/".into())),
+            exec.resolve_node("/foo/".into())
         );
+        assert_eq!(Node::DIR(foo), exec.resolve_node("/foo".into()).unwrap());
         assert_eq!(
             Node::DIR(bar),
-            exec.resolve_node("/foo/bar".to_owned()).unwrap()
+            exec.resolve_node("/foo/bar".into()).unwrap()
         );
         assert_eq!(
             Node::FILE(boo),
-            exec.resolve_node("/foo/bar/boo".to_owned()).unwrap()
+            exec.resolve_node("/foo/bar/boo".into()).unwrap()
         );
         assert_eq!(3, exec.nodes_created);
         test_replay(exec.recording);

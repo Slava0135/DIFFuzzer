@@ -1,13 +1,10 @@
-use rand::{
-    seq::SliceRandom,
-    Rng,
-};
+use rand::{seq::SliceRandom, Rng};
 
 use super::{
-    executor::{join_path, AbstractExecutor},
+    executor::AbstractExecutor,
     flags::ModeFlag,
-    node::{Name, PathName},
     operation::{OperationKind, OperationWeights},
+    pathname::{Name, PathName},
     workload::Workload,
 };
 
@@ -41,7 +38,7 @@ pub fn append_one(
     let alive_dirs_except_root: Vec<PathName> = alive
         .dirs
         .iter()
-        .filter(|d| **d != "/")
+        .filter(|d| **d != "/".into())
         .map(|d| d.clone())
         .collect();
     let mut ops = weights.clone();
@@ -54,14 +51,12 @@ pub fn append_one(
     match ops.weights.choose_weighted(rng, |item| item.1).unwrap().0 {
         OperationKind::MKDIR => {
             let path = alive.dirs.choose(rng).unwrap().to_owned();
-            executor
-                .mkdir(join_path(path, gen_name()), mode.clone())
-                .unwrap();
+            executor.mkdir(path.join(gen_name()), mode.clone()).unwrap();
         }
         OperationKind::CREATE => {
             let path = alive.dirs.choose(rng).unwrap().to_owned();
             executor
-                .create(join_path(path, gen_name()), mode.clone())
+                .create(path.join(gen_name()), mode.clone())
                 .unwrap();
         }
         OperationKind::REMOVE => {
@@ -76,7 +71,7 @@ pub fn append_one(
             let file_path = alive.files.choose(rng).unwrap().to_owned();
             let dir_path = alive.dirs.choose(rng).unwrap().to_owned();
             executor
-                .hardlink(file_path, join_path(dir_path, gen_name()))
+                .hardlink(file_path, dir_path.join(gen_name()))
                 .unwrap();
         }
     }
