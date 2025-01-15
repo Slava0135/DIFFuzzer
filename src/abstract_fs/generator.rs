@@ -3,6 +3,7 @@ use rand::{seq::SliceRandom, Rng};
 use super::{
     executor::AbstractExecutor,
     flags::ModeFlag,
+    node::FileDescriptor,
     operation::{OperationKind, OperationWeights},
     pathname::{Name, PathName},
     workload::Workload,
@@ -41,6 +42,18 @@ pub fn append_one(
         .filter(|d| **d != "/".into())
         .map(|d| d.clone())
         .collect();
+    let alive_closed_files: Vec<PathName> = alive
+        .files
+        .iter()
+        .filter(|(idx, _)| executor.file(idx).descriptor.is_none())
+        .map(|(_, p)| p.clone())
+        .collect();
+    let alive_open_files: Vec<FileDescriptor> = alive
+        .files
+        .iter()
+        .map(|(idx, _)| executor.file(idx).descriptor)
+        .flatten()
+        .collect();
     let mut ops = weights.clone();
     if alive_dirs_except_root.is_empty() {
         ops.weights.retain(|(op, _)| *op != OperationKind::REMOVE);
@@ -50,6 +63,12 @@ pub fn append_one(
     }
     if alive_dirs_except_root.is_empty() && alive.files.is_empty() {
         ops.weights.retain(|(op, _)| *op != OperationKind::RENAME);
+    }
+    if alive_closed_files.is_empty() {
+        ops.weights.retain(|(op, _)| *op != OperationKind::OPEN);
+    }
+    if alive_open_files.is_empty() {
+        ops.weights.retain(|(op, _)| *op != OperationKind::CLOSE);
     }
     match ops.weights.choose_weighted(rng, |item| item.1).unwrap().0 {
         OperationKind::MKDIR => {
@@ -63,30 +82,44 @@ pub fn append_one(
                 .unwrap();
         }
         OperationKind::REMOVE => {
-            let path = [alive_dirs_except_root, alive.files]
-                .concat()
-                .choose(rng)
-                .unwrap()
-                .to_owned();
+            let path = [
+                alive_dirs_except_root,
+                alive.files.iter().map(|(_, path)| path.clone()).collect(),
+            ]
+            .concat()
+            .choose(rng)
+            .unwrap()
+            .to_owned();
             executor.remove(path).unwrap();
         }
         OperationKind::HARDLINK => {
-            let file_path = alive.files.choose(rng).unwrap().to_owned();
+            let file_path = alive.files.choose(rng).unwrap().to_owned().1;
             let dir_path = alive.dirs.choose(rng).unwrap().to_owned();
             executor
                 .hardlink(file_path, dir_path.join(gen_name()))
                 .unwrap();
         }
         OperationKind::RENAME => {
-            let old_path = [alive_dirs_except_root, alive.files]
-                .concat()
-                .choose(rng)
-                .unwrap()
-                .to_owned();
+            let old_path = [
+                alive_dirs_except_root,
+                alive.files.iter().map(|(_, path)| path.clone()).collect(),
+            ]
+            .concat()
+            .choose(rng)
+            .unwrap()
+            .to_owned();
             let new_path = alive.dirs.choose(rng).unwrap().to_owned();
             executor
                 .rename(old_path, new_path.join(gen_name()))
                 .unwrap();
+        }
+        OperationKind::OPEN => {
+            let path = alive_closed_files.choose(rng).unwrap().to_owned();
+            executor.open(path).unwrap();
+        }
+        OperationKind::CLOSE => {
+            let des = alive_open_files.choose(rng).unwrap().to_owned();
+            executor.close(des).unwrap();
         }
     }
 }

@@ -48,7 +48,7 @@ pub struct AbstractExecutor {
 #[derive(Debug, PartialEq, Eq)]
 pub struct AliveNodes {
     pub dirs: Vec<PathName>,
-    pub files: Vec<PathName>,
+    pub files: Vec<(FileIndex, PathName)>,
 }
 
 impl AbstractExecutor {
@@ -215,7 +215,7 @@ impl AbstractExecutor {
         self.dirs.get_mut(idx.0).unwrap()
     }
 
-    fn file(&self, idx: &FileIndex) -> &File {
+    pub fn file(&self, idx: &FileIndex) -> &File {
         self.files.get(idx.0).unwrap()
     }
 
@@ -290,8 +290,8 @@ impl AbstractExecutor {
                         queue.push_back((path.clone(), idx));
                         alive.dirs.push(path.clone());
                     }
-                    Node::FILE(_) => {
-                        alive.files.push(path.join(name.to_owned()));
+                    Node::FILE(idx) => {
+                        alive.files.push((idx.clone(), path.join(name.to_owned())));
                     }
                 }
             }
@@ -372,7 +372,7 @@ mod tests {
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
-                files: vec!["/foobar".into()]
+                files: vec![(foo, "/foobar".into())]
             },
             exec.alive()
         );
@@ -401,13 +401,13 @@ mod tests {
     #[test]
     fn test_remove_file() {
         let mut exec = AbstractExecutor::new();
-        exec.create("/foobar".into(), vec![]).unwrap();
+        let foo = exec.create("/foobar".into(), vec![]).unwrap();
         let boo = exec.create("/boo".into(), vec![]).unwrap();
 
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
-                files: vec!["/boo".into(), "/foobar".into()]
+                files: vec![(foo, "/foobar".into()), (boo, "/boo".into())]
             },
             exec.alive()
         );
@@ -419,7 +419,7 @@ mod tests {
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
-                files: vec!["/boo".into()]
+                files: vec![(boo, "/boo".into())]
             },
             exec.alive()
         );
@@ -455,7 +455,7 @@ mod tests {
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into(), "/bar".into()],
-                files: vec!["/bar/boo".into(), "/foo".into()]
+                files: vec![(boo, "/bar/boo".into()), (foo, "/foo".into())]
             },
             exec.alive()
         );
@@ -494,14 +494,14 @@ mod tests {
     #[test]
     fn test_remove_hardlink() {
         let mut exec = AbstractExecutor::new();
-        exec.create("/foo".into(), vec![]).unwrap();
+        let foo = exec.create("/foo".into(), vec![]).unwrap();
         exec.hardlink("/foo".into(), "/bar".into()).unwrap();
         exec.remove("/bar".into()).unwrap();
 
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
-                files: vec!["/foo".into()]
+                files: vec![(foo, "/foo".into())]
             },
             exec.alive()
         );
@@ -605,12 +605,12 @@ mod tests {
     #[test]
     fn test_rename_file() {
         let mut exec = AbstractExecutor::new();
-        exec.create("/foo".into(), vec![]).unwrap();
+        let foo = exec.create("/foo".into(), vec![]).unwrap();
         exec.rename("/foo".into(), "/bar".into()).unwrap();
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
-                files: vec!["/bar".into()]
+                files: vec![(foo, "/bar".into())]
             },
             exec.alive()
         );

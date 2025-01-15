@@ -39,6 +39,8 @@ pub enum OperationKind {
     REMOVE,
     HARDLINK,
     RENAME,
+    OPEN,
+    CLOSE,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -59,6 +61,8 @@ impl OperationWeights {
                 (OperationKind::REMOVE, 100),
                 (OperationKind::HARDLINK, 100),
                 (OperationKind::RENAME, 100),
+                (OperationKind::OPEN, 100),
+                (OperationKind::CLOSE, 100),
             ],
         }
     }
