@@ -16,7 +16,6 @@ pub struct File;
 
 #[derive(Debug, Clone)]
 pub struct Dir {
-    pub parent: Option<DirIndex>,
     pub children: HashMap<Name, Node>,
 }
 

@@ -46,7 +46,6 @@ impl AbstractExecutor {
     pub fn new() -> Self {
         AbstractExecutor {
             dirs: vec![Dir {
-                parent: None,
                 children: HashMap::new(),
             }],
             files: vec![],
@@ -74,7 +73,6 @@ impl AbstractExecutor {
             return Err(ExecutorError::NameAlreadyExists(path));
         }
         let dir = Dir {
-            parent: Some(parent.clone()),
             children: HashMap::new(),
         };
         let dir_idx = DirIndex(self.dirs.len());
