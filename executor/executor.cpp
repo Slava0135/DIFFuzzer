@@ -63,6 +63,7 @@ const char *UNLINK = "UNLINK";
 const char *STAT = "STAT";
 const char *HARDLINK = "HARDLINK";
 const char *RENAME = "RENAME";
+const char *OPEN = "OPEN";
 
 enum ExitCode : int {
   OK = 0,
@@ -368,12 +369,35 @@ int do_hardlink(const char *old_path, const char *new_path) {
 }
 
 int do_rename(const char *old_path, const char *new_path) {
-    idx++;
-    int status = rename(patch_path(old_path).c_str(), patch_path(new_path).c_str());
-    if (status == -1) {
-        failure2(status, RENAME, old_path, new_path);
-    } else {
-        success(status, RENAME);
-    }
-    return status;
+  idx++;
+  int status =
+      rename(patch_path(old_path).c_str(), patch_path(new_path).c_str());
+  if (status == -1) {
+    failure2(status, RENAME, old_path, new_path);
+  } else {
+    success(status, RENAME);
+  }
+  return status;
+}
+
+int do_open(const char *path) {
+  idx++;
+  int fd = open(patch_path(path).c_str(), O_RDWR);
+  if (fd == -1) {
+    failure(fd, OPEN, path);
+  } else {
+    success(fd, OPEN);
+  }
+  return fd;
+}
+
+int do_close(int fd) {
+  idx++;
+  int status = close(fd);
+  if (status == -1) {
+    failure(status, CLOSE, std::to_string(fd).c_str());
+  } else {
+    success(status, CLOSE);
+  }
+  return status;
 }
