@@ -21,7 +21,7 @@ impl Display for FileDescriptor {
 
 #[derive(Debug, Clone)]
 pub struct File {
-    pub is_open: bool,
+    pub descriptor: Option<FileDescriptor>,
 }
 
 #[derive(Debug, Clone)]

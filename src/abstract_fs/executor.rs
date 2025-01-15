@@ -100,7 +100,7 @@ impl AbstractExecutor {
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists(path));
         }
-        let file = File { is_open: false };
+        let file = File { descriptor: None };
         let file_idx = FileIndex(self.files.len());
         self.files.push(file);
         self.dir_mut(&parent)
@@ -150,13 +150,13 @@ impl AbstractExecutor {
     }
 
     pub fn open(&mut self, path: PathName) -> Result<FileDescriptor> {
+        let des = FileDescriptor(self.descriptors.len());
         let file_idx = self.resolve_file(path.clone())?;
         let file = self.file_mut(&file_idx);
-        if file.is_open {
+        if file.descriptor.is_some() {
             return Err(ExecutorError::FileAlreadyOpened(path));
         }
-        file.is_open = true;
-        let des = FileDescriptor(self.descriptors.len());
+        file.descriptor = Some(des);
         self.descriptors.push(file_idx);
         self.recording.push(Operation::OPEN { path, des });
         Ok(des)
@@ -168,10 +168,10 @@ impl AbstractExecutor {
             .get(des.0)
             .ok_or(ExecutorError::BadDescriptor(des, self.descriptors.len()))?;
         let file = self.file_mut(&file_idx.clone());
-        if !file.is_open {
+        if file.descriptor != Some(des) {
             return Err(ExecutorError::DescriptorWasClosed(des));
         }
-        file.is_open = false;
+        file.descriptor = None;
         self.recording.push(Operation::CLOSE { des });
         Ok(())
     }
@@ -682,10 +682,10 @@ mod tests {
         let foo = exec.create("/foo".into(), vec![]).unwrap();
         let des = exec.open("/foo".into()).unwrap();
         let file = exec.file(&foo);
-        assert_eq!(true, file.is_open);
+        assert_eq!(Some(des), file.descriptor);
         exec.close(des).unwrap();
         let file = exec.file(&foo);
-        assert_eq!(false, file.is_open);
+        assert_eq!(None, file.descriptor);
         assert_eq!(
             Workload {
                 ops: vec![
