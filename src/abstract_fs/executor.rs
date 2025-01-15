@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use super::{
     flags::Mode,
-    node::{Dir, DirIndex, File, FileIndex, Node},
+    node::{Dir, DirIndex, File, FileDescriptor, FileIndex, Node},
     operation::Operation,
     pathname::{Name, PathName},
     workload::Workload,
@@ -33,6 +33,9 @@ pub enum ExecutorError {
 pub struct AbstractExecutor {
     pub dirs: Vec<Dir>,
     pub files: Vec<File>,
+
+    pub descriptors: Vec<FileIndex>,
+
     pub recording: Workload,
 }
 
@@ -49,6 +52,7 @@ impl AbstractExecutor {
                 children: HashMap::new(),
             }],
             files: vec![],
+            descriptors: vec![],
             recording: Workload::new(),
         }
     }
@@ -90,7 +94,7 @@ impl AbstractExecutor {
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists(path));
         }
-        let file = File {};
+        let file = File { is_open: false };
         let file_idx = FileIndex(self.files.len());
         self.files.push(file);
         self.dir_mut(&parent)
@@ -139,6 +143,24 @@ impl AbstractExecutor {
         Ok(node)
     }
 
+    pub fn open(&mut self, path: PathName) -> Result<FileDescriptor> {
+        let file_idx = self.resolve_file(path.clone())?;
+        let file = self.file_mut(&file_idx);
+        file.is_open = true;
+        let des = FileDescriptor(self.descriptors.len());
+        self.descriptors.push(file_idx);
+        self.recording.push(Operation::OPEN { path });
+        Ok(des)
+    }
+
+    pub fn close(&mut self, des: FileDescriptor) -> Result<()> {
+        let file_idx = self.descriptors[des.0];
+        let file = self.file_mut(&file_idx);
+        file.is_open = false;
+        self.recording.push(Operation::CLOSE { des });
+        Ok(())
+    }
+
     pub fn replay(&mut self, workload: &Workload) -> Result<()> {
         for op in &workload.ops {
             match op {
@@ -154,6 +176,12 @@ impl AbstractExecutor {
                 }
                 Operation::RENAME { old_path, new_path } => {
                     self.rename(old_path.clone(), new_path.clone())?;
+                }
+                Operation::OPEN { path } => {
+                    self.open(path.clone())?;
+                }
+                Operation::CLOSE { des } => {
+                    self.close(des.clone())?;
                 }
             };
         }
@@ -631,6 +659,34 @@ mod tests {
         );
         exec.remove("/bar/baz".into()).unwrap();
         exec.rename("/foo".into(), "/bar".into()).unwrap();
+    }
+
+    #[test]
+    fn test_open_close_file() {
+        let mut exec = AbstractExecutor::new();
+        let foo = exec.create("/foo".into(), vec![]).unwrap();
+        let des = exec.open("/foo".into()).unwrap();
+        let file = exec.file(&foo);
+        assert_eq!(true, file.is_open);
+        exec.close(des).unwrap();
+        let file = exec.file(&foo);
+        assert_eq!(false, file.is_open);
+        assert_eq!(
+            Workload {
+                ops: vec![
+                    Operation::CREATE {
+                        path: "/foo".into(),
+                        mode: vec![]
+                    },
+                    Operation::OPEN {
+                        path: "/foo".into(),
+                    },
+                    Operation::CLOSE { des }
+                ]
+            },
+            exec.recording
+        );
+        test_replay(exec.recording);
     }
 
     #[test]

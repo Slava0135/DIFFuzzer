@@ -74,6 +74,12 @@ pub fn insert(
                     used_names.insert(segment);
                 }
             }
+            Operation::OPEN { path } => {
+                for segment in path.segments() {
+                    used_names.insert(segment);
+                }
+            }
+            Operation::CLOSE { des: _ } => {}
         }
     }
 

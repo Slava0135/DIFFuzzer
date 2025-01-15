@@ -33,6 +33,12 @@ impl Workload {
                         format!("do_rename(\"{}\", \"{}\");\n", old_path, new_path).as_str(),
                     );
                 }
+                Operation::OPEN { path: _ } => {
+                    todo!()
+                }
+                Operation::CLOSE { des: _ } => {
+                    todo!()
+                }
             }
         }
         result.push_str("}");

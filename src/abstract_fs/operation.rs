@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{flags::Mode, pathname::PathName};
+use super::{flags::Mode, node::FileDescriptor, pathname::PathName};
 
 #[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
 pub enum Operation {
@@ -22,6 +22,12 @@ pub enum Operation {
     RENAME {
         old_path: PathName,
         new_path: PathName,
+    },
+    OPEN {
+        path: PathName,
+    },
+    CLOSE {
+        des: FileDescriptor
     },
 }
 
