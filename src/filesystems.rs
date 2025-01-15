@@ -6,8 +6,9 @@ impl TryFrom<String> for &'static dyn FileSystemMount {
     type Error = String;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
+        let value = value.to_lowercase();
         for fs in FILESYSTEMS {
-            if fs.to_string() == value {
+            if fs.to_string().to_lowercase() == value {
                 return Ok(*fs);
             }
         }
