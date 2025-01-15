@@ -1,4 +1,17 @@
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
+
+use crate::mount::{btrfs::Btrfs, ext4::Ext4, f2fs::F2FS, mount::FileSystemMount};
+
+pub const FILESYSTEMS: &[&dyn FileSystemMount] = &[&Ext4 {}, &Btrfs {}, &F2FS {}];
+
+pub fn string_to_fs(s: String) -> &'static dyn FileSystemMount {
+    for fs in FILESYSTEMS {
+        if fs.to_string() == s {
+            return *fs;
+        }
+    }
+    panic!("unknown filesystem '{}'", s)
+}
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -16,7 +29,14 @@ pub struct Args {
 #[clap(rename_all = "kebab_case")]
 pub enum Mode {
     /// Run greybox fuzzing
-    Greybox,
+    Greybox {
+        /// First filesystem to test
+        #[arg(short, long)]
+        first_filesystem: String,
+        /// Second filesystem to test
+        #[arg(short, long)]
+        second_filesystem: String,
+    },
     /// Run single test
     Single {
         /// Place where results will be saved
@@ -27,12 +47,6 @@ pub enum Mode {
         path_to_test: String,
         /// Filesystem to test
         #[arg(short, long)]
-        filesystem: Filesystem,
+        filesystem: String,
     },
-}
-
-#[derive(ValueEnum, Debug, PartialEq, Clone)]
-pub enum Filesystem {
-    Ext4,
-    Btrfs,
 }

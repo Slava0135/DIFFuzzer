@@ -11,16 +11,16 @@ impl Display for F2FS {
 }
 
 impl FileSystemMount for F2FS {
-    fn mkfs_cmd() -> String {
+    fn mkfs_cmd(&self) -> String {
         "mkfs.f2fs".to_owned()
     }
-    fn mkfs_opts() -> Option<String> {
+    fn mkfs_opts(&self) -> Option<String> {
         Some("extra_attr,inode_checksum,sb_checksum,compression".to_owned())
     }
-    fn mount_t() -> String {
+    fn mount_t(&self) -> String {
         "f2fs".to_owned()
     }
-    fn mount_opts() -> Option<String> {
+    fn mount_opts(&self) -> Option<String> {
         Some("compress_algorithm=zstd:6,compress_chksum,atgc,gc_merge,lazytime".to_owned())
     }
 }

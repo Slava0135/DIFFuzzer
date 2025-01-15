@@ -25,11 +25,7 @@ use crate::{
 
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 
-pub struct Fuzzer<F, S>
-where
-    F: FileSystemMount,
-    S: FileSystemMount,
-{
+pub struct Fuzzer {
     corpus: Vec<Workload>,
     next_seed: usize,
 
@@ -54,8 +50,8 @@ where
 
     fst_fs_name: String,
     snd_fs_name: String,
-    fst_harness: Harness<F>,
-    snd_harness: Harness<S>,
+    fst_harness: Harness,
+    snd_harness: Harness,
 
     mutator: Mutator,
 
@@ -82,12 +78,12 @@ impl Stats {
     }
 }
 
-impl<F, S> Fuzzer<F, S>
-where
-    F: FileSystemMount,
-    S: FileSystemMount,
-{
-    pub fn new(config: Config, fst_mount: F, snd_mount: S) -> Self {
+impl Fuzzer {
+    pub fn new(
+        config: Config,
+        fst_mount: &'static dyn FileSystemMount,
+        snd_mount: &'static dyn FileSystemMount,
+    ) -> Self {
         info!("new greybox fuzzer");
 
         let temp_dir = setup_temp_dir();

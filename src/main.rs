@@ -1,11 +1,10 @@
 use std::{fs, path::Path};
 
-use args::Args;
+use args::{string_to_fs, Args};
 use clap::Parser;
 use config::Config;
 use greybox::fuzzer::Fuzzer;
 use log::info;
-use mount::{btrfs::Btrfs, ext4::Ext4};
 
 mod abstract_fs;
 mod args;
@@ -28,27 +27,25 @@ fn main() {
     let config: Config = toml::from_str(&config).expect("bad configuration");
 
     match args.mode {
-        args::Mode::Greybox => {
-            let mut fuzzer = Fuzzer::new(config, Ext4::new(), Btrfs::new());
+        args::Mode::Greybox {
+            first_filesystem: fst_filesystem,
+            second_filesystem: snd_filesystem,
+        } => {
+            let mut fuzzer = Fuzzer::new(
+                config,
+                string_to_fs(fst_filesystem),
+                string_to_fs(snd_filesystem),
+            );
             fuzzer.fuzz();
         }
         args::Mode::Single {
             save_to_dir,
             path_to_test,
             filesystem,
-        } => {
-            match filesystem {
-                args::Filesystem::Ext4 => single::run(
-                    Path::new(&path_to_test),
-                    Path::new(&save_to_dir),
-                    Ext4::new(),
-                ),
-                args::Filesystem::Btrfs => single::run(
-                    Path::new(&path_to_test),
-                    Path::new(&save_to_dir),
-                    Btrfs::new(),
-                ),
-            };
-        }
+        } => single::run(
+            Path::new(&path_to_test),
+            Path::new(&save_to_dir),
+            string_to_fs(filesystem),
+        ),
     }
 }

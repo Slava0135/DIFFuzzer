@@ -6,17 +6,17 @@ use crate::mount::mount::FileSystemMount;
 
 pub type ConsolePipe = Rc<RefCell<String>>;
 
-pub struct Harness<T: FileSystemMount> {
-    fs_mount: T,
+pub struct Harness {
+    fs_mount: &'static dyn FileSystemMount,
     fs_dir: Box<Path>,
     exec_dir: Box<Path>,
     stdout: ConsolePipe,
     stderr: ConsolePipe,
 }
 
-impl<T: FileSystemMount> Harness<T> {
+impl Harness {
     pub fn new(
-        fs_mount: T,
+        fs_mount: &'static dyn FileSystemMount,
         fs_dir: Box<Path>,
         exec_dir: Box<Path>,
         stdout: ConsolePipe,

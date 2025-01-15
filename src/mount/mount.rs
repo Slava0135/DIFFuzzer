@@ -30,8 +30,8 @@ pub trait FileSystemMount: Display {
             );
         }
 
-        let mut mkfs = Command::new(Self::mkfs_cmd());
-        if let Some(opts) = Self::mkfs_opts() {
+        let mut mkfs = Command::new(self.mkfs_cmd());
+        if let Some(opts) = self.mkfs_opts() {
             mkfs.arg("-O");
             mkfs.arg(opts);
         }
@@ -47,8 +47,8 @@ pub trait FileSystemMount: Display {
         }
 
         let mut mount = Command::new("mount");
-        mount.arg("-t").arg(Self::mount_t());
-        if let Some(opts) = Self::mount_opts() {
+        mount.arg("-t").arg(self.mount_t());
+        if let Some(opts) = self.mount_opts() {
             mount.arg("-o");
             mount.arg(opts);
         }
@@ -100,25 +100,25 @@ pub trait FileSystemMount: Display {
 
     /// Used in default implementation: `mkfs` command to make new FS.
     /// Example: `"mkfs.ext4"` or `"mkfs.btrfs"`
-    fn mkfs_cmd() -> String {
+    fn mkfs_cmd(&self) -> String {
         todo!()
     }
 
     /// Used in default implementation: `mkfs -O` argument.
     /// Example: `extra_attr,inode_checksum,sb_checksum,compression`
-    fn mkfs_opts() -> Option<String> {
+    fn mkfs_opts(&self) -> Option<String> {
         None
     }
 
     /// Used in default implementation: `mount -t` argument.
     /// Example: `"ext4"` or `"btrfs"`
-    fn mount_t() -> String {
+    fn mount_t(&self) -> String {
         todo!()
     }
 
     /// Used in default implementation: `mount -o` argument.
     /// Example: `compress_algorithm=zstd:6,compress_chksum,atgc,gc_merge,lazytime`
-    fn mount_opts() -> Option<String> {
+    fn mount_opts(&self) -> Option<String> {
         None
     }
 }
