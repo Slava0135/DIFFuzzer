@@ -29,7 +29,7 @@ fn main() {
 
     match args.mode {
         args::Mode::Greybox => {
-            let mut fuzzer = Fuzzer::new(config);
+            let mut fuzzer = Fuzzer::new(config, Ext4::new(), Btrfs::new());
             fuzzer.fuzz();
         }
         args::Mode::Single {

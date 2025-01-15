@@ -18,14 +18,18 @@ use crate::{
         objective::{console::ConsoleObjective, trace::TraceObjective},
     },
     harness::{ConsolePipe, Harness},
-    mount::{btrfs::Btrfs, ext4::Ext4},
+    mount::mount::FileSystemMount,
     save::{save_output, save_testcase},
     temp_dir::setup_temp_dir,
 };
 
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 
-pub struct Fuzzer {
+pub struct Fuzzer<F, S>
+where
+    F: FileSystemMount,
+    S: FileSystemMount,
+{
     corpus: Vec<Workload>,
     next_seed: usize,
 
@@ -50,8 +54,8 @@ pub struct Fuzzer {
 
     fst_fs_name: String,
     snd_fs_name: String,
-    fst_harness: Harness<Ext4>,
-    snd_harness: Harness<Btrfs>,
+    fst_harness: Harness<F>,
+    snd_harness: Harness<S>,
 
     mutator: Mutator,
 
@@ -78,8 +82,12 @@ impl Stats {
     }
 }
 
-impl Fuzzer {
-    pub fn new(config: Config) -> Self {
+impl<F, S> Fuzzer<F, S>
+where
+    F: FileSystemMount,
+    S: FileSystemMount,
+{
+    pub fn new(config: Config, fst_mount: F, snd_mount: S) -> Self {
         info!("new greybox fuzzer");
 
         let temp_dir = setup_temp_dir();
@@ -110,7 +118,6 @@ impl Fuzzer {
         );
         let console_objective = ConsoleObjective::new(fst_stdout.clone(), snd_stdout.clone());
 
-        let fst_mount = Ext4::new();
         let fst_fs_name = fst_mount.to_string();
         let fst_harness = Harness::new(
             fst_mount,
@@ -122,10 +129,10 @@ impl Fuzzer {
             fst_stdout.clone(),
             fst_stderr.clone(),
         );
-        let snd_mount = Btrfs::new();
+
         let snd_fs_name = snd_mount.to_string();
         let snd_harness = Harness::new(
-            Btrfs::new(),
+            snd_mount,
             Path::new("/mnt")
                 .join(snd_fs_name.to_lowercase())
                 .join("fstest")
