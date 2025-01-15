@@ -158,7 +158,7 @@ impl AbstractExecutor {
         file.is_open = true;
         let des = FileDescriptor(self.descriptors.len());
         self.descriptors.push(file_idx);
-        self.recording.push(Operation::OPEN { path });
+        self.recording.push(Operation::OPEN { path, des });
         Ok(des)
     }
 
@@ -192,7 +192,7 @@ impl AbstractExecutor {
                 Operation::RENAME { old_path, new_path } => {
                     self.rename(old_path.clone(), new_path.clone())?;
                 }
-                Operation::OPEN { path } => {
+                Operation::OPEN { path, des: _ } => {
                     self.open(path.clone())?;
                 }
                 Operation::CLOSE { des } => {
@@ -695,6 +695,7 @@ mod tests {
                     },
                     Operation::OPEN {
                         path: "/foo".into(),
+                        des
                     },
                     Operation::CLOSE { des }
                 ]

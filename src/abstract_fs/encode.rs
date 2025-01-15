@@ -1,9 +1,31 @@
-use super::{flags::Mode, operation::Operation, workload::Workload};
+use std::cmp::max;
+
+use super::{flags::Mode, node::FileDescriptor, operation::Operation, workload::Workload};
+
+fn descriptor_to_var(des: &FileDescriptor) -> String {
+    format!("fd_{}", des.0)
+}
 
 impl Workload {
     pub fn encode_c(&self) -> String {
         let mut result = String::new();
         result.push_str("#include \"executor.h\"\n");
+        let mut descriptors_n = 0;
+        for op in self.ops.iter() {
+            match op {
+                Operation::OPEN { path: _, des } => {
+                    descriptors_n = max(descriptors_n, des.0 + 1);
+                }
+                _ => {}
+            }
+        }
+        if descriptors_n > 0 {
+            let descriptors_vars: Vec<String> =
+                (0..descriptors_n).map(|it| format!("fd_{}", it)).collect();
+            result.push_str(format!("\nint {};\n\n", descriptors_vars.join(", ")).as_str());
+        } else {
+            result.push_str("\n// no descriptors\n\n");
+        }
         result.push_str("void test_workload()\n");
         result.push_str("{\n");
         for op in &self.ops {
@@ -33,11 +55,13 @@ impl Workload {
                         format!("do_rename(\"{}\", \"{}\");\n", old_path, new_path).as_str(),
                     );
                 }
-                Operation::OPEN { path: _ } => {
-                    todo!()
+                Operation::OPEN { path, des } => {
+                    result.push_str(
+                        format!("{} = do_open(\"{}\");\n", descriptor_to_var(des), path).as_str(),
+                    );
                 }
-                Operation::CLOSE { des: _ } => {
-                    todo!()
+                Operation::CLOSE { des } => {
+                    result.push_str(format!("do_close({});\n", descriptor_to_var(des)).as_str());
                 }
             }
         }
@@ -57,19 +81,42 @@ fn encode_mode(mode: &Mode) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::abstract_fs::flags::ModeFlag;
+    use crate::abstract_fs::{flags::ModeFlag, node::FileDescriptor};
 
     use super::*;
+
+    #[test]
+    fn test_encode_c_empty() {
+        let expected = r#"
+#include "executor.h"
+
+// no descriptors
+
+void test_workload()
+{
+}
+"#
+        .trim();
+        let actual = Workload { ops: vec![] }.encode_c();
+        assert_eq!(expected, actual);
+    }
 
     #[test]
     fn test_encode_c() {
         let expected = r#"
 #include "executor.h"
+
+int fd_0, fd_1;
+
 void test_workload()
 {
 do_mkdir("/foo", 0);
 do_create("/foo/bar", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+fd_0 = do_open("/foo/bar");
+do_close(fd_0);
 do_hardlink("/foo/bar", "/baz");
+fd_1 = do_open("/baz");
+do_close(fd_1);
 do_rename("/baz", "/gaz");
 do_remove("/foo");
 }
@@ -91,9 +138,23 @@ do_remove("/foo");
                     path: "/foo/bar".into(),
                     mode: mode.clone(),
                 },
+                Operation::OPEN {
+                    path: "/foo/bar".into(),
+                    des: FileDescriptor(0),
+                },
+                Operation::CLOSE {
+                    des: FileDescriptor(0),
+                },
                 Operation::HARDLINK {
                     old_path: "/foo/bar".into(),
                     new_path: "/baz".into(),
+                },
+                Operation::OPEN {
+                    path: "/baz".into(),
+                    des: FileDescriptor(1),
+                },
+                Operation::CLOSE {
+                    des: FileDescriptor(1),
                 },
                 Operation::RENAME {
                     old_path: "/baz".into(),

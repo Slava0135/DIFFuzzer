@@ -25,6 +25,7 @@ pub enum Operation {
     },
     OPEN {
         path: PathName,
+        des: FileDescriptor,
     },
     CLOSE {
         des: FileDescriptor
