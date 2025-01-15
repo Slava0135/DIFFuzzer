@@ -1,4 +1,5 @@
-use clap::{Parser, Subcommand};
+use crate::filesystems::filesystem_available;
+use clap::{builder::PossibleValuesParser, Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -19,9 +20,11 @@ pub enum Mode {
     Greybox {
         /// First filesystem to test
         #[arg(short, long)]
+        #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
         first_filesystem: String,
         /// Second filesystem to test
         #[arg(short, long)]
+        #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
         second_filesystem: String,
     },
     /// Run single test
@@ -34,6 +37,7 @@ pub enum Mode {
         path_to_test: String,
         /// Filesystem to test
         #[arg(short, long)]
+        #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
         filesystem: String,
     },
 }
