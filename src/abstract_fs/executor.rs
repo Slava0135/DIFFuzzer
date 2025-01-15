@@ -28,6 +28,8 @@ pub enum ExecutorError {
     InvalidPath(PathName),
     #[error("directory '{0}' is not empty")]
     DirNotEmpty(PathName),
+    #[error("bad descriptor '{0}' ({1} created)")]
+    BadDescriptor(FileDescriptor, usize),
 }
 
 pub struct AbstractExecutor {
@@ -154,8 +156,11 @@ impl AbstractExecutor {
     }
 
     pub fn close(&mut self, des: FileDescriptor) -> Result<()> {
-        let file_idx = self.descriptors[des.0];
-        let file = self.file_mut(&file_idx);
+        let file_idx = self
+            .descriptors
+            .get(des.0)
+            .ok_or(ExecutorError::BadDescriptor(des, self.descriptors.len()))?;
+        let file = self.file_mut(&file_idx.clone());
         file.is_open = false;
         self.recording.push(Operation::CLOSE { des });
         Ok(())
@@ -687,6 +692,13 @@ mod tests {
             exec.recording
         );
         test_replay(exec.recording);
+    }
+
+    #[test]
+    fn test_close_bad_descriptor() {
+        let mut exec = AbstractExecutor::new();
+        let des = FileDescriptor(0);
+        assert_eq!(Err(ExecutorError::BadDescriptor(des, 0)), exec.close(des));
     }
 
     #[test]
