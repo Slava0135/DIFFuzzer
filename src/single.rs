@@ -16,7 +16,7 @@ use crate::{
     temp_dir::setup_temp_dir,
 };
 
-pub fn run(test_path: &Path, save_to_dir: &Path, mount: impl FileSystemMount) {
+pub fn run(test_path: &Path, save_to_dir: &Path, mount: &'static dyn FileSystemMount) {
     info!("running single test");
 
     info!("reading testcase at '{}'", test_path.display());

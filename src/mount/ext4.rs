@@ -11,10 +11,10 @@ impl Display for Ext4 {
 }
 
 impl FileSystemMount for Ext4 {
-    fn mkfs_cmd() -> String {
+    fn mkfs_cmd(&self) -> String {
         "mkfs.ext4".to_owned()
     }
-    fn mount_t() -> String {
+    fn mount_t(&self) -> String {
         "ext4".to_owned()
     }
 }

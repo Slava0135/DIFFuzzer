@@ -13,10 +13,10 @@ use crate::harness::Harness;
 use crate::mount::mount::FileSystemMount;
 use crate::temp_dir::setup_temp_dir;
 
-pub fn fuzz<FS: FileSystemMount>(
+pub fn fuzz(
     count: usize,
-    fst_fs: FS,
-    snd_fs: FS,
+    fst_fs: &'static dyn FileSystemMount,
+    snd_fs: &'static dyn FileSystemMount,
     trace_len: usize,
     seed: u64,
     hasher: &Hasher,

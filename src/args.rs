@@ -1,4 +1,5 @@
-use clap::{Parser, Subcommand, ValueEnum};
+use crate::filesystems::filesystem_available;
+use clap::{builder::PossibleValuesParser, Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -16,7 +17,16 @@ pub struct Args {
 #[clap(rename_all = "kebab_case")]
 pub enum Mode {
     /// Run greybox fuzzing
-    Greybox,
+    Greybox {
+        /// First filesystem to test
+        #[arg(short, long)]
+        #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
+        first_filesystem: String,
+        /// Second filesystem to test
+        #[arg(short, long)]
+        #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
+        second_filesystem: String,
+    },
     /// Run single test
     Single {
         /// Place where results will be saved
@@ -27,12 +37,7 @@ pub enum Mode {
         path_to_test: String,
         /// Filesystem to test
         #[arg(short, long)]
-        filesystem: Filesystem,
+        #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
+        filesystem: String,
     },
-}
-
-#[derive(ValueEnum, Debug, PartialEq, Clone)]
-pub enum Filesystem {
-    Ext4,
-    Btrfs,
 }
