@@ -30,6 +30,8 @@ pub enum ExecutorError {
     DirNotEmpty(PathName),
     #[error("bad descriptor '{0}' ({1} created)")]
     BadDescriptor(FileDescriptor, usize),
+    #[error("descriptor '{0}' was already closed")]
+    DescriptorWasClosed(FileDescriptor),
 }
 
 pub struct AbstractExecutor {
@@ -161,6 +163,9 @@ impl AbstractExecutor {
             .get(des.0)
             .ok_or(ExecutorError::BadDescriptor(des, self.descriptors.len()))?;
         let file = self.file_mut(&file_idx.clone());
+        if !file.is_open {
+            return Err(ExecutorError::DescriptorWasClosed(des));
+        }
         file.is_open = false;
         self.recording.push(Operation::CLOSE { des });
         Ok(())
@@ -699,6 +704,18 @@ mod tests {
         let mut exec = AbstractExecutor::new();
         let des = FileDescriptor(0);
         assert_eq!(Err(ExecutorError::BadDescriptor(des, 0)), exec.close(des));
+    }
+
+    #[test]
+    fn test_close_twice() {
+        let mut exec = AbstractExecutor::new();
+        exec.create("/foo".into(), vec![]).unwrap();
+        let des = exec.open("/foo".into()).unwrap();
+        exec.close(des).unwrap();
+        assert_eq!(
+            Err(ExecutorError::DescriptorWasClosed(des)),
+            exec.close(des)
+        );
     }
 
     #[test]
