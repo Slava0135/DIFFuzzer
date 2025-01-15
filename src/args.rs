@@ -1,18 +1,5 @@
 use clap::{Parser, Subcommand};
 
-use crate::mount::{btrfs::Btrfs, ext4::Ext4, f2fs::F2FS, mount::FileSystemMount};
-
-pub const FILESYSTEMS: &[&dyn FileSystemMount] = &[&Ext4 {}, &Btrfs {}, &F2FS {}];
-
-pub fn string_to_fs(s: String) -> &'static dyn FileSystemMount {
-    for fs in FILESYSTEMS {
-        if fs.to_string() == s {
-            return *fs;
-        }
-    }
-    panic!("unknown filesystem '{}'", s)
-}
-
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 #[command(propagate_version = true)]

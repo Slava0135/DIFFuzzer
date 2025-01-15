@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use args::{string_to_fs, Args};
+use args::Args;
 use clap::Parser;
 use config::Config;
 use greybox::fuzzer::Fuzzer;
@@ -10,6 +10,7 @@ mod abstract_fs;
 mod args;
 mod blackbox;
 mod config;
+mod filesystems;
 mod greybox;
 mod harness;
 mod mount;
@@ -28,13 +29,13 @@ fn main() {
 
     match args.mode {
         args::Mode::Greybox {
-            first_filesystem: fst_filesystem,
-            second_filesystem: snd_filesystem,
+            first_filesystem,
+            second_filesystem,
         } => {
             let mut fuzzer = Fuzzer::new(
                 config,
-                string_to_fs(fst_filesystem),
-                string_to_fs(snd_filesystem),
+                first_filesystem.try_into().unwrap(),
+                second_filesystem.try_into().unwrap(),
             );
             fuzzer.fuzz();
         }
@@ -45,7 +46,7 @@ fn main() {
         } => single::run(
             Path::new(&path_to_test),
             Path::new(&save_to_dir),
-            string_to_fs(filesystem),
+            filesystem.try_into().unwrap(),
         ),
     }
 }
