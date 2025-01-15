@@ -11,6 +11,6 @@ impl TryFrom<String> for &'static dyn FileSystemMount {
                 return Ok(*fs);
             }
         }
-        Err("unknown filesystem '{}'".to_owned())
+        Err(format!("unknown filesystem '{}'", value))
     }
 }
