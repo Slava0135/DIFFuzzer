@@ -32,6 +32,8 @@ pub enum ExecutorError {
     BadDescriptor(FileDescriptor, usize),
     #[error("descriptor '{0}' was already closed")]
     DescriptorWasClosed(FileDescriptor),
+    #[error("file at '{0}' was already opened")]
+    FileAlreadyOpened(PathName),
 }
 
 pub struct AbstractExecutor {
@@ -150,6 +152,9 @@ impl AbstractExecutor {
     pub fn open(&mut self, path: PathName) -> Result<FileDescriptor> {
         let file_idx = self.resolve_file(path.clone())?;
         let file = self.file_mut(&file_idx);
+        if file.is_open {
+            return Err(ExecutorError::FileAlreadyOpened(path));
+        }
         file.is_open = true;
         let des = FileDescriptor(self.descriptors.len());
         self.descriptors.push(file_idx);
@@ -715,6 +720,17 @@ mod tests {
         assert_eq!(
             Err(ExecutorError::DescriptorWasClosed(des)),
             exec.close(des)
+        );
+    }
+
+    #[test]
+    fn test_open_twice() {
+        let mut exec = AbstractExecutor::new();
+        exec.create("/foo".into(), vec![]).unwrap();
+        exec.open("/foo".into()).unwrap();
+        assert_eq!(
+            Err(ExecutorError::FileAlreadyOpened("/foo".into())),
+            exec.open("/foo".into())
         );
     }
 
