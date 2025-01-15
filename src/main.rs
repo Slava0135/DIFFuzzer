@@ -5,11 +5,12 @@ use clap::Parser;
 use config::Config;
 use greybox::fuzzer::Fuzzer;
 use log::info;
-use rand::random;
 use mount::{btrfs::Btrfs, ext4::Ext4};
-use crate::blackbox::fuzzer::fuzz;
+use rand::random;
+use crate::blackbox::fuzzer::BlackBoxFuzzer;
 
 mod abstract_fs;
+mod abstract_fuzzer;
 mod args;
 mod blackbox;
 mod config;
@@ -46,9 +47,13 @@ fn main() {
             first_filesystem,
             second_filesystem,
             count,
-            trace_len
+            trace_len,
         } => {
             //todo: create fs instance from input data (without match if possible)
+            BlackBoxFuzzer::new(
+                Ext4::new(),
+                Btrfs::new()
+            ).fuzz(count, trace_len, random(), config);
         }
         args::Mode::Single {
             save_to_dir,
