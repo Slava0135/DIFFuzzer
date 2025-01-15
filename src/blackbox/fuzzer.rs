@@ -1,113 +1,89 @@
+use anyhow::Context;
 use log::{debug, info};
 use std::cell::RefCell;
-use std::{fs, io};
 use std::path::Path;
 use std::rc::Rc;
-use anyhow::Context;
+use std::time::Instant;
+use std::{fs, io};
 
 use rand::prelude::StdRng;
 use rand::SeedableRng;
 
 use crate::abstract_fs::generator::generate_new;
 use crate::abstract_fs::trace::TRACE_FILENAME;
+use crate::abstract_fs::types::Workload;
+use crate::abstract_fuzzer::fuzzer_data::FuzzData;
 use crate::config::Config;
-use crate::greybox::objective::console::ConsoleObjective;
-use crate::greybox::objective::trace::TraceObjective;
+
 use crate::harness::Harness;
 use crate::hasher::hasher::{get_diff, get_hash_for_dir};
 use crate::mount::mount::FileSystemMount;
+use crate::save::{save_output, save_testcase};
 use crate::temp_dir::setup_temp_dir;
 
-pub fn fuzz<FS1: FileSystemMount, FS2: FileSystemMount>(
-    count: usize,
-    fst_fs: FS1,
-    snd_fs: FS2,
-    trace_len: usize,
-    seed: u64,
-    config: Config,
-) {
-    info!("running blackbox fuzzing");
-    let mut rng = StdRng::seed_from_u64(seed);
 
-    let temp_dir = setup_temp_dir();
+pub struct BlackBoxFuzzer<FS1: FileSystemMount, FS2: FileSystemMount> {
+    data: FuzzData<FS1, FS2>,
+}
 
-    info!("setting up fuzzing components");
-    let test_dir = temp_dir.clone();
-    let exec_dir = temp_dir.join("exec");
+impl<FS1: FileSystemMount, FS2: FileSystemMount> BlackBoxFuzzer<FS1, FS2> {
+    pub fn new(fst_fs: FS1, snd_fs: FS2) -> Self {
+        Self {
+            data: FuzzData::new(fst_fs, snd_fs)
+        }
+    }
 
-    let fst_stdout = Rc::new(RefCell::new("".to_owned()));
-    let fst_stderr = Rc::new(RefCell::new("".to_owned()));
-    let snd_stdout = Rc::new(RefCell::new("".to_owned()));
-    let snd_stderr = Rc::new(RefCell::new("".to_owned()));
+    pub fn fuzz(
+        &mut self,
+        count: usize,
+        trace_len: usize,
+        seed: u64,
+        config: Config,
+    ) {
+        let mut rng = StdRng::seed_from_u64(seed);
 
-    let fst_exec_dir = temp_dir.join("fst_exec").into_boxed_path();
-    let snd_exec_dir = temp_dir.join("snd_exec").into_boxed_path();
+        for _ in 1..=count {
+            let workload = generate_new(&mut rng, trace_len, &config.operation_weights);
+            let wl_path = workload
+                .compile(&self.data.test_dir)
+                .with_context(|| "failed to compile test".to_string())
+                .unwrap();
 
-    let fst_fs_name = fst_fs.to_string();
-    let snd_fs_name = snd_fs.to_string();
+            debug!("running harness at '{}'", wl_path.display());
 
-    let fst_trace_path = fst_exec_dir.join(TRACE_FILENAME);
-    let snd_trace_path = snd_exec_dir.join(TRACE_FILENAME);
+            setup_dir(self.data.fst_exec_dir.as_ref())
+                .with_context(|| format!("failed to setup dir at '{}'", self.data.fst_exec_dir.display()))
+                .unwrap();
+            setup_dir(self.data.snd_exec_dir.as_ref())
+                .with_context(|| format!("failed to setup dir at '{}'", self.data.snd_exec_dir.display()))
+                .unwrap();
 
-    let mut trace_objective = TraceObjective::new(
-        fst_trace_path.clone().into_boxed_path(),
-        snd_trace_path.clone().into_boxed_path(),
-    );
-    let mut console_objective = ConsoleObjective::new(
-        fst_stdout.clone(),
-        fst_stderr.clone(),
-        snd_stdout.clone(),
-        snd_stderr.clone(),
-    );
+            self.data.fst_harness
+                .run(&wl_path)
+                .with_context(|| format!("failed to run first harness '{}'", self.data.fst_fs_name))
+                .unwrap();
+            self.data.snd_harness
+                .run(&wl_path)
+                .with_context(|| format!("failed to run second harness '{}'", self.data.snd_fs_name))
+                .unwrap();
 
-    let fst_harness = Harness::new(
-        fst_fs,
-        exec_dir.clone().into_boxed_path(),
-        fst_exec_dir.clone(),
-        fst_stdout,
-        fst_stderr,
-    );
-    let snd_harness = Harness::new(
-        snd_fs,
-        exec_dir.clone().into_boxed_path(),
-        snd_exec_dir.clone(),
-        snd_stdout,
-        snd_stderr,
-    );
+            let fst_hash = get_hash_for_dir(self.data.fst_exec_dir.as_ref(), seed, false, false); //todo: options
+            let snd_hash = get_hash_for_dir(self.data.snd_exec_dir.as_ref(), seed, false, false); //todo: options
 
+            let hash_diff_interesting = fst_hash != snd_hash;
+            debug!("doing objectives");
+            let console_is_interesting = self.data.console_objective
+                .is_interesting()
+                .with_context(|| format!("failed to do console objective")).unwrap();
+            let trace_is_interesting = self.data.trace_objective
+                .is_interesting()
+                .with_context(|| format!("failed to do trace objective")).unwrap();
 
-
-    for _ in 1..=count {
-        let workload = generate_new(&mut rng, trace_len, &config.operation_weights);
-        let wl_path = workload.compile(&test_dir)
-            .with_context(|| "failed to compile test".to_string()).unwrap();
-
-        setup_dir(fst_exec_dir.as_ref())
-            .with_context(|| format!("failed to setup dir at '{}'", fst_exec_dir.display())).unwrap();
-        setup_dir(snd_exec_dir.as_ref())
-            .with_context(|| format!("failed to setup dir at '{}'", snd_exec_dir.display())).unwrap();
-
-        fst_harness.run(&wl_path)
-            .with_context(|| format!("failed to run first harness '{}'", fst_fs_name)).unwrap();
-        snd_harness.run(&wl_path)
-            .with_context(|| format!("failed to run second harness '{}'", snd_fs_name)).unwrap();
-
-        let fst_hash = get_hash_for_dir(&fst_exec_dir, seed, false, false); //todo: options
-        let snd_hash = get_hash_for_dir(&snd_exec_dir, seed, false, false); //todo: options
-
-
-        let hash_diff_interesting = fst_hash != snd_hash;
-        // { get_diff(&fst_exec_dir, &snd_exec_dir, io::stdout(), false, false) }
-        debug!("doing objectives");
-        let console_is_interesting = console_objective
-            .is_interesting()
-            .with_context(|| format!("failed to do console objective"))?;
-        let trace_is_interesting = trace_objective
-            .is_interesting()
-            .with_context(|| format!("failed to do trace objective"))?;
-
-        if console_is_interesting || trace_is_interesting || hash_diff_interesting {
-            //todo: report crash
+            if console_is_interesting || trace_is_interesting || hash_diff_interesting {
+                self.data.report_crash(workload, &wl_path);
+                self.data.show_stats();
+                //todo: get_diff(&fst_exec_dir, &snd_exec_dir, io::stdout(), false, false)
+            }
         }
     }
 }
@@ -117,4 +93,3 @@ fn setup_dir(path: &Path) -> io::Result<()> {
     fs::remove_dir_all(path).unwrap_or(());
     fs::create_dir(path)
 }
-
