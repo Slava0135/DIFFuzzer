@@ -13,7 +13,13 @@ pub struct TraceRow {
     index: u32,
     command: String,
     return_code: i32,
-    errno: String,
+    errno: Errno,
+}
+
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
+pub struct Errno {
+    name: String,
+    code: i32,
 }
 
 pub const TRACE_FILENAME: &str = "trace.csv";
@@ -28,6 +34,8 @@ pub enum TraceError {
     InvalidColumnNumber,
     #[error("invalid integer format")]
     IntParse(ParseIntError),
+    #[error("invalid errno string '{0}'")]
+    InvalidErrno(String),
 }
 
 impl From<ParseIntError> for TraceError {
@@ -54,12 +62,25 @@ impl Trace {
             let index = columns[0].trim().parse()?;
             let command = columns[1].trim().to_owned();
             let return_code = columns[2].trim().parse()?;
-            let errno: String = columns[3].trim().to_owned();
+            let errno_string = columns[3].trim().to_owned();
+            let errno_parts: Vec<String> = errno_string
+                .split(&['(', ')'])
+                .map(|s| s.to_owned())
+                .collect();
+            let name = errno_parts
+                .get(0)
+                .ok_or(TraceError::InvalidErrno(errno_string.clone()))?
+                .clone();
+            let code: i32 = errno_parts
+                .get(1)
+                .ok_or(TraceError::InvalidErrno(errno_string.clone()))?
+                .parse()?;
+
             trace.rows.push(TraceRow {
                 index,
                 command,
                 return_code,
-                errno,
+                errno: Errno { name, code },
             });
         }
         Ok(trace)
@@ -115,16 +136,36 @@ Index,Command,ReturnCode,Errno
                         index: 1,
                         command: "Foo".to_owned(),
                         return_code: 42,
-                        errno: "Success(0)".to_owned(),
+                        errno: Errno {
+                            name: "Success".to_owned(),
+                            code: 0
+                        },
                     },
                     TraceRow {
                         index: 2,
                         command: "Bar".to_owned(),
                         return_code: -1,
-                        errno: "Error(42)".to_owned(),
+                        errno: Errno {
+                            name: "Error".to_owned(),
+                            code: 42
+                        },
                     },
                 ]
             }),
+            Trace::try_parse(trace.to_owned())
+        )
+    }
+
+    #[test]
+    fn test_invalid_errno_no_brackets() {
+        let trace = r#"
+        Index,Command,ReturnCode,Errno
+            1,    Foo,        42,Success 0
+            2,    Bar,        -1,Error(42)
+        "#
+        .trim();
+        assert_eq!(
+            Err(TraceError::InvalidErrno("Success 0".to_owned())),
             Trace::try_parse(trace.to_owned())
         )
     }
