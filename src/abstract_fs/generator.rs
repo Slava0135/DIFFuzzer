@@ -1,7 +1,7 @@
 use rand::{seq::SliceRandom, Rng};
 
 use super::{
-    executor::AbstractExecutor,
+    fs::AbstractFS,
     flags::ModeFlag,
     node::FileDescriptor,
     operation::{OperationKind, OperationWeights},
@@ -10,7 +10,7 @@ use super::{
 };
 
 pub fn generate_new(rng: &mut impl Rng, size: usize, weights: &OperationWeights) -> Workload {
-    let mut executor = AbstractExecutor::new();
+    let mut fs = AbstractFS::new();
     let mut name_idx: usize = 0;
     let mut gen_name = || {
         let name = name_idx.to_string();
@@ -18,14 +18,14 @@ pub fn generate_new(rng: &mut impl Rng, size: usize, weights: &OperationWeights)
         name
     };
     for _ in 0..size {
-        append_one(rng, &mut executor, &weights, &mut gen_name);
+        append_one(rng, &mut fs, &weights, &mut gen_name);
     }
-    executor.recording
+    fs.recording
 }
 
 pub fn append_one(
     rng: &mut impl Rng,
-    executor: &mut AbstractExecutor,
+    fs: &mut AbstractFS,
     weights: &OperationWeights,
     mut gen_name: impl FnMut() -> Name,
 ) {
@@ -35,7 +35,7 @@ pub fn append_one(
         ModeFlag::S_IROTH,
         ModeFlag::S_IXOTH,
     ];
-    let alive = executor.alive();
+    let alive = fs.alive();
     let alive_dirs_except_root: Vec<PathName> = alive
         .dirs
         .iter()
@@ -45,13 +45,13 @@ pub fn append_one(
     let alive_closed_files: Vec<PathName> = alive
         .files
         .iter()
-        .filter(|(idx, _)| executor.file(idx).descriptor.is_none())
+        .filter(|(idx, _)| fs.file(idx).descriptor.is_none())
         .map(|(_, p)| p.clone())
         .collect();
     let alive_open_files: Vec<FileDescriptor> = alive
         .files
         .iter()
-        .map(|(idx, _)| executor.file(idx).descriptor)
+        .map(|(idx, _)| fs.file(idx).descriptor)
         .flatten()
         .collect();
     let mut ops = weights.clone();
@@ -73,11 +73,11 @@ pub fn append_one(
     match ops.weights.choose_weighted(rng, |item| item.1).unwrap().0 {
         OperationKind::MKDIR => {
             let path = alive.dirs.choose(rng).unwrap().to_owned();
-            executor.mkdir(path.join(gen_name()), mode.clone()).unwrap();
+            fs.mkdir(path.join(gen_name()), mode.clone()).unwrap();
         }
         OperationKind::CREATE => {
             let path = alive.dirs.choose(rng).unwrap().to_owned();
-            executor
+            fs
                 .create(path.join(gen_name()), mode.clone())
                 .unwrap();
         }
@@ -90,12 +90,12 @@ pub fn append_one(
             .choose(rng)
             .unwrap()
             .to_owned();
-            executor.remove(path).unwrap();
+            fs.remove(path).unwrap();
         }
         OperationKind::HARDLINK => {
             let file_path = alive.files.choose(rng).unwrap().to_owned().1;
             let dir_path = alive.dirs.choose(rng).unwrap().to_owned();
-            executor
+            fs
                 .hardlink(file_path, dir_path.join(gen_name()))
                 .unwrap();
         }
@@ -115,17 +115,17 @@ pub fn append_one(
                 .map(|p| p.clone())
                 .collect();
             let new_path = alive_non_subdirectories.choose(rng).unwrap().to_owned();
-            executor
+            fs
                 .rename(old_path, new_path.join(gen_name()))
                 .unwrap();
         }
         OperationKind::OPEN => {
             let path = alive_closed_files.choose(rng).unwrap().to_owned();
-            executor.open(path).unwrap();
+            fs.open(path).unwrap();
         }
         OperationKind::CLOSE => {
             let des = alive_open_files.choose(rng).unwrap().to_owned();
-            executor.close(des).unwrap();
+            fs.close(des).unwrap();
         }
     }
 }

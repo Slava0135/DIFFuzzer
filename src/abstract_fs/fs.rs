@@ -10,10 +10,10 @@ use super::{
     workload::Workload,
 };
 
-type Result<T> = std::result::Result<T, ExecutorError>;
+type Result<T> = std::result::Result<T, FsError>;
 
 #[derive(Error, Debug, PartialEq, Eq)]
-pub enum ExecutorError {
+pub enum FsError {
     #[error("'{0}' is not a file")]
     NotAFile(PathName),
     #[error("'{0}' is not a dir")]
@@ -38,7 +38,7 @@ pub enum ExecutorError {
     RenameToSubdirectoryError(PathName, PathName),
 }
 
-pub struct AbstractExecutor {
+pub struct AbstractFS {
     pub dirs: Vec<Dir>,
     pub files: Vec<File>,
 
@@ -53,9 +53,9 @@ pub struct AliveNodes {
     pub files: Vec<(FileIndex, PathName)>,
 }
 
-impl AbstractExecutor {
+impl AbstractFS {
     pub fn new() -> Self {
-        AbstractExecutor {
+        AbstractFS {
             dirs: vec![Dir {
                 children: HashMap::new(),
             }],
@@ -67,13 +67,13 @@ impl AbstractExecutor {
 
     pub fn remove(&mut self, path: PathName) -> Result<()> {
         if path.is_root() {
-            return Err(ExecutorError::RootRemovalForbidden);
+            return Err(FsError::RootRemovalForbidden);
         }
         let (parent_path, name) = path.split();
         let parent_idx = self.resolve_dir(parent_path.to_owned())?;
         let parent = self.dir_mut(&parent_idx);
         if parent.children.remove(&name).is_none() {
-            return Err(ExecutorError::NotFound(path));
+            return Err(FsError::NotFound(path));
         }
         self.recording
             .push(Operation::REMOVE { path: path.clone() });
@@ -84,7 +84,7 @@ impl AbstractExecutor {
         let (parent_path, name) = path.split();
         let parent = self.resolve_dir(parent_path.to_owned())?;
         if self.name_exists(&parent, &name) {
-            return Err(ExecutorError::NameAlreadyExists(path));
+            return Err(FsError::NameAlreadyExists(path));
         }
         let dir = Dir {
             children: HashMap::new(),
@@ -102,7 +102,7 @@ impl AbstractExecutor {
         let (parent_path, name) = path.split();
         let parent = self.resolve_dir(parent_path.to_owned())?;
         if self.name_exists(&parent, &name) {
-            return Err(ExecutorError::NameAlreadyExists(path));
+            return Err(FsError::NameAlreadyExists(path));
         }
         let file = File { descriptor: None };
         let file_idx = FileIndex(self.files.len());
@@ -119,7 +119,7 @@ impl AbstractExecutor {
         let (parent_path, name) = new_path.split();
         let parent = self.resolve_dir(parent_path.to_owned())?;
         if self.name_exists(&parent, &name) {
-            return Err(ExecutorError::NameAlreadyExists(new_path));
+            return Err(FsError::NameAlreadyExists(new_path));
         }
         let parent_dir = self.dir_mut(&parent);
         parent_dir
@@ -132,11 +132,11 @@ impl AbstractExecutor {
 
     pub fn rename(&mut self, old_path: PathName, new_path: PathName) -> Result<Node> {
         if old_path.is_prefix_of(&new_path) {
-            return Err(ExecutorError::RenameToSubdirectoryError(old_path, new_path));
+            return Err(FsError::RenameToSubdirectoryError(old_path, new_path));
         }
         if let Ok(dir_idx) = self.resolve_dir(new_path.clone()) {
             if !self.dir(&dir_idx).children.is_empty() {
-                return Err(ExecutorError::DirNotEmpty(new_path));
+                return Err(FsError::DirNotEmpty(new_path));
             }
         }
         let node = self.resolve_node(old_path.clone())?;
@@ -161,7 +161,7 @@ impl AbstractExecutor {
         let file_idx = self.resolve_file(path.clone())?;
         let file = self.file_mut(&file_idx);
         if file.descriptor.is_some() {
-            return Err(ExecutorError::FileAlreadyOpened(path));
+            return Err(FsError::FileAlreadyOpened(path));
         }
         file.descriptor = Some(des);
         self.descriptors.push(file_idx);
@@ -173,10 +173,10 @@ impl AbstractExecutor {
         let file_idx = self
             .descriptors
             .get(des.0)
-            .ok_or(ExecutorError::BadDescriptor(des, self.descriptors.len()))?;
+            .ok_or(FsError::BadDescriptor(des, self.descriptors.len()))?;
         let file = self.file_mut(&file_idx.clone());
         if file.descriptor != Some(des) {
-            return Err(ExecutorError::DescriptorWasClosed(des));
+            return Err(FsError::DescriptorWasClosed(des));
         }
         file.descriptor = None;
         self.recording.push(Operation::CLOSE { des });
@@ -240,22 +240,22 @@ impl AbstractExecutor {
 
     pub fn resolve_node(&self, path: PathName) -> Result<Node> {
         if !path.is_valid() {
-            return Err(ExecutorError::InvalidPath(path));
+            return Err(FsError::InvalidPath(path));
         }
         let segments: Vec<&str> = path.segments();
-        let mut last = Node::DIR(AbstractExecutor::root_index());
+        let mut last = Node::DIR(AbstractFS::root_index());
         let mut path = String::new();
         for segment in &segments {
             path.push_str("/");
             path.push_str(segment);
             let dir = match last {
                 Node::DIR(dir_index) => self.dir(&dir_index),
-                _ => return Err(ExecutorError::NotADir(path.into())),
+                _ => return Err(FsError::NotADir(path.into())),
             };
             last = dir
                 .children
                 .get(segment.to_owned())
-                .ok_or(ExecutorError::NotFound(path.clone().into()))?
+                .ok_or(FsError::NotFound(path.clone().into()))?
                 .clone();
         }
         Ok(last)
@@ -264,14 +264,14 @@ impl AbstractExecutor {
     pub fn resolve_file(&self, path: PathName) -> Result<FileIndex> {
         match self.resolve_node(path.clone())? {
             Node::FILE(idx) => Ok(idx),
-            _ => Err(ExecutorError::NotAFile(path)),
+            _ => Err(FsError::NotAFile(path)),
         }
     }
 
     pub fn resolve_dir(&self, path: PathName) -> Result<DirIndex> {
         match self.resolve_node(path.clone())? {
             Node::DIR(idx) => Ok(idx),
-            _ => Err(ExecutorError::NotADir(path)),
+            _ => Err(FsError::NotADir(path)),
         }
     }
 
@@ -280,7 +280,7 @@ impl AbstractExecutor {
     }
 
     pub fn alive(&self) -> AliveNodes {
-        let root = AbstractExecutor::root_index();
+        let root = AbstractFS::root_index();
         let mut alive = AliveNodes {
             dirs: vec![],
             files: vec![],
@@ -315,30 +315,30 @@ mod tests {
 
     #[test]
     fn test_init_root() {
-        let exec = AbstractExecutor::new();
+        let fs = AbstractFS::new();
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
                 files: vec![]
             },
-            exec.alive()
+            fs.alive()
         )
     }
 
     #[test]
     fn test_remove_root() {
-        let mut exec = AbstractExecutor::new();
+        let mut fs = AbstractFS::new();
         assert_eq!(
-            Err(ExecutorError::RootRemovalForbidden),
-            exec.remove("/".into())
+            Err(FsError::RootRemovalForbidden),
+            fs.remove("/".into())
         );
     }
 
     #[test]
     fn test_mkdir() {
-        let mut exec = AbstractExecutor::new();
-        let foo = exec.mkdir("/foobar".into(), vec![]).unwrap();
-        assert_eq!(Node::DIR(foo), *exec.root().children.get("foobar").unwrap());
+        let mut fs = AbstractFS::new();
+        let foo = fs.mkdir("/foobar".into(), vec![]).unwrap();
+        assert_eq!(Node::DIR(foo), *fs.root().children.get("foobar").unwrap());
         assert_eq!(
             Workload {
                 ops: vec![Operation::MKDIR {
@@ -346,42 +346,42 @@ mod tests {
                     mode: vec![],
                 }],
             },
-            exec.recording
+            fs.recording
         );
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into(), "/foobar".into()],
                 files: vec![]
             },
-            exec.alive()
+            fs.alive()
         );
-        test_replay(exec.recording);
+        test_replay(fs.recording);
     }
 
     #[test]
     fn test_mkdir_name_exists() {
-        let mut exec = AbstractExecutor::new();
-        exec.mkdir("/foobar".into(), vec![]).unwrap();
+        let mut fs = AbstractFS::new();
+        fs.mkdir("/foobar".into(), vec![]).unwrap();
         assert_eq!(
-            Err(ExecutorError::NameAlreadyExists("/foobar".into())),
-            exec.mkdir("/foobar".into(), vec![])
+            Err(FsError::NameAlreadyExists("/foobar".into())),
+            fs.mkdir("/foobar".into(), vec![])
         );
     }
 
     #[test]
     fn test_create() {
-        let mut exec = AbstractExecutor::new();
-        let foo = exec.create("/foobar".into(), vec![]).unwrap();
+        let mut fs = AbstractFS::new();
+        let foo = fs.create("/foobar".into(), vec![]).unwrap();
         assert_eq!(
             Node::FILE(foo),
-            *exec.root().children.get("foobar").unwrap()
+            *fs.root().children.get("foobar").unwrap()
         );
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
                 files: vec![(foo, "/foobar".into())]
             },
-            exec.alive()
+            fs.alive()
         );
         assert_eq!(
             Workload {
@@ -390,45 +390,45 @@ mod tests {
                     mode: vec![],
                 }]
             },
-            exec.recording
+            fs.recording
         );
-        test_replay(exec.recording);
+        test_replay(fs.recording);
     }
 
     #[test]
     fn test_create_name_exists() {
-        let mut exec = AbstractExecutor::new();
-        exec.create("/foobar".into(), vec![]).unwrap();
+        let mut fs = AbstractFS::new();
+        fs.create("/foobar".into(), vec![]).unwrap();
         assert_eq!(
-            Err(ExecutorError::NameAlreadyExists("/foobar".into())),
-            exec.create("/foobar".into(), vec![])
+            Err(FsError::NameAlreadyExists("/foobar".into())),
+            fs.create("/foobar".into(), vec![])
         );
     }
 
     #[test]
     fn test_remove_file() {
-        let mut exec = AbstractExecutor::new();
-        let foo = exec.create("/foobar".into(), vec![]).unwrap();
-        let boo = exec.create("/boo".into(), vec![]).unwrap();
+        let mut fs = AbstractFS::new();
+        let foo = fs.create("/foobar".into(), vec![]).unwrap();
+        let boo = fs.create("/boo".into(), vec![]).unwrap();
 
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
                 files: vec![(foo, "/foobar".into()), (boo, "/boo".into())]
             },
-            exec.alive()
+            fs.alive()
         );
 
-        exec.remove("/foobar".into()).unwrap();
+        fs.remove("/foobar".into()).unwrap();
 
-        assert_eq!(1, exec.root().children.len());
-        assert_eq!(Node::FILE(boo), *exec.root().children.get("boo").unwrap());
+        assert_eq!(1, fs.root().children.len());
+        assert_eq!(Node::FILE(boo), *fs.root().children.get("boo").unwrap());
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
                 files: vec![(boo, "/boo".into())]
             },
-            exec.alive()
+            fs.alive()
         );
         assert_eq!(
             Workload {
@@ -446,17 +446,17 @@ mod tests {
                     }
                 ],
             },
-            exec.recording
+            fs.recording
         );
-        test_replay(exec.recording);
+        test_replay(fs.recording);
     }
 
     #[test]
     fn test_hardlink() {
-        let mut exec = AbstractExecutor::new();
-        let foo = exec.create("/foo".into(), vec![]).unwrap();
-        let bar = exec.mkdir("/bar".into(), vec![]).unwrap();
-        let boo = exec.hardlink("/foo".into(), "/bar/boo".into()).unwrap();
+        let mut fs = AbstractFS::new();
+        let foo = fs.create("/foo".into(), vec![]).unwrap();
+        let bar = fs.mkdir("/bar".into(), vec![]).unwrap();
+        let boo = fs.hardlink("/foo".into(), "/bar/boo".into()).unwrap();
 
         assert_eq!(foo, boo);
         assert_eq!(
@@ -464,11 +464,11 @@ mod tests {
                 dirs: vec!["/".into(), "/bar".into()],
                 files: vec![(boo, "/bar/boo".into()), (foo, "/foo".into())]
             },
-            exec.alive()
+            fs.alive()
         );
 
-        let root = exec.root();
-        let bar_dir = exec.dir(&bar);
+        let root = fs.root();
+        let bar_dir = fs.dir(&bar);
         assert_eq!(2, root.children.len());
         assert_eq!(1, bar_dir.children.len());
         assert_eq!(
@@ -493,27 +493,27 @@ mod tests {
                     }
                 ],
             },
-            exec.recording
+            fs.recording
         );
-        test_replay(exec.recording);
+        test_replay(fs.recording);
     }
 
     #[test]
     fn test_remove_hardlink() {
-        let mut exec = AbstractExecutor::new();
-        let foo = exec.create("/foo".into(), vec![]).unwrap();
-        exec.hardlink("/foo".into(), "/bar".into()).unwrap();
-        exec.remove("/bar".into()).unwrap();
+        let mut fs = AbstractFS::new();
+        let foo = fs.create("/foo".into(), vec![]).unwrap();
+        fs.hardlink("/foo".into(), "/bar".into()).unwrap();
+        fs.remove("/bar".into()).unwrap();
 
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
                 files: vec![(foo, "/foo".into())]
             },
-            exec.alive()
+            fs.alive()
         );
 
-        assert_eq!(1, exec.root().children.len());
+        assert_eq!(1, fs.root().children.len());
 
         assert_eq!(
             Workload {
@@ -531,62 +531,62 @@ mod tests {
                     }
                 ],
             },
-            exec.recording
+            fs.recording
         );
-        test_replay(exec.recording);
+        test_replay(fs.recording);
     }
 
     #[test]
     fn test_remove_hardlink_dir() {
-        let mut exec = AbstractExecutor::new();
-        let zero = exec.create("/0".into(), vec![]).unwrap();
-        exec.mkdir("/1".into(), vec![]).unwrap();
-        exec.mkdir("/1/2".into(), vec![]).unwrap();
-        exec.hardlink("/0".into(), "/1/2/3".into()).unwrap();
-        assert_eq!(Ok(zero), exec.resolve_file("/1/2/3".into()));
-        exec.remove("/1".into()).unwrap();
+        let mut fs = AbstractFS::new();
+        let zero = fs.create("/0".into(), vec![]).unwrap();
+        fs.mkdir("/1".into(), vec![]).unwrap();
+        fs.mkdir("/1/2".into(), vec![]).unwrap();
+        fs.hardlink("/0".into(), "/1/2/3".into()).unwrap();
+        assert_eq!(Ok(zero), fs.resolve_file("/1/2/3".into()));
+        fs.remove("/1".into()).unwrap();
         assert_eq!(
-            Err(ExecutorError::NotFound("/1".into())),
-            exec.resolve_file("/1/2/3".into())
+            Err(FsError::NotFound("/1".into())),
+            fs.resolve_file("/1/2/3".into())
         );
-        assert_eq!(Ok(zero), exec.resolve_file("/0".into()));
+        assert_eq!(Ok(zero), fs.resolve_file("/0".into()));
     }
 
     #[test]
     fn test_hardlink_name_exists() {
-        let mut exec = AbstractExecutor::new();
-        exec.create("/foo".into(), vec![]).unwrap();
-        exec.create("/bar".into(), vec![]).unwrap();
+        let mut fs = AbstractFS::new();
+        fs.create("/foo".into(), vec![]).unwrap();
+        fs.create("/bar".into(), vec![]).unwrap();
         assert_eq!(
-            Err(ExecutorError::NameAlreadyExists("/foo".into())),
-            exec.hardlink("/bar".into(), "/foo".into())
+            Err(FsError::NameAlreadyExists("/foo".into())),
+            fs.hardlink("/bar".into(), "/foo".into())
         );
     }
 
     #[test]
     fn test_remove_dir() {
-        let mut exec = AbstractExecutor::new();
-        exec.mkdir("/foobar".into(), vec![]).unwrap();
-        let boo = exec.mkdir("/boo".into(), vec![]).unwrap();
+        let mut fs = AbstractFS::new();
+        fs.mkdir("/foobar".into(), vec![]).unwrap();
+        let boo = fs.mkdir("/boo".into(), vec![]).unwrap();
 
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into(), "/boo".into(), "/foobar".into()],
                 files: vec![]
             },
-            exec.alive()
+            fs.alive()
         );
 
-        exec.remove("/foobar".into()).unwrap();
+        fs.remove("/foobar".into()).unwrap();
 
-        assert_eq!(1, exec.root().children.len());
-        assert_eq!(Node::DIR(boo), *exec.root().children.get("boo").unwrap());
+        assert_eq!(1, fs.root().children.len());
+        assert_eq!(Node::DIR(boo), *fs.root().children.get("boo").unwrap());
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into(), "/boo".into()],
                 files: vec![]
             },
-            exec.alive()
+            fs.alive()
         );
         assert_eq!(
             Workload {
@@ -604,33 +604,33 @@ mod tests {
                     }
                 ],
             },
-            exec.recording
+            fs.recording
         );
-        test_replay(exec.recording);
+        test_replay(fs.recording);
     }
 
     #[test]
     fn test_remove_twice() {
-        let mut exec = AbstractExecutor::new();
-        exec.create("/0".into(), vec![]).unwrap();
-        exec.remove("/0".into()).unwrap();
+        let mut fs = AbstractFS::new();
+        fs.create("/0".into(), vec![]).unwrap();
+        fs.remove("/0".into()).unwrap();
         assert_eq!(
-            Err(ExecutorError::NotFound("/0".into())),
-            exec.remove("/0".into())
+            Err(FsError::NotFound("/0".into())),
+            fs.remove("/0".into())
         )
     }
 
     #[test]
     fn test_rename_file() {
-        let mut exec = AbstractExecutor::new();
-        let foo = exec.create("/foo".into(), vec![]).unwrap();
-        exec.rename("/foo".into(), "/bar".into()).unwrap();
+        let mut fs = AbstractFS::new();
+        let foo = fs.create("/foo".into(), vec![]).unwrap();
+        fs.rename("/foo".into(), "/bar".into()).unwrap();
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
                 files: vec![(foo, "/bar".into())]
             },
-            exec.alive()
+            fs.alive()
         );
         assert_eq!(
             Workload {
@@ -645,22 +645,22 @@ mod tests {
                     }
                 ]
             },
-            exec.recording
+            fs.recording
         );
-        test_replay(exec.recording);
+        test_replay(fs.recording);
     }
 
     #[test]
     fn test_rename_dir() {
-        let mut exec = AbstractExecutor::new();
-        exec.mkdir("/foo".into(), vec![]).unwrap();
-        exec.rename("/foo".into(), "/bar".into()).unwrap();
+        let mut fs = AbstractFS::new();
+        fs.mkdir("/foo".into(), vec![]).unwrap();
+        fs.rename("/foo".into(), "/bar".into()).unwrap();
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into(), "/bar".into()],
                 files: vec![]
             },
-            exec.alive()
+            fs.alive()
         );
         assert_eq!(
             Workload {
@@ -675,47 +675,47 @@ mod tests {
                     }
                 ]
             },
-            exec.recording
+            fs.recording
         );
-        test_replay(exec.recording);
+        test_replay(fs.recording);
     }
 
     #[test]
     fn test_rename_dir_non_empty() {
-        let mut exec = AbstractExecutor::new();
-        exec.mkdir("/foo".into(), vec![]).unwrap();
-        exec.mkdir("/bar".into(), vec![]).unwrap();
-        exec.create("/bar/baz".into(), vec![]).unwrap();
+        let mut fs = AbstractFS::new();
+        fs.mkdir("/foo".into(), vec![]).unwrap();
+        fs.mkdir("/bar".into(), vec![]).unwrap();
+        fs.create("/bar/baz".into(), vec![]).unwrap();
         assert_eq!(
-            Err(ExecutorError::DirNotEmpty("/bar".into())),
-            exec.rename("/foo".into(), "/bar".into())
+            Err(FsError::DirNotEmpty("/bar".into())),
+            fs.rename("/foo".into(), "/bar".into())
         );
-        exec.remove("/bar/baz".into()).unwrap();
-        exec.rename("/foo".into(), "/bar".into()).unwrap();
+        fs.remove("/bar/baz".into()).unwrap();
+        fs.rename("/foo".into(), "/bar".into()).unwrap();
     }
 
     #[test]
     fn test_rename_old_prefix() {
-        let mut exec = AbstractExecutor::new();
-        exec.mkdir("/0".into(), vec![]).unwrap();
+        let mut fs = AbstractFS::new();
+        fs.mkdir("/0".into(), vec![]).unwrap();
         assert_eq!(
-            Err(ExecutorError::RenameToSubdirectoryError(
+            Err(FsError::RenameToSubdirectoryError(
                 "/0".into(),
                 "/0/1".into()
             )),
-            exec.rename("/0".into(), "/0/1".into())
+            fs.rename("/0".into(), "/0/1".into())
         );
     }
 
     #[test]
     fn test_open_close_file() {
-        let mut exec = AbstractExecutor::new();
-        let foo = exec.create("/foo".into(), vec![]).unwrap();
-        let des = exec.open("/foo".into()).unwrap();
-        let file = exec.file(&foo);
+        let mut fs = AbstractFS::new();
+        let foo = fs.create("/foo".into(), vec![]).unwrap();
+        let des = fs.open("/foo".into()).unwrap();
+        let file = fs.file(&foo);
         assert_eq!(Some(des), file.descriptor);
-        exec.close(des).unwrap();
-        let file = exec.file(&foo);
+        fs.close(des).unwrap();
+        let file = fs.file(&foo);
         assert_eq!(None, file.descriptor);
         assert_eq!(
             Workload {
@@ -731,78 +731,80 @@ mod tests {
                     Operation::CLOSE { des }
                 ]
             },
-            exec.recording
+            fs.recording
         );
-        test_replay(exec.recording);
+        test_replay(fs.recording);
     }
 
     #[test]
     fn test_close_bad_descriptor() {
-        let mut exec = AbstractExecutor::new();
+        let mut fs = AbstractFS::new();
         let des = FileDescriptor(0);
-        assert_eq!(Err(ExecutorError::BadDescriptor(des, 0)), exec.close(des));
+        assert_eq!(Err(FsError::BadDescriptor(des, 0)), fs.close(des));
     }
 
     #[test]
     fn test_close_twice() {
-        let mut exec = AbstractExecutor::new();
-        exec.create("/foo".into(), vec![]).unwrap();
-        let des = exec.open("/foo".into()).unwrap();
-        exec.close(des).unwrap();
+        let mut fs = AbstractFS::new();
+        fs.create("/foo".into(), vec![]).unwrap();
+        let des = fs.open("/foo".into()).unwrap();
+        fs.close(des).unwrap();
         assert_eq!(
-            Err(ExecutorError::DescriptorWasClosed(des)),
-            exec.close(des)
+            Err(FsError::DescriptorWasClosed(des)),
+            fs.close(des)
         );
     }
 
     #[test]
     fn test_open_twice() {
-        let mut exec = AbstractExecutor::new();
-        exec.create("/foo".into(), vec![]).unwrap();
-        exec.open("/foo".into()).unwrap();
+        let mut fs = AbstractFS::new();
+        fs.create("/foo".into(), vec![]).unwrap();
+        fs.open("/foo".into()).unwrap();
         assert_eq!(
-            Err(ExecutorError::FileAlreadyOpened("/foo".into())),
-            exec.open("/foo".into())
+            Err(FsError::FileAlreadyOpened("/foo".into())),
+            fs.open("/foo".into())
         );
     }
+
+
 
     #[test]
     fn test_resolve_node() {
-        let mut exec = AbstractExecutor::new();
+        let mut fs = AbstractFS::new();
         assert_eq!(
-            Node::DIR(AbstractExecutor::root_index()),
-            exec.resolve_node("/".into()).unwrap()
+            Node::DIR(AbstractFS::root_index()),
+            fs.resolve_node("/".into()).unwrap()
         );
-        let foo = exec.mkdir("/foo".into(), vec![]).unwrap();
-        let bar = exec.mkdir("/foo/bar".into(), vec![]).unwrap();
-        let boo = exec.create("/foo/bar/boo".into(), vec![]).unwrap();
+        let foo = fs.mkdir("/foo".into(), vec![]).unwrap();
+        let bar = fs.mkdir("/foo/bar".into(), vec![]).unwrap();
+        let boo = fs.create("/foo/bar/boo".into(), vec![]).unwrap();
         assert_eq!(
-            Err(ExecutorError::InvalidPath("".into())),
-            exec.resolve_node("".into())
-        );
-        assert_eq!(
-            Err(ExecutorError::InvalidPath("foo".into())),
-            exec.resolve_node("foo".into())
+            Err(FsError::InvalidPath("".into())),
+            fs.resolve_node("".into())
         );
         assert_eq!(
-            Err(ExecutorError::InvalidPath("/foo/".into())),
-            exec.resolve_node("/foo/".into())
+            Err(FsError::InvalidPath("foo".into())),
+            fs.resolve_node("foo".into())
         );
-        assert_eq!(Node::DIR(foo), exec.resolve_node("/foo".into()).unwrap());
+        assert_eq!(
+            Err(FsError::InvalidPath("/foo/".into())),
+            fs.resolve_node("/foo/".into())
+        );
+        assert_eq!(Node::DIR(foo), fs.resolve_node("/foo".into()).unwrap());
         assert_eq!(
             Node::DIR(bar),
-            exec.resolve_node("/foo/bar".into()).unwrap()
+            fs.resolve_node("/foo/bar".into()).unwrap()
         );
         assert_eq!(
             Node::FILE(boo),
-            exec.resolve_node("/foo/bar/boo".into()).unwrap()
+            fs.resolve_node("/foo/bar/boo".into()).unwrap()
         );
-        test_replay(exec.recording);
+        test_replay(fs.recording);
     }
 
     fn test_replay(workload: Workload) {
-        let mut exec = AbstractExecutor::new();
-        exec.replay(&workload).unwrap();
-        assert_eq!(workload, exec.recording);
+        let mut fs = AbstractFS::new();
+        fs.replay(&workload).unwrap();
+        assert_eq!(workload, fs.recording);
     }
 }

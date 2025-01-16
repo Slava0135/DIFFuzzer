@@ -4,7 +4,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    executor::AbstractExecutor,
+    fs::AbstractFS,
     generator::append_one,
     operation::{Operation, OperationWeights},
     workload::Workload,
@@ -30,11 +30,11 @@ impl MutationWeights {
 pub fn remove(workload: &Workload, index: usize) -> Option<Workload> {
     let mut ops = workload.ops.clone();
     ops.remove(index);
-    let mut exec = AbstractExecutor::new();
-    if !exec.replay(&Workload { ops }).is_ok() {
+    let mut fs = AbstractFS::new();
+    if !fs.replay(&Workload { ops }).is_ok() {
         None
     } else {
-        Some(exec.recording)
+        Some(fs.recording)
     }
 }
 
@@ -84,8 +84,8 @@ pub fn insert(
     }
 
     let (before, after) = workload.ops.split_at(index);
-    let mut exec = AbstractExecutor::new();
-    if !exec
+    let mut fs = AbstractFS::new();
+    if !fs
         .replay(&Workload {
             ops: before.to_vec(),
         })
@@ -102,8 +102,8 @@ pub fn insert(
             break name;
         }
     };
-    append_one(rng, &mut exec, weights, &mut gen_name);
-    if !exec
+    append_one(rng, &mut fs, weights, &mut gen_name);
+    if !fs
         .replay(&Workload {
             ops: after.to_vec(),
         })
@@ -111,7 +111,7 @@ pub fn insert(
     {
         None
     } else {
-        Some(exec.recording)
+        Some(fs.recording)
     }
 }
 
