@@ -13,6 +13,7 @@ mod config;
 mod filesystems;
 mod greybox;
 mod harness;
+mod hasher;
 mod mount;
 mod save;
 mod single;
