@@ -55,6 +55,10 @@ impl PathName {
     pub fn is_root(&self) -> bool {
         self.0 == "/"
     }
+
+    pub fn is_prefix_of(&self, other: &PathName) -> bool {
+        other.0.starts_with(&self.0)
+    }
 }
 
 pub type Name = String;
