@@ -34,6 +34,8 @@ pub enum ExecutorError {
     DescriptorWasClosed(FileDescriptor),
     #[error("file at '{0}' was already opened")]
     FileAlreadyOpened(PathName),
+    #[error("tried to rename '{0}' into subdirectory of itself '{1}'")]
+    RenameToSubdirectoryError(PathName, PathName),
 }
 
 pub struct AbstractExecutor {
@@ -127,6 +129,9 @@ impl AbstractExecutor {
     }
 
     pub fn rename(&mut self, old_path: PathName, new_path: PathName) -> Result<Node> {
+        if old_path.is_prefix_of(&new_path) {
+            return Err(ExecutorError::RenameToSubdirectoryError(old_path, new_path));
+        }
         if let Ok(dir_idx) = self.resolve_dir(new_path.clone()) {
             if !self.dir(&dir_idx).children.is_empty() {
                 return Err(ExecutorError::DirNotEmpty(new_path));
@@ -674,6 +679,19 @@ mod tests {
         );
         exec.remove("/bar/baz".into()).unwrap();
         exec.rename("/foo".into(), "/bar".into()).unwrap();
+    }
+
+    #[test]
+    fn test_rename_old_prefix() {
+        let mut exec = AbstractExecutor::new();
+        exec.mkdir("/0".into(), vec![]).unwrap();
+        assert_eq!(
+            Err(ExecutorError::RenameToSubdirectoryError(
+                "/0".into(),
+                "/0/1".into()
+            )),
+            exec.rename("/0".into(), "/0/1".into())
+        );
     }
 
     #[test]
