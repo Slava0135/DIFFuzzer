@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{flags::Mode, pathname::PathName};
+use super::{flags::Mode, node::FileDescriptor, pathname::PathName};
 
 #[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
 pub enum Operation {
@@ -23,6 +23,13 @@ pub enum Operation {
         old_path: PathName,
         new_path: PathName,
     },
+    OPEN {
+        path: PathName,
+        des: FileDescriptor,
+    },
+    CLOSE {
+        des: FileDescriptor
+    },
 }
 
 #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Copy)]
@@ -32,6 +39,8 @@ pub enum OperationKind {
     REMOVE,
     HARDLINK,
     RENAME,
+    OPEN,
+    CLOSE,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -52,6 +61,8 @@ impl OperationWeights {
                 (OperationKind::REMOVE, 100),
                 (OperationKind::HARDLINK, 100),
                 (OperationKind::RENAME, 100),
+                (OperationKind::OPEN, 100),
+                (OperationKind::CLOSE, 100),
             ],
         }
     }

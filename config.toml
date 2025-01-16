@@ -1,8 +1,8 @@
 [greybox]
-max_workload_length = 100
-max_mutations = 10
-timeout = 10 # in seconds
 heartbeat_interval = 30 # in seconds
+max_mutations = 10 
+max_workload_length = 100 
+timeout = 10 # in seconds
 
 [operation_weights]
 weights = [
@@ -16,7 +16,7 @@ weights = [
   ],
   [
     "REMOVE",
-    100,
+    30,
   ],
   [
     "HARDLINK",
@@ -25,6 +25,14 @@ weights = [
   [
     "RENAME",
     100,
+  ],
+  [
+    "OPEN",
+    100,
+  ],
+  [
+    "CLOSE",
+    30,
   ],
 ]
 

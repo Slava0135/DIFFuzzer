@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use super::{
     flags::Mode,
-    node::{Dir, DirIndex, File, FileIndex, Node},
+    node::{Dir, DirIndex, File, FileDescriptor, FileIndex, Node},
     operation::Operation,
     pathname::{Name, PathName},
     workload::Workload,
@@ -28,18 +28,27 @@ pub enum ExecutorError {
     InvalidPath(PathName),
     #[error("directory '{0}' is not empty")]
     DirNotEmpty(PathName),
+    #[error("bad descriptor '{0}' ({1} created)")]
+    BadDescriptor(FileDescriptor, usize),
+    #[error("descriptor '{0}' was already closed")]
+    DescriptorWasClosed(FileDescriptor),
+    #[error("file at '{0}' was already opened")]
+    FileAlreadyOpened(PathName),
 }
 
 pub struct AbstractExecutor {
     pub dirs: Vec<Dir>,
     pub files: Vec<File>,
+
+    pub descriptors: Vec<FileIndex>,
+
     pub recording: Workload,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct AliveNodes {
     pub dirs: Vec<PathName>,
-    pub files: Vec<PathName>,
+    pub files: Vec<(FileIndex, PathName)>,
 }
 
 impl AbstractExecutor {
@@ -49,6 +58,7 @@ impl AbstractExecutor {
                 children: HashMap::new(),
             }],
             files: vec![],
+            descriptors: vec![],
             recording: Workload::new(),
         }
     }
@@ -90,7 +100,7 @@ impl AbstractExecutor {
         if self.name_exists(&parent, &name) {
             return Err(ExecutorError::NameAlreadyExists(path));
         }
-        let file = File {};
+        let file = File { descriptor: None };
         let file_idx = FileIndex(self.files.len());
         self.files.push(file);
         self.dir_mut(&parent)
@@ -139,6 +149,33 @@ impl AbstractExecutor {
         Ok(node)
     }
 
+    pub fn open(&mut self, path: PathName) -> Result<FileDescriptor> {
+        let des = FileDescriptor(self.descriptors.len());
+        let file_idx = self.resolve_file(path.clone())?;
+        let file = self.file_mut(&file_idx);
+        if file.descriptor.is_some() {
+            return Err(ExecutorError::FileAlreadyOpened(path));
+        }
+        file.descriptor = Some(des);
+        self.descriptors.push(file_idx);
+        self.recording.push(Operation::OPEN { path, des });
+        Ok(des)
+    }
+
+    pub fn close(&mut self, des: FileDescriptor) -> Result<()> {
+        let file_idx = self
+            .descriptors
+            .get(des.0)
+            .ok_or(ExecutorError::BadDescriptor(des, self.descriptors.len()))?;
+        let file = self.file_mut(&file_idx.clone());
+        if file.descriptor != Some(des) {
+            return Err(ExecutorError::DescriptorWasClosed(des));
+        }
+        file.descriptor = None;
+        self.recording.push(Operation::CLOSE { des });
+        Ok(())
+    }
+
     pub fn replay(&mut self, workload: &Workload) -> Result<()> {
         for op in &workload.ops {
             match op {
@@ -154,6 +191,12 @@ impl AbstractExecutor {
                 }
                 Operation::RENAME { old_path, new_path } => {
                     self.rename(old_path.clone(), new_path.clone())?;
+                }
+                Operation::OPEN { path, des: _ } => {
+                    self.open(path.clone())?;
+                }
+                Operation::CLOSE { des } => {
+                    self.close(des.clone())?;
                 }
             };
         }
@@ -172,7 +215,7 @@ impl AbstractExecutor {
         self.dirs.get_mut(idx.0).unwrap()
     }
 
-    fn file(&self, idx: &FileIndex) -> &File {
+    pub fn file(&self, idx: &FileIndex) -> &File {
         self.files.get(idx.0).unwrap()
     }
 
@@ -247,8 +290,8 @@ impl AbstractExecutor {
                         queue.push_back((path.clone(), idx));
                         alive.dirs.push(path.clone());
                     }
-                    Node::FILE(_) => {
-                        alive.files.push(path.join(name.to_owned()));
+                    Node::FILE(idx) => {
+                        alive.files.push((idx.clone(), path.join(name.to_owned())));
                     }
                 }
             }
@@ -329,7 +372,7 @@ mod tests {
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
-                files: vec!["/foobar".into()]
+                files: vec![(foo, "/foobar".into())]
             },
             exec.alive()
         );
@@ -358,13 +401,13 @@ mod tests {
     #[test]
     fn test_remove_file() {
         let mut exec = AbstractExecutor::new();
-        exec.create("/foobar".into(), vec![]).unwrap();
+        let foo = exec.create("/foobar".into(), vec![]).unwrap();
         let boo = exec.create("/boo".into(), vec![]).unwrap();
 
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
-                files: vec!["/boo".into(), "/foobar".into()]
+                files: vec![(foo, "/foobar".into()), (boo, "/boo".into())]
             },
             exec.alive()
         );
@@ -376,7 +419,7 @@ mod tests {
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
-                files: vec!["/boo".into()]
+                files: vec![(boo, "/boo".into())]
             },
             exec.alive()
         );
@@ -412,7 +455,7 @@ mod tests {
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into(), "/bar".into()],
-                files: vec!["/bar/boo".into(), "/foo".into()]
+                files: vec![(boo, "/bar/boo".into()), (foo, "/foo".into())]
             },
             exec.alive()
         );
@@ -451,14 +494,14 @@ mod tests {
     #[test]
     fn test_remove_hardlink() {
         let mut exec = AbstractExecutor::new();
-        exec.create("/foo".into(), vec![]).unwrap();
+        let foo = exec.create("/foo".into(), vec![]).unwrap();
         exec.hardlink("/foo".into(), "/bar".into()).unwrap();
         exec.remove("/bar".into()).unwrap();
 
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
-                files: vec!["/foo".into()]
+                files: vec![(foo, "/foo".into())]
             },
             exec.alive()
         );
@@ -562,12 +605,12 @@ mod tests {
     #[test]
     fn test_rename_file() {
         let mut exec = AbstractExecutor::new();
-        exec.create("/foo".into(), vec![]).unwrap();
+        let foo = exec.create("/foo".into(), vec![]).unwrap();
         exec.rename("/foo".into(), "/bar".into()).unwrap();
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
-                files: vec!["/bar".into()]
+                files: vec![(foo, "/bar".into())]
             },
             exec.alive()
         );
@@ -631,6 +674,65 @@ mod tests {
         );
         exec.remove("/bar/baz".into()).unwrap();
         exec.rename("/foo".into(), "/bar".into()).unwrap();
+    }
+
+    #[test]
+    fn test_open_close_file() {
+        let mut exec = AbstractExecutor::new();
+        let foo = exec.create("/foo".into(), vec![]).unwrap();
+        let des = exec.open("/foo".into()).unwrap();
+        let file = exec.file(&foo);
+        assert_eq!(Some(des), file.descriptor);
+        exec.close(des).unwrap();
+        let file = exec.file(&foo);
+        assert_eq!(None, file.descriptor);
+        assert_eq!(
+            Workload {
+                ops: vec![
+                    Operation::CREATE {
+                        path: "/foo".into(),
+                        mode: vec![]
+                    },
+                    Operation::OPEN {
+                        path: "/foo".into(),
+                        des
+                    },
+                    Operation::CLOSE { des }
+                ]
+            },
+            exec.recording
+        );
+        test_replay(exec.recording);
+    }
+
+    #[test]
+    fn test_close_bad_descriptor() {
+        let mut exec = AbstractExecutor::new();
+        let des = FileDescriptor(0);
+        assert_eq!(Err(ExecutorError::BadDescriptor(des, 0)), exec.close(des));
+    }
+
+    #[test]
+    fn test_close_twice() {
+        let mut exec = AbstractExecutor::new();
+        exec.create("/foo".into(), vec![]).unwrap();
+        let des = exec.open("/foo".into()).unwrap();
+        exec.close(des).unwrap();
+        assert_eq!(
+            Err(ExecutorError::DescriptorWasClosed(des)),
+            exec.close(des)
+        );
+    }
+
+    #[test]
+    fn test_open_twice() {
+        let mut exec = AbstractExecutor::new();
+        exec.create("/foo".into(), vec![]).unwrap();
+        exec.open("/foo".into()).unwrap();
+        assert_eq!(
+            Err(ExecutorError::FileAlreadyOpened("/foo".into())),
+            exec.open("/foo".into())
+        );
     }
 
     #[test]
