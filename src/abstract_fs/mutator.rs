@@ -80,6 +80,7 @@ pub fn insert(
                 }
             }
             Operation::CLOSE { des: _ } => {}
+            Operation::READ { des: _, size: _ } => {}
         }
     }
 

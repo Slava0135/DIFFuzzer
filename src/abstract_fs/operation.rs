@@ -28,7 +28,11 @@ pub enum Operation {
         des: FileDescriptor,
     },
     CLOSE {
-        des: FileDescriptor
+        des: FileDescriptor,
+    },
+    READ {
+        des: FileDescriptor,
+        size: u64,
     },
 }
 
