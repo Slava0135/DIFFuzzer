@@ -172,25 +172,28 @@ impl AbstractFS {
         Ok(des)
     }
 
-    pub fn close(&mut self, des: FileDescriptor) -> Result<()> {
+    fn find_file_by_descriptor(&mut self, des: FileDescriptor) -> Result<&mut File> {
         let file_idx = self
             .descriptors
             .get(des.0)
-            .ok_or(FsError::BadDescriptor(des, self.descriptors.len()))?;
-        let file = self.file_mut(&file_idx.clone());
+            .ok_or(FsError::BadDescriptor(des, self.descriptors.len()))?
+            .clone();
+        let file = self.file_mut(&file_idx);
         if file.descriptor != Some(des) {
             return Err(FsError::DescriptorWasClosed(des));
         }
+        Ok(file)
+    }
+
+    pub fn close(&mut self, des: FileDescriptor) -> Result<()> {
+        let file = self.find_file_by_descriptor(des)?;
         file.descriptor = None;
         self.recording.push(Operation::CLOSE { des });
         Ok(())
     }
 
     pub fn read(&mut self, des: FileDescriptor, size: usize) -> Result<Content> {
-        let file_idx = self
-            .descriptors
-            .get(des.0)
-            .ok_or(FsError::BadDescriptor(des, self.descriptors.len()))?;
+        let file = self.find_file_by_descriptor(des)?;
         Ok(Content {})
     }
 
@@ -767,6 +770,15 @@ mod tests {
         let mut fs = AbstractFS::new();
         let des = FileDescriptor(0);
         assert_eq!(Err(FsError::BadDescriptor(des, 0)), fs.read(des, 0));
+    }
+
+    #[test]
+    fn test_read_closed() {
+        let mut fs = AbstractFS::new();
+        fs.create("/foo".into(), vec![]).unwrap();
+        let des = fs.open("/foo".into()).unwrap();
+        fs.close(des).unwrap();
+        assert_eq!(Err(FsError::DescriptorWasClosed(des)), fs.read(des, 0));
     }
 
     #[test]
