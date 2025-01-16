@@ -204,6 +204,11 @@ impl AbstractFS {
         Ok(Content::new())
     }
 
+    pub fn write(&mut self, des: FileDescriptor, size: u64) -> Result<()> {
+        let file = self.find_file_by_descriptor(des)?;
+        Ok(())
+    }
+
     pub fn replay(&mut self, workload: &Workload) -> Result<()> {
         for op in &workload.ops {
             match op {
@@ -818,6 +823,22 @@ mod tests {
             fs.recording
         );
         test_replay(fs.recording);
+    }
+
+    #[test]
+    fn test_write_bad_descriptor() {
+        let mut fs = AbstractFS::new();
+        let des = FileDescriptor(0);
+        assert_eq!(Err(FsError::BadDescriptor(des, 0)), fs.write(des, 0));
+    }
+
+    #[test]
+    fn test_write_closed() {
+        let mut fs = AbstractFS::new();
+        fs.create("/foo".into(), vec![]).unwrap();
+        let des = fs.open("/foo".into()).unwrap();
+        fs.close(des).unwrap();
+        assert_eq!(Err(FsError::DescriptorWasClosed(des)), fs.write(des, 0));
     }
 
     #[test]
