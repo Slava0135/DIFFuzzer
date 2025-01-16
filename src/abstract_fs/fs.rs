@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use super::{
     flags::Mode,
-    node::{Dir, DirIndex, File, FileDescriptor, FileIndex, Node},
+    node::{Content, Dir, DirIndex, File, FileDescriptor, FileIndex, Node},
     operation::Operation,
     pathname::{Name, PathName},
     workload::Workload,
@@ -51,15 +51,6 @@ pub struct AbstractFS {
 pub struct AliveNodes {
     pub dirs: Vec<PathName>,
     pub files: Vec<(FileIndex, PathName)>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct Content;
-
-impl Content {
-    pub fn new() -> Self {
-        Self {}
-    }
 }
 
 impl AbstractFS {
@@ -113,7 +104,10 @@ impl AbstractFS {
         if self.name_exists(&parent, &name) {
             return Err(FsError::NameAlreadyExists(path));
         }
-        let file = File { descriptor: None };
+        let file = File {
+            descriptor: None,
+            content: Content::new(),
+        };
         let file_idx = FileIndex(self.files.len());
         self.files.push(file);
         self.dir_mut(&parent)
@@ -204,8 +198,14 @@ impl AbstractFS {
         Ok(Content::new())
     }
 
-    pub fn write(&mut self, des: FileDescriptor, size: u64) -> Result<()> {
+    pub fn write(&mut self, des: FileDescriptor, src_offset: u64, size: u64) -> Result<()> {
         let file = self.find_file_by_descriptor(des)?;
+        file.content.write(src_offset, size);
+        self.recording.push(Operation::WRITE {
+            des,
+            src_offset,
+            size,
+        });
         Ok(())
     }
 
@@ -233,6 +233,13 @@ impl AbstractFS {
                 }
                 Operation::READ { des, size } => {
                     self.read(des.clone(), size.clone())?;
+                }
+                Operation::WRITE {
+                    des,
+                    src_offset,
+                    size,
+                } => {
+                    self.write(des.clone(), src_offset.clone(), size.clone())?;
                 }
             };
         }
@@ -337,6 +344,8 @@ impl AbstractFS {
 
 #[cfg(test)]
 mod tests {
+    use crate::abstract_fs::node::SourceSlice;
+
     use super::*;
 
     #[test]
@@ -829,7 +838,7 @@ mod tests {
     fn test_write_bad_descriptor() {
         let mut fs = AbstractFS::new();
         let des = FileDescriptor(0);
-        assert_eq!(Err(FsError::BadDescriptor(des, 0)), fs.write(des, 0));
+        assert_eq!(Err(FsError::BadDescriptor(des, 0)), fs.write(des, 0, 0));
     }
 
     #[test]
@@ -838,7 +847,49 @@ mod tests {
         fs.create("/foo".into(), vec![]).unwrap();
         let des = fs.open("/foo".into()).unwrap();
         fs.close(des).unwrap();
-        assert_eq!(Err(FsError::DescriptorWasClosed(des)), fs.write(des, 0));
+        assert_eq!(Err(FsError::DescriptorWasClosed(des)), fs.write(des, 0, 0));
+    }
+
+    #[test]
+    fn test_write() {
+        let mut fs = AbstractFS::new();
+        let foo = fs.create("/foo".into(), vec![]).unwrap();
+        let des = fs.open("/foo".into()).unwrap();
+        fs.write(des, 999, 1024).unwrap();
+        fs.close(des).unwrap();
+
+        assert_eq!(
+            Content {
+                slices: vec![SourceSlice {
+                    from: 999,
+                    to: 999 + 1024
+                }]
+            },
+            fs.file(&foo).content
+        );
+
+        assert_eq!(
+            Workload {
+                ops: vec![
+                    Operation::CREATE {
+                        path: "/foo".into(),
+                        mode: vec![]
+                    },
+                    Operation::OPEN {
+                        path: "/foo".into(),
+                        des
+                    },
+                    Operation::WRITE {
+                        des,
+                        src_offset: 999,
+                        size: 1024
+                    },
+                    Operation::CLOSE { des },
+                ]
+            },
+            fs.recording
+        );
+        test_replay(fs.recording);
     }
 
     #[test]

@@ -22,6 +22,32 @@ impl Display for FileDescriptor {
 #[derive(Debug, Clone)]
 pub struct File {
     pub descriptor: Option<FileDescriptor>,
+    pub content: Content,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct SourceSlice {
+    /// inclusive
+    pub from: u64,
+    /// exclusive
+    pub to: u64,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Content {
+    pub slices: Vec<SourceSlice>,
+}
+
+impl Content {
+    pub fn new() -> Self {
+        Self { slices: vec![] }
+    }
+    pub fn write(&mut self, src_offset: u64, size: u64) {
+        self.slices.push(SourceSlice {
+            from: src_offset,
+            to: src_offset + size,
+        });
+    }
 }
 
 #[derive(Debug, Clone)]

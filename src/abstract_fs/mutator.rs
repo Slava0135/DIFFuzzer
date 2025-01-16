@@ -82,6 +82,11 @@ pub fn insert(
             }
             Operation::CLOSE { des: _ } => {}
             Operation::READ { des: _, size: _ } => {}
+            Operation::WRITE {
+                des: _,
+                src_offset: _,
+                size: _,
+            } => {}
         }
     }
 

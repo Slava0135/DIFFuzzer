@@ -68,6 +68,21 @@ impl Workload {
                         format!("do_read({}, {});\n", descriptor_to_var(des), size).as_str(),
                     );
                 }
+                Operation::WRITE {
+                    des,
+                    src_offset,
+                    size,
+                } => {
+                    result.push_str(
+                        format!(
+                            "do_write({}, {}, {});\n",
+                            descriptor_to_var(des),
+                            src_offset,
+                            size
+                        )
+                        .as_str(),
+                    );
+                }
             }
         }
         result.push_str("}");
@@ -118,10 +133,11 @@ void test_workload()
 do_mkdir("/foo", 0);
 do_create("/foo/bar", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 fd_0 = do_open("/foo/bar");
-do_read(fd_0, 1024);
+do_write(fd_0, 999, 1024);
 do_close(fd_0);
 do_hardlink("/foo/bar", "/baz");
 fd_1 = do_open("/baz");
+do_read(fd_1, 1024);
 do_close(fd_1);
 do_rename("/baz", "/gaz");
 do_remove("/foo");
@@ -148,8 +164,9 @@ do_remove("/foo");
                     path: "/foo/bar".into(),
                     des: FileDescriptor(0),
                 },
-                Operation::READ {
+                Operation::WRITE {
                     des: FileDescriptor(0),
+                    src_offset: 999,
                     size: 1024,
                 },
                 Operation::CLOSE {
@@ -162,6 +179,10 @@ do_remove("/foo");
                 Operation::OPEN {
                     path: "/baz".into(),
                     des: FileDescriptor(1),
+                },
+                Operation::READ {
+                    des: FileDescriptor(1),
+                    size: 1024,
                 },
                 Operation::CLOSE {
                     des: FileDescriptor(1),

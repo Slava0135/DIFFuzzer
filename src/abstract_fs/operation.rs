@@ -34,6 +34,11 @@ pub enum Operation {
         des: FileDescriptor,
         size: u64,
     },
+    WRITE {
+        des: FileDescriptor,
+        src_offset: u64,
+        size: u64,
+    },
 }
 
 #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Copy)]
