@@ -1,8 +1,8 @@
 use rand::{seq::SliceRandom, Rng};
 
 use super::{
-    fs::AbstractFS,
     flags::ModeFlag,
+    fs::AbstractFS,
     node::FileDescriptor,
     operation::{OperationKind, OperationWeights},
     pathname::{Name, PathName},
@@ -77,9 +77,7 @@ pub fn append_one(
         }
         OperationKind::CREATE => {
             let path = alive.dirs.choose(rng).unwrap().to_owned();
-            fs
-                .create(path.join(gen_name()), mode.clone())
-                .unwrap();
+            fs.create(path.join(gen_name()), mode.clone()).unwrap();
         }
         OperationKind::REMOVE => {
             let path = [
@@ -95,9 +93,7 @@ pub fn append_one(
         OperationKind::HARDLINK => {
             let file_path = alive.files.choose(rng).unwrap().to_owned().1;
             let dir_path = alive.dirs.choose(rng).unwrap().to_owned();
-            fs
-                .hardlink(file_path, dir_path.join(gen_name()))
-                .unwrap();
+            fs.hardlink(file_path, dir_path.join(gen_name())).unwrap();
         }
         OperationKind::RENAME => {
             let old_path = [
@@ -115,9 +111,7 @@ pub fn append_one(
                 .map(|p| p.clone())
                 .collect();
             let new_path = alive_non_subdirectories.choose(rng).unwrap().to_owned();
-            fs
-                .rename(old_path, new_path.join(gen_name()))
-                .unwrap();
+            fs.rename(old_path, new_path.join(gen_name())).unwrap();
         }
         OperationKind::OPEN => {
             let path = alive_closed_files.choose(rng).unwrap().to_owned();

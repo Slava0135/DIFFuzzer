@@ -1,22 +1,24 @@
 use std::{fs, path::Path};
 
+use crate::fuzzing::blackbox::fuzzer::BlackBoxFuzzer;
+use crate::fuzzing::greybox::fuzzer::Fuzzer;
 use args::Args;
 use clap::Parser;
 use config::Config;
-use greybox::fuzzer::Fuzzer;
 use log::info;
+use rand::random;
 
 mod abstract_fs;
 mod args;
-mod blackbox;
 mod config;
-mod filesystems;
-mod greybox;
+mod fuzzing;
 mod harness;
+mod hasher;
 mod mount;
 mod save;
 mod single;
 mod temp_dir;
+mod filesystems;
 
 fn main() {
     let args = Args::parse();
@@ -38,6 +40,16 @@ fn main() {
                 second_filesystem.try_into().unwrap(),
             );
             fuzzer.fuzz();
+        }
+        args::Mode::Blackbox {
+            first_filesystem,
+            second_filesystem
+        } => {
+            BlackBoxFuzzer::new(
+                first_filesystem.try_into().unwrap(),
+                second_filesystem.try_into().unwrap(),
+            )
+            .fuzz(random(), config);
         }
         args::Mode::Single {
             save_to_dir,
