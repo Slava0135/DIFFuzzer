@@ -1,7 +1,6 @@
 [greybox]
 heartbeat_interval = 30 # in seconds
 max_mutations = 10 
-max_workload_length = 100 
 timeout = 10 # in seconds
 
 [operation_weights]
@@ -47,3 +46,7 @@ weights = [
     30,
   ],
 ]
+
+count = 1000
+max_workload_length = 100
+

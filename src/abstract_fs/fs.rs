@@ -328,10 +328,7 @@ mod tests {
     #[test]
     fn test_remove_root() {
         let mut fs = AbstractFS::new();
-        assert_eq!(
-            Err(FsError::RootRemovalForbidden),
-            fs.remove("/".into())
-        );
+        assert_eq!(Err(FsError::RootRemovalForbidden), fs.remove("/".into()));
     }
 
     #[test]
@@ -372,10 +369,7 @@ mod tests {
     fn test_create() {
         let mut fs = AbstractFS::new();
         let foo = fs.create("/foobar".into(), vec![]).unwrap();
-        assert_eq!(
-            Node::FILE(foo),
-            *fs.root().children.get("foobar").unwrap()
-        );
+        assert_eq!(Node::FILE(foo), *fs.root().children.get("foobar").unwrap());
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
@@ -614,10 +608,7 @@ mod tests {
         let mut fs = AbstractFS::new();
         fs.create("/0".into(), vec![]).unwrap();
         fs.remove("/0".into()).unwrap();
-        assert_eq!(
-            Err(FsError::NotFound("/0".into())),
-            fs.remove("/0".into())
-        )
+        assert_eq!(Err(FsError::NotFound("/0".into())), fs.remove("/0".into()))
     }
 
     #[test]
@@ -749,10 +740,7 @@ mod tests {
         fs.create("/foo".into(), vec![]).unwrap();
         let des = fs.open("/foo".into()).unwrap();
         fs.close(des).unwrap();
-        assert_eq!(
-            Err(FsError::DescriptorWasClosed(des)),
-            fs.close(des)
-        );
+        assert_eq!(Err(FsError::DescriptorWasClosed(des)), fs.close(des));
     }
 
     #[test]
@@ -765,8 +753,6 @@ mod tests {
             fs.open("/foo".into())
         );
     }
-
-
 
     #[test]
     fn test_resolve_node() {
@@ -791,10 +777,7 @@ mod tests {
             fs.resolve_node("/foo/".into())
         );
         assert_eq!(Node::DIR(foo), fs.resolve_node("/foo".into()).unwrap());
-        assert_eq!(
-            Node::DIR(bar),
-            fs.resolve_node("/foo/bar".into()).unwrap()
-        );
+        assert_eq!(Node::DIR(bar), fs.resolve_node("/foo/bar".into()).unwrap());
         assert_eq!(
             Node::FILE(boo),
             fs.resolve_node("/foo/bar/boo".into()).unwrap()
