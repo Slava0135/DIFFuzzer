@@ -72,7 +72,9 @@ impl AbstractExecutor {
         let (parent_path, name) = path.split();
         let parent_idx = self.resolve_dir(parent_path.to_owned())?;
         let parent = self.dir_mut(&parent_idx);
-        parent.children.remove(&name);
+        if parent.children.remove(&name).is_none() {
+            return Err(ExecutorError::NotFound(path));
+        }
         self.recording
             .push(Operation::REMOVE { path: path.clone() });
         Ok(())
@@ -605,6 +607,17 @@ mod tests {
             exec.recording
         );
         test_replay(exec.recording);
+    }
+
+    #[test]
+    fn test_remove_twice() {
+        let mut exec = AbstractExecutor::new();
+        exec.create("/0".into(), vec![]).unwrap();
+        exec.remove("/0".into()).unwrap();
+        assert_eq!(
+            Err(ExecutorError::NotFound("/0".into())),
+            exec.remove("/0".into())
+        )
     }
 
     #[test]
