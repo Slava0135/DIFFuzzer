@@ -63,6 +63,11 @@ impl Workload {
                 Operation::CLOSE { des } => {
                     result.push_str(format!("do_close({});\n", descriptor_to_var(des)).as_str());
                 }
+                Operation::READ { des, size } => {
+                    result.push_str(
+                        format!("do_read({}, {});\n", descriptor_to_var(des), size).as_str(),
+                    );
+                }
             }
         }
         result.push_str("}");
@@ -113,6 +118,7 @@ void test_workload()
 do_mkdir("/foo", 0);
 do_create("/foo/bar", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 fd_0 = do_open("/foo/bar");
+do_read(fd_0, 1024);
 do_close(fd_0);
 do_hardlink("/foo/bar", "/baz");
 fd_1 = do_open("/baz");
@@ -141,6 +147,10 @@ do_remove("/foo");
                 Operation::OPEN {
                     path: "/foo/bar".into(),
                     des: FileDescriptor(0),
+                },
+                Operation::READ {
+                    des: FileDescriptor(0),
+                    size: 1024,
                 },
                 Operation::CLOSE {
                     des: FileDescriptor(0),

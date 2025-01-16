@@ -30,6 +30,10 @@ pub enum Operation {
     CLOSE {
         des: FileDescriptor,
     },
+    READ {
+        des: FileDescriptor,
+        size: u64,
+    },
 }
 
 #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Copy)]

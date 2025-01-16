@@ -56,6 +56,12 @@ pub struct AliveNodes {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Content;
 
+impl Content {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 impl AbstractFS {
     pub fn new() -> Self {
         AbstractFS {
@@ -192,9 +198,10 @@ impl AbstractFS {
         Ok(())
     }
 
-    pub fn read(&mut self, des: FileDescriptor, size: usize) -> Result<Content> {
+    pub fn read(&mut self, des: FileDescriptor, size: u64) -> Result<Content> {
         let file = self.find_file_by_descriptor(des)?;
-        Ok(Content {})
+        self.recording.push(Operation::READ { des, size });
+        Ok(Content::new())
     }
 
     pub fn replay(&mut self, workload: &Workload) -> Result<()> {
@@ -218,6 +225,9 @@ impl AbstractFS {
                 }
                 Operation::CLOSE { des } => {
                     self.close(des.clone())?;
+                }
+                Operation::READ { des, size } => {
+                    self.read(des.clone(), size.clone())?;
                 }
             };
         }
@@ -779,6 +789,35 @@ mod tests {
         let des = fs.open("/foo".into()).unwrap();
         fs.close(des).unwrap();
         assert_eq!(Err(FsError::DescriptorWasClosed(des)), fs.read(des, 0));
+    }
+
+    #[test]
+    fn test_read_empty() {
+        let mut fs = AbstractFS::new();
+        fs.create("/foo".into(), vec![]).unwrap();
+        let des = fs.open("/foo".into()).unwrap();
+        let content = fs.read(des, 1024).unwrap();
+        fs.close(des).unwrap();
+
+        assert_eq!(Content::new(), content);
+        assert_eq!(
+            Workload {
+                ops: vec![
+                    Operation::CREATE {
+                        path: "/foo".into(),
+                        mode: vec![]
+                    },
+                    Operation::OPEN {
+                        path: "/foo".into(),
+                        des
+                    },
+                    Operation::READ { des, size: 1024 },
+                    Operation::CLOSE { des },
+                ]
+            },
+            fs.recording
+        );
+        test_replay(fs.recording);
     }
 
     #[test]
