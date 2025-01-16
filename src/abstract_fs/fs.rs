@@ -53,6 +53,9 @@ pub struct AliveNodes {
     pub files: Vec<(FileIndex, PathName)>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct Content;
+
 impl AbstractFS {
     pub fn new() -> Self {
         AbstractFS {
@@ -181,6 +184,14 @@ impl AbstractFS {
         file.descriptor = None;
         self.recording.push(Operation::CLOSE { des });
         Ok(())
+    }
+
+    pub fn read(&mut self, des: FileDescriptor, size: usize) -> Result<Content> {
+        let file_idx = self
+            .descriptors
+            .get(des.0)
+            .ok_or(FsError::BadDescriptor(des, self.descriptors.len()))?;
+        Ok(Content {})
     }
 
     pub fn replay(&mut self, workload: &Workload) -> Result<()> {
@@ -749,6 +760,13 @@ mod tests {
             Err(FsError::FileAlreadyOpened("/foo".into())),
             fs.open("/foo".into())
         );
+    }
+
+    #[test]
+    fn test_read_bad_descriptor() {
+        let mut fs = AbstractFS::new();
+        let des = FileDescriptor(0);
+        assert_eq!(Err(FsError::BadDescriptor(des, 0)), fs.read(des, 0));
     }
 
     #[test]
