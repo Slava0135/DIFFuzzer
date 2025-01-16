@@ -249,7 +249,7 @@ impl Fuzzer {
 
         if fst_trace.has_errors() && snd_trace.has_errors() {
             warn!("both traces contain errors, potential bug in model");
-            self.report_crash(input, &input_path, self.crashes_path.clone())
+            self.report_crash(input, &input_path, self.accidents_path.clone())
                 .with_context(|| format!("failed to report accident"))?;
             return Ok(());
         }
