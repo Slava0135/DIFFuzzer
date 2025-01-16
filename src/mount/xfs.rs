@@ -20,7 +20,7 @@ impl FileSystemMount for XFS {
 }
 
 impl XFS {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {}
     }
 }

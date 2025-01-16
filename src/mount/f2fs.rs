@@ -26,7 +26,7 @@ impl FileSystemMount for F2FS {
 }
 
 impl F2FS {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {}
     }
 }

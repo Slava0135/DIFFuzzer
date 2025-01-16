@@ -20,7 +20,7 @@ impl FileSystemMount for Ext4 {
 }
 
 impl Ext4 {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {}
     }
 }

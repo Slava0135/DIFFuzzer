@@ -1,6 +1,7 @@
 use crate::mount::{btrfs::Btrfs, ext4::Ext4, f2fs::F2FS, mount::FileSystemMount, xfs::XFS};
 
-pub const FILESYSTEMS: &[&dyn FileSystemMount] = &[&Ext4 {}, &Btrfs {}, &F2FS {}, &XFS {}];
+pub const FILESYSTEMS: &[&dyn FileSystemMount] =
+    &[&Ext4::new(), &Btrfs::new(), &F2FS::new(), &XFS::new()];
 
 pub fn filesystem_available() -> Vec<String> {
     FILESYSTEMS
