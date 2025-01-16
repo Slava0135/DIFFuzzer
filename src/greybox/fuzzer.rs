@@ -1,17 +1,21 @@
 use std::{
     cell::RefCell,
-    fs, io,
+    fs::{self, read_to_string},
+    io,
     path::Path,
     rc::Rc,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
-use anyhow::Context;
-use log::{debug, error, info};
+use anyhow::{Context, Ok};
+use log::{debug, error, info, warn};
 use rand::{rngs::StdRng, SeedableRng};
 
 use crate::{
-    abstract_fs::{trace::TRACE_FILENAME, workload::Workload},
+    abstract_fs::{
+        trace::{Trace, TRACE_FILENAME},
+        workload::Workload,
+    },
     config::Config,
     greybox::{
         feedback::kcov::KCOV_FILENAME,
@@ -41,6 +45,7 @@ pub struct Fuzzer {
 
     test_dir: Box<Path>,
     crashes_path: Box<Path>,
+    accidents_path: Box<Path>,
 
     fst_kcov_feedback: KCovFeedback,
     snd_kcov_feedback: KCovFeedback,
@@ -100,6 +105,9 @@ impl Fuzzer {
         let crashes_path = Path::new("./crashes");
         fs::create_dir(crashes_path).unwrap_or(());
 
+        let accidents_path = Path::new("./accidents");
+        fs::create_dir(accidents_path).unwrap_or(());
+
         let fst_stdout = Rc::new(RefCell::new("".to_owned()));
         let fst_stderr = Rc::new(RefCell::new("".to_owned()));
         let snd_stdout = Rc::new(RefCell::new("".to_owned()));
@@ -108,10 +116,7 @@ impl Fuzzer {
         let fst_kcov_feedback = KCovFeedback::new(fst_kcov_path.clone().into_boxed_path());
         let snd_kcov_feedback = KCovFeedback::new(snd_kcov_path.clone().into_boxed_path());
 
-        let trace_objective = TraceObjective::new(
-            fst_trace_path.clone().into_boxed_path(),
-            snd_trace_path.clone().into_boxed_path(),
-        );
+        let trace_objective = TraceObjective::new();
         let console_objective = ConsoleObjective::new(fst_stdout.clone(), snd_stdout.clone());
 
         let fst_fs_name = fst_mount.to_string();
@@ -167,6 +172,7 @@ impl Fuzzer {
 
             test_dir: test_dir.into_boxed_path(),
             crashes_path: crashes_path.to_path_buf().into_boxed_path(),
+            accidents_path: accidents_path.to_path_buf().into_boxed_path(),
 
             fst_kcov_feedback,
             snd_kcov_feedback,
@@ -235,6 +241,19 @@ impl Fuzzer {
             .run(&input_path)
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
 
+        debug!("checking results");
+        let fst_trace = parse_trace(&self.fst_trace_path)
+            .with_context(|| format!("failed to parse first trace"))?;
+        let snd_trace = parse_trace(&self.snd_trace_path)
+            .with_context(|| format!("failed to parse second trace"))?;
+
+        if fst_trace.has_errors() && snd_trace.has_errors() {
+            warn!("both traces contain errors, potential bug in model");
+            self.report_crash(input, &input_path, self.accidents_path.clone())
+                .with_context(|| format!("failed to report accident"))?;
+            return Ok(());
+        }
+
         debug!("doing objectives");
         let console_is_interesting = self
             .console_objective
@@ -242,11 +261,12 @@ impl Fuzzer {
             .with_context(|| format!("failed to do console objective"))?;
         let trace_is_interesting = self
             .trace_objective
-            .is_interesting()
+            .is_interesting(&fst_trace, &snd_trace)
             .with_context(|| format!("failed to do trace objective"))?;
         if console_is_interesting || trace_is_interesting {
-            self.report_crash(input, &input_path)
+            self.report_crash(input, &input_path, self.crashes_path.clone())
                 .with_context(|| format!("failed to report crash"))?;
+            self.stats.crashes += 1;
             self.show_stats();
             return Ok(());
         }
@@ -284,11 +304,16 @@ impl Fuzzer {
         workload
     }
 
-    fn report_crash(&mut self, input: Workload, input_path: &Path) -> anyhow::Result<()> {
+    fn report_crash(
+        &mut self,
+        input: Workload,
+        input_path: &Path,
+        crash_dir: Box<Path>,
+    ) -> anyhow::Result<()> {
         let name = input.generate_name();
         debug!("report crash '{}'", name);
 
-        let crash_dir = self.crashes_path.join(name);
+        let crash_dir = crash_dir.join(name);
         if fs::exists(crash_dir.as_path()).with_context(|| {
             format!(
                 "failed to determine existence of crash directory at '{}'",
@@ -322,7 +347,8 @@ impl Fuzzer {
         )
         .with_context(|| format!("failed to save output for first harness"))?;
 
-        self.stats.crashes += 1;
+        info!("crash saved at '{}'", crash_dir.display());
+
         Ok(())
     }
 
@@ -351,4 +377,10 @@ impl Fuzzer {
 fn setup_dir(path: &Path) -> io::Result<()> {
     fs::remove_dir_all(path).unwrap_or(());
     fs::create_dir(path)
+}
+
+fn parse_trace(path: &Path) -> anyhow::Result<Trace> {
+    let trace = read_to_string(&path)
+        .with_context(|| format!("failed to read trace at '{}'", path.display()))?;
+    Ok(Trace::try_parse(trace).with_context(|| format!("failed to parse trace"))?)
 }
