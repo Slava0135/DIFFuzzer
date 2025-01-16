@@ -1,15 +1,16 @@
 use crate::abstract_fs::trace::TRACE_FILENAME;
-use crate::abstract_fs::types::{ConsolePipe, Workload};
 use crate::config::Config;
-use crate::greybox::feedback::kcov::{KCovFeedback, KCOV_FILENAME};
-use crate::greybox::fuzzer::Fuzzer;
-use crate::greybox::mutator::Mutator;
 
-use crate::harness::Harness;
+use crate::abstract_fs::workload::Workload;
+use crate::fuzzing::abstract_fuzzer::objective::console::ConsoleObjective;
+use crate::fuzzing::abstract_fuzzer::objective::trace::TraceObjective;
+use crate::harness::{ConsolePipe, Harness};
 use crate::mount::btrfs::Btrfs;
 use crate::mount::ext4::Ext4;
 use crate::mount::mount::FileSystemMount;
+use crate::save::{save_output, save_testcase};
 use crate::temp_dir::setup_temp_dir;
+use anyhow::Context;
 use log::{debug, info};
 use rand::prelude::StdRng;
 use std::cell::RefCell;
@@ -17,12 +18,8 @@ use std::fs;
 use std::path::Path;
 use std::rc::Rc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
-use anyhow::Context;
-use crate::abstract_fuzzer::objective::console::ConsoleObjective;
-use crate::abstract_fuzzer::objective::trace::TraceObjective;
-use crate::save::{save_output, save_testcase};
 
-pub struct FuzzData<FS1: FileSystemMount, FS2: FileSystemMount> {
+pub struct FuzzData {
     pub fst_exec_dir: Box<Path>,
     pub snd_exec_dir: Box<Path>,
     pub fst_trace_path: Box<Path>,
@@ -35,20 +32,24 @@ pub struct FuzzData<FS1: FileSystemMount, FS2: FileSystemMount> {
 
     pub test_dir: Box<Path>,
     pub crashes_path: Box<Path>,
+    pub accidents_path: Box<Path>,
 
     pub trace_objective: TraceObjective,
     pub console_objective: ConsoleObjective,
 
     pub fst_fs_name: String,
     pub snd_fs_name: String,
-    pub fst_harness: Harness<FS1>,
-    pub snd_harness: Harness<FS2>,
+    pub fst_harness: Harness,
+    pub snd_harness: Harness,
 
     pub stats: Stats,
 }
 
-impl<FS1: FileSystemMount, FS2: FileSystemMount> FuzzData<FS1, FS2> {
-    pub fn new(fst_fs: FS1, snd_fs: FS2) -> Self {
+impl FuzzData {
+    pub fn new(
+        fst_mount: &'static dyn FileSystemMount,
+        snd_mount: &'static dyn FileSystemMount,
+    ) -> Self {
         info!("new fuzzer");
 
         let temp_dir = setup_temp_dir();
@@ -64,27 +65,22 @@ impl<FS1: FileSystemMount, FS2: FileSystemMount> FuzzData<FS1, FS2> {
         let crashes_path = Path::new("./crashes");
         fs::create_dir(crashes_path).unwrap_or(());
 
+        let accidents_path = Path::new("./accidents");
+        fs::create_dir(accidents_path).unwrap_or(());
+
         let fst_stdout = Rc::new(RefCell::new("".to_owned()));
         let fst_stderr = Rc::new(RefCell::new("".to_owned()));
         let snd_stdout = Rc::new(RefCell::new("".to_owned()));
         let snd_stderr = Rc::new(RefCell::new("".to_owned()));
 
-        let trace_objective = TraceObjective::new(
-            fst_trace_path.clone().into_boxed_path(),
-            snd_trace_path.clone().into_boxed_path(),
-        );
-        let console_objective = ConsoleObjective::new(
-            fst_stdout.clone(),
-            fst_stderr.clone(),
-            snd_stdout.clone(),
-            snd_stderr.clone(),
-        );
+        let trace_objective = TraceObjective::new();
+        let console_objective = ConsoleObjective::new(fst_stdout.clone(), snd_stdout.clone());
 
-        let fst_fs_name = fst_fs.to_string();
-        let snd_fs_name = snd_fs.to_string();
+        let fst_fs_name = fst_mount.to_string();
+        let snd_fs_name = snd_mount.to_string();
 
         let fst_harness = Harness::new(
-            fst_fs,
+            fst_mount,
             Path::new("/mnt")
                 .join(fst_fs_name.to_lowercase())
                 .join("fstest")
@@ -95,7 +91,7 @@ impl<FS1: FileSystemMount, FS2: FileSystemMount> FuzzData<FS1, FS2> {
         );
 
         let snd_harness = Harness::new(
-            snd_fs,
+            snd_mount,
             Path::new("/mnt")
                 .join(snd_fs_name.to_lowercase())
                 .join("fstest")
@@ -118,6 +114,7 @@ impl<FS1: FileSystemMount, FS2: FileSystemMount> FuzzData<FS1, FS2> {
 
             test_dir: test_dir.into_boxed_path(),
             crashes_path: crashes_path.to_path_buf().into_boxed_path(),
+            accidents_path: accidents_path.to_path_buf().into_boxed_path(),
 
             trace_objective,
             console_objective,
@@ -131,19 +128,23 @@ impl<FS1: FileSystemMount, FS2: FileSystemMount> FuzzData<FS1, FS2> {
         }
     }
 
-
-    pub(crate) fn report_crash(&mut self, input: Workload, input_path: &Path) -> anyhow::Result<()> {
+    pub fn report_crash(
+        &mut self,
+        input: Workload,
+        input_path: &Path,
+        crash_dir: Box<Path>,
+    ) -> anyhow::Result<()> {
         let name = input.generate_name();
         debug!("report crash '{}'", name);
 
-        let crash_dir = self.crashes_path.join(name);
+        let crash_dir = crash_dir.join(name);
         if fs::exists(crash_dir.as_path()).with_context(|| {
             format!(
                 "failed to determine existence of crash directory at '{}'",
                 crash_dir.display()
             )
         })? {
-            return Ok(());
+            return anyhow::Ok(());
         }
         fs::create_dir(crash_dir.as_path()).with_context(|| {
             format!(
@@ -160,7 +161,7 @@ impl<FS1: FileSystemMount, FS2: FileSystemMount> FuzzData<FS1, FS2> {
             self.fst_stdout.borrow().clone(),
             self.fst_stderr.borrow().clone(),
         )
-            .with_context(|| format!("failed to save output for first harness"))?;
+        .with_context(|| format!("failed to save output for first harness"))?;
         save_output(
             &crash_dir,
             &self.snd_trace_path,
@@ -168,13 +169,14 @@ impl<FS1: FileSystemMount, FS2: FileSystemMount> FuzzData<FS1, FS2> {
             self.snd_stdout.borrow().clone(),
             self.snd_stderr.borrow().clone(),
         )
-            .with_context(|| format!("failed to save output for first harness"))?;
+        .with_context(|| format!("failed to save output for first harness"))?;
 
-        self.stats.crashes += 1;
-        Ok(())
+        info!("crash saved at '{}'", crash_dir.display());
+
+        anyhow::Ok(())
     }
 
-    pub(crate) fn show_stats(&mut self) {
+    pub fn show_stats(&mut self) {
         self.stats.last_time_showed = Instant::now();
         let since_start = Instant::now().duration_since(self.stats.start);
         let secs = since_start.as_secs();
@@ -190,11 +192,11 @@ impl<FS1: FileSystemMount, FS2: FileSystemMount> FuzzData<FS1, FS2> {
     }
 }
 
-struct Stats {
-    executions: usize,
-    crashes: usize,
-    start: Instant,
-    last_time_showed: Instant,
+pub struct Stats {
+    pub executions: usize,
+    pub crashes: usize,
+    pub start: Instant,
+    pub last_time_showed: Instant,
 }
 
 impl Stats {

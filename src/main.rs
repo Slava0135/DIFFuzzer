@@ -1,26 +1,24 @@
 use std::{fs, path::Path};
 
+use crate::fuzzing::blackbox::fuzzer::BlackBoxFuzzer;
+use crate::fuzzing::greybox::fuzzer::Fuzzer;
 use args::Args;
 use clap::Parser;
 use config::Config;
-use greybox::fuzzer::Fuzzer;
 use log::info;
-use mount::{btrfs::Btrfs, ext4::Ext4};
 use rand::random;
-use crate::blackbox::fuzzer::BlackBoxFuzzer;
 
 mod abstract_fs;
-mod abstract_fuzzer;
 mod args;
-mod blackbox;
 mod config;
-mod greybox;
+mod fuzzing;
 mod harness;
 mod hasher;
 mod mount;
 mod save;
 mod single;
 mod temp_dir;
+mod filesystems;
 
 fn main() {
     let args = Args::parse();
@@ -45,15 +43,13 @@ fn main() {
         }
         args::Mode::Blackbox {
             first_filesystem,
-            second_filesystem,
-            count,
-            trace_len,
+            second_filesystem
         } => {
-            //todo: create fs instance from input data (without match if possible)
             BlackBoxFuzzer::new(
-                Ext4::new(),
-                Btrfs::new()
-            ).fuzz(count, trace_len, random(), config);
+                first_filesystem.try_into().unwrap(),
+                second_filesystem.try_into().unwrap(),
+            )
+            .fuzz(random(), config);
         }
         args::Mode::Single {
             save_to_dir,
