@@ -108,7 +108,13 @@ pub fn append_one(
             .choose(rng)
             .unwrap()
             .to_owned();
-            let new_path = alive.dirs.choose(rng).unwrap().to_owned();
+            let alive_non_subdirectories: Vec<PathName> = alive
+                .dirs
+                .iter()
+                .filter(|p| !old_path.is_prefix_of(p))
+                .map(|p| p.clone())
+                .collect();
+            let new_path = alive_non_subdirectories.choose(rng).unwrap().to_owned();
             executor
                 .rename(old_path, new_path.join(gen_name()))
                 .unwrap();

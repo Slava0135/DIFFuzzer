@@ -57,8 +57,33 @@ impl PathName {
     }
 
     pub fn is_prefix_of(&self, other: &PathName) -> bool {
-        other.0.starts_with(&self.0)
+        let segments = self.segments();
+        let other_segments = other.segments();
+        if other_segments.len() < segments.len() {
+            return false;
+        } else {
+            for i in 0..segments.len() {
+                if segments[i] != other_segments[i] {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 }
 
 pub type Name = String;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_prefix_of() {
+        assert!(PathName::from("/1/2").is_prefix_of(&PathName::from("/1/2/3")));
+        assert!(!PathName::from("/1/2").is_prefix_of(&PathName::from("/1/20/3")));
+        assert!(!PathName::from("/1/2").is_prefix_of(&PathName::from("/1")));
+        assert!(PathName::from("/").is_prefix_of(&PathName::from("/1")));
+        assert!(PathName::from("/1").is_prefix_of(&PathName::from("/1")));
+    }
+}
