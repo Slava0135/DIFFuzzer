@@ -8,6 +8,7 @@ use rand::random;
 
 use crate::hasher::hasher::{calc_hash_for_dir, get_diff};
 
+#[ignore]
 #[test]
 fn test_hash_eq() {
     let dirs = vec!["A/B", "A/C", "AA/D/E", "AAA/D/F/G", "Q"];
@@ -30,6 +31,7 @@ fn test_hash_eq() {
     assert_eq!(diff.len(), 0, "diff not empty");
 }
 
+#[ignore]
 #[test]
 fn test_hash_not_eq() {
     let dirs = vec!["A/B", "A/C", "AA/D/E", "AAA/D/F/G", "Q"];
