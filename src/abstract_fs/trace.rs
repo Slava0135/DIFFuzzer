@@ -88,6 +88,9 @@ impl Trace {
     pub fn same_as(&self, other: &Trace) -> bool {
         self == other
     }
+    pub fn has_errors(&self) -> bool {
+        self.rows.iter().any(|row| row.errno.code != 0)
+    }
 }
 
 #[cfg(test)]
