@@ -53,6 +53,9 @@ pub struct AliveNodes {
     pub files: Vec<(FileIndex, PathName)>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct Content;
+
 impl AbstractFS {
     pub fn new() -> Self {
         AbstractFS {
@@ -181,6 +184,14 @@ impl AbstractFS {
         file.descriptor = None;
         self.recording.push(Operation::CLOSE { des });
         Ok(())
+    }
+
+    pub fn read(&mut self, des: FileDescriptor, size: usize) -> Result<Content> {
+        let file_idx = self
+            .descriptors
+            .get(des.0)
+            .ok_or(FsError::BadDescriptor(des, self.descriptors.len()))?;
+        Ok(Content {})
     }
 
     pub fn replay(&mut self, workload: &Workload) -> Result<()> {
@@ -328,10 +339,7 @@ mod tests {
     #[test]
     fn test_remove_root() {
         let mut fs = AbstractFS::new();
-        assert_eq!(
-            Err(FsError::RootRemovalForbidden),
-            fs.remove("/".into())
-        );
+        assert_eq!(Err(FsError::RootRemovalForbidden), fs.remove("/".into()));
     }
 
     #[test]
@@ -372,10 +380,7 @@ mod tests {
     fn test_create() {
         let mut fs = AbstractFS::new();
         let foo = fs.create("/foobar".into(), vec![]).unwrap();
-        assert_eq!(
-            Node::FILE(foo),
-            *fs.root().children.get("foobar").unwrap()
-        );
+        assert_eq!(Node::FILE(foo), *fs.root().children.get("foobar").unwrap());
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
@@ -614,10 +619,7 @@ mod tests {
         let mut fs = AbstractFS::new();
         fs.create("/0".into(), vec![]).unwrap();
         fs.remove("/0".into()).unwrap();
-        assert_eq!(
-            Err(FsError::NotFound("/0".into())),
-            fs.remove("/0".into())
-        )
+        assert_eq!(Err(FsError::NotFound("/0".into())), fs.remove("/0".into()))
     }
 
     #[test]
@@ -749,10 +751,7 @@ mod tests {
         fs.create("/foo".into(), vec![]).unwrap();
         let des = fs.open("/foo".into()).unwrap();
         fs.close(des).unwrap();
-        assert_eq!(
-            Err(FsError::DescriptorWasClosed(des)),
-            fs.close(des)
-        );
+        assert_eq!(Err(FsError::DescriptorWasClosed(des)), fs.close(des));
     }
 
     #[test]
@@ -766,7 +765,12 @@ mod tests {
         );
     }
 
-
+    #[test]
+    fn test_read_bad_descriptor() {
+        let mut fs = AbstractFS::new();
+        let des = FileDescriptor(0);
+        assert_eq!(Err(FsError::BadDescriptor(des, 0)), fs.read(des, 0));
+    }
 
     #[test]
     fn test_resolve_node() {
@@ -791,10 +795,7 @@ mod tests {
             fs.resolve_node("/foo/".into())
         );
         assert_eq!(Node::DIR(foo), fs.resolve_node("/foo".into()).unwrap());
-        assert_eq!(
-            Node::DIR(bar),
-            fs.resolve_node("/foo/bar".into()).unwrap()
-        );
+        assert_eq!(Node::DIR(bar), fs.resolve_node("/foo/bar".into()).unwrap());
         assert_eq!(
             Node::FILE(boo),
             fs.resolve_node("/foo/bar/boo".into()).unwrap()
