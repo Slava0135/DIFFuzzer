@@ -3,11 +3,7 @@ use std::collections::{HashMap, VecDeque};
 use thiserror::Error;
 
 use super::{
-    flags::Mode,
-    node::{Content, Dir, DirIndex, File, FileDescriptor, FileDescriptorIndex, FileIndex, Node},
-    operation::Operation,
-    pathname::{Name, PathName},
-    workload::Workload,
+    content::Content, flags::Mode, node::{Dir, DirIndex, File, FileDescriptor, FileDescriptorIndex, FileIndex, Node}, operation::Operation, pathname::{Name, PathName}, workload::Workload
 };
 
 type Result<T> = std::result::Result<T, FsError>;
@@ -377,7 +373,7 @@ impl AbstractFS {
 
 #[cfg(test)]
 mod tests {
-    use crate::abstract_fs::node::SourceSlice;
+    use crate::abstract_fs::content::SourceSlice;
 
     use super::*;
 
