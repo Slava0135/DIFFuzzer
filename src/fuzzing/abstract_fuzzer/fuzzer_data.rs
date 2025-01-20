@@ -4,7 +4,7 @@ use crate::abstract_fs::workload::Workload;
 use crate::fuzzing::abstract_fuzzer::objective::console::ConsoleObjective;
 use crate::fuzzing::abstract_fuzzer::objective::trace::TraceObjective;
 use crate::harness::{ConsolePipe, Harness};
-use crate::hasher::hasher::FileDiff;
+use crate::hasher::hasher::{FileDiff, HasherOptions};
 use crate::mount::mount::FileSystemMount;
 use crate::save::{save_diff, save_output, save_testcase};
 use crate::temp_dir::setup_temp_dir;
@@ -40,6 +40,8 @@ pub struct FuzzData {
     pub snd_harness: Harness,
 
     pub stats: Stats,
+
+    pub hasher_options: HasherOptions,
 }
 
 impl FuzzData {
@@ -122,6 +124,7 @@ impl FuzzData {
             snd_harness,
 
             stats: Stats::new(),
+            hasher_options: Default::default(),
         }
     }
 

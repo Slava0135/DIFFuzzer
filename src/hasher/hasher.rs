@@ -31,6 +31,20 @@ pub enum FileDiff {
     OneExists(FileInfo),
 }
 
+pub struct HasherOptions {
+    nlink: bool,
+    mode: bool,
+}
+
+impl Default for HasherOptions {
+    fn default() -> Self {
+        Self {
+            nlink: false,
+            mode: false,
+        }
+    }
+}
+
 impl Display for FileInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -42,7 +56,7 @@ impl Display for FileInfo {
 }
 
 // if nlink = True, include nlink to hash. Same for mode.
-pub fn calc_hash_for_dir(path: &Path, seed: u64, nlink: bool, mode: bool) -> u64 {
+pub fn calc_hash_for_dir(path: &Path, seed: u64, hasher_options: &HasherOptions) -> u64 {
     let mut hasher = XxHash64::with_seed(seed);
 
     for entry in WalkDir::new(path).sort_by(|a, b| a.file_name().cmp(b.file_name())) {
@@ -59,10 +73,10 @@ pub fn calc_hash_for_dir(path: &Path, seed: u64, nlink: bool, mode: bool) -> u64
         hasher.write_u32(metadata.gid());
         hasher.write_u32(metadata.uid());
         hasher.write_u64(metadata.size());
-        if nlink {
+        if hasher_options.nlink {
             hasher.write(&metadata.nlink().to_le_bytes());
         }
-        if mode {
+        if hasher_options.mode {
             hasher.write(&metadata.mode().to_le_bytes());
         }
     }
@@ -70,7 +84,7 @@ pub fn calc_hash_for_dir(path: &Path, seed: u64, nlink: bool, mode: bool) -> u64
     return hasher.finish();
 }
 
-pub fn get_diff(path_fst: &Path, path_snd: &Path, nlink: bool, mode: bool) -> Vec<FileDiff> {
+pub fn get_diff(path_fst: &Path, path_snd: &Path, hasher_options: &HasherOptions) -> Vec<FileDiff> {
     let vec_fst = get_dir_content(path_fst);
     let vec_snd = get_dir_content(path_snd);
     let mut i_fst = vec_fst.len() - 1;
@@ -83,9 +97,9 @@ pub fn get_diff(path_fst: &Path, path_snd: &Path, nlink: bool, mode: bool) -> Ve
             Ordering::Equal => {
                 let seed = random();
                 let hash_fst =
-                    calc_hash_for_dir(vec_fst[i_fst].abs_path.as_ref(), seed, nlink, mode);
+                    calc_hash_for_dir(vec_fst[i_fst].abs_path.as_ref(), seed, &hasher_options);
                 let hash_snd =
-                    calc_hash_for_dir(vec_snd[i_snd].abs_path.as_ref(), seed, nlink, mode);
+                    calc_hash_for_dir(vec_snd[i_snd].abs_path.as_ref(), seed, &hasher_options);
                 if hash_fst != hash_snd {
                     res.push(DifferentHash {
                         fst: vec_fst[i_fst].clone(),
