@@ -29,17 +29,17 @@ impl BlackBoxFuzzer {
 
         match test_count {
             None => loop {
-                self.fuzz_one(seed, &mut rng, trace_len, &config);
+                self.fuzz_one(&mut rng, trace_len, &config);
             },
             Some(count) => {
                 for _ in 0..count {
-                    self.fuzz_one(seed, &mut rng, trace_len, &config);
+                    self.fuzz_one(&mut rng, trace_len, &config);
                 }
             }
         }
     }
 
-    fn fuzz_one(&mut self, seed: u64, rng: &mut StdRng, trace_len: usize, config: &Config) {
+    fn fuzz_one(&mut self, rng: &mut StdRng, trace_len: usize, config: &Config) {
         let workload = generate_new(rng, trace_len, &config.operation_weights);
         let wl_path = workload
             .compile(&self.data.test_dir)
@@ -78,12 +78,10 @@ impl BlackBoxFuzzer {
 
         let fst_hash = calc_hash_for_dir(
             self.data.fst_exec_dir.as_ref(),
-            seed,
             &self.data.hasher_options,
         );
         let snd_hash = calc_hash_for_dir(
             self.data.snd_exec_dir.as_ref(),
-            seed,
             &self.data.hasher_options,
         );
 

@@ -2,7 +2,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Ok};
 use log::{debug, error, info, warn};
-use rand::{random, rngs::StdRng, SeedableRng};
+use rand::{rngs::StdRng, SeedableRng};
 
 use crate::fuzzing::abstract_fuzzer::fuzzer_data::FuzzData;
 use crate::fuzzing::abstract_fuzzer::utils::{parse_trace, setup_dir};
@@ -116,15 +116,12 @@ impl Fuzzer {
             .run(&input_path)
             .with_context(|| format!("failed to run second harness '{}'", self.data.snd_fs_name))?;
 
-        let seed = random();
         let fst_hash = calc_hash_for_dir(
             self.data.fst_exec_dir.as_ref(),
-            seed,
             &self.data.hasher_options,
         );
         let snd_hash = calc_hash_for_dir(
             self.data.snd_exec_dir.as_ref(),
-            seed,
             &self.data.hasher_options,
         );
 

@@ -6,11 +6,11 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::sync::OnceLock;
 
-use crate::hasher::hasher::FileDiff::DifferentHash;
-use crate::hasher::hasher::FileDiff::OneExists;
-use rand::random;
 use twox_hash::XxHash64;
 use walkdir::WalkDir;
+
+use crate::hasher::hasher::FileDiff::DifferentHash;
+use crate::hasher::hasher::FileDiff::OneExists;
 
 pub const DIFF_HASH_FILENAME: &str = "diff_hash.txt";
 
@@ -56,8 +56,8 @@ impl Display for FileInfo {
 }
 
 // if nlink = True, include nlink to hash. Same for mode.
-pub fn calc_hash_for_dir(path: &Path, seed: u64, hasher_options: &HasherOptions) -> u64 {
-    let mut hasher = XxHash64::with_seed(seed);
+pub fn calc_hash_for_dir(path: &Path, hasher_options: &HasherOptions) -> u64 {
+    let mut hasher = XxHash64::default();
 
     for entry in WalkDir::new(path).sort_by(|a, b| a.file_name().cmp(b.file_name())) {
         let entry = entry.unwrap();
@@ -95,11 +95,10 @@ pub fn get_diff(path_fst: &Path, path_snd: &Path, hasher_options: &HasherOptions
         let cmp_res = vec_fst[i_fst].rel_path.cmp(&vec_snd[i_snd].rel_path);
         match cmp_res {
             Ordering::Equal => {
-                let seed = random();
                 let hash_fst =
-                    calc_hash_for_dir(vec_fst[i_fst].abs_path.as_ref(), seed, &hasher_options);
+                    calc_hash_for_dir(vec_fst[i_fst].abs_path.as_ref(), &hasher_options);
                 let hash_snd =
-                    calc_hash_for_dir(vec_snd[i_snd].abs_path.as_ref(), seed, &hasher_options);
+                    calc_hash_for_dir(vec_snd[i_snd].abs_path.as_ref(), &hasher_options);
                 if hash_fst != hash_snd {
                     res.push(DifferentHash {
                         fst: vec_fst[i_fst].clone(),
