@@ -83,7 +83,7 @@ impl Fuzzer {
                 .as_secs()
                 > self.heartbeat_interval.into()
             {
-                self.data.show_stats();
+                self.show_stats();
             }
         }
     }
@@ -160,8 +160,7 @@ impl Fuzzer {
                 .report_crash(input, &input_path, self.data.crashes_path.clone(), diff)
                 .with_context(|| format!("failed to report crash"))?;
             self.data.stats.crashes += 1;
-            self.show_stats_corpus();
-            self.data.show_stats();
+            self.show_stats();
             return Ok(());
         }
 
@@ -182,7 +181,7 @@ impl Fuzzer {
             })?;
         if fst_kcov_is_interesting || snd_kcov_is_interesting {
             self.add_to_corpus(input);
-            self.data.show_stats();
+            self.show_stats();
             return Ok(());
         }
 
@@ -203,7 +202,20 @@ impl Fuzzer {
         self.corpus.push(input);
     }
 
-    fn show_stats_corpus(&self) {
-        info!("corpus: {}, ", self.corpus.len());
+    pub fn show_stats(&mut self) {
+        self.data.stats.last_time_showed = Instant::now();
+        let since_start = Instant::now().duration_since(self.data.stats.start);
+        let secs = since_start.as_secs();
+        info!(
+            "corpus: {}, crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
+            self.corpus.len(),
+            self.data.stats.crashes,
+            self.data.stats.executions,
+            (self.data.stats.executions as f64) / (secs as f64),
+            secs / (60 * 60),
+            (secs / (60)) % 60,
+            secs % 60,
+        );
     }
+
 }

@@ -175,21 +175,6 @@ impl FuzzData {
 
         anyhow::Ok(())
     }
-
-    pub fn show_stats(&mut self) {
-        self.stats.last_time_showed = Instant::now();
-        let since_start = Instant::now().duration_since(self.stats.start);
-        let secs = since_start.as_secs();
-        info!(
-            "crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
-            self.stats.crashes,
-            self.stats.executions,
-            (self.stats.executions as f64) / (secs as f64),
-            secs / (60 * 60),
-            (secs / (60)) % 60,
-            secs % 60,
-        );
-    }
 }
 
 pub struct Stats {

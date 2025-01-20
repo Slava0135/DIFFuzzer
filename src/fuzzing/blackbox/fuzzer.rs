@@ -1,5 +1,6 @@
+use std::time::Instant;
 use anyhow::Context;
-use log::{debug, warn};
+use log::{debug, info, warn};
 use rand::prelude::StdRng;
 use rand::SeedableRng;
 
@@ -124,7 +125,22 @@ impl BlackBoxFuzzer {
                 .report_crash(workload, &wl_path, self.data.crashes_path.clone(), diff)
                 .with_context(|| format!("failed to report crash"))
                 .unwrap();
-            self.data.show_stats();
+            self.show_stats();
         }
+    }
+
+    pub fn show_stats(&mut self) {
+        self.data.stats.last_time_showed = Instant::now();
+        let since_start = Instant::now().duration_since(self.data.stats.start);
+        let secs = since_start.as_secs();
+        info!(
+            "crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
+            self.data.stats.crashes,
+            self.data.stats.executions,
+            (self.data.stats.executions as f64) / (secs as f64),
+            secs / (60 * 60),
+            (secs / (60)) % 60,
+            secs % 60,
+        );
     }
 }
