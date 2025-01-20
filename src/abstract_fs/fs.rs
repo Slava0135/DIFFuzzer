@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use super::{
     flags::Mode,
-    node::{Content, Dir, DirIndex, File, FileDescriptor, FileIndex, Node},
+    node::{Content, Dir, DirIndex, File, FileDescriptor, FileDescriptorIndex, FileIndex, Node},
     operation::Operation,
     pathname::{Name, PathName},
     workload::Workload,
@@ -29,9 +29,9 @@ pub enum FsError {
     #[error("directory '{0}' is not empty")]
     DirNotEmpty(PathName),
     #[error("bad descriptor '{0}' ({1} created)")]
-    BadDescriptor(FileDescriptor, usize),
+    BadDescriptor(FileDescriptorIndex, usize),
     #[error("descriptor '{0}' was already closed")]
-    DescriptorWasClosed(FileDescriptor),
+    DescriptorWasClosed(FileDescriptorIndex),
     #[error("file at '{0}' was already opened")]
     FileAlreadyOpened(PathName),
     #[error("tried to rename '{0}' into subdirectory of itself '{1}'")]
@@ -42,7 +42,7 @@ pub struct AbstractFS {
     pub dirs: Vec<Dir>,
     pub files: Vec<File>,
 
-    pub descriptors: Vec<FileIndex>,
+    pub descriptors: Vec<FileDescriptor>,
 
     pub recording: Workload,
 }
@@ -159,50 +159,68 @@ impl AbstractFS {
         Ok(node)
     }
 
-    pub fn open(&mut self, path: PathName) -> Result<FileDescriptor> {
-        let des = FileDescriptor(self.descriptors.len());
+    pub fn open(&mut self, path: PathName) -> Result<FileDescriptorIndex> {
+        let des = FileDescriptorIndex(self.descriptors.len());
         let file_idx = self.resolve_file(path.clone())?;
         let file = self.file_mut(&file_idx);
         if file.descriptor.is_some() {
             return Err(FsError::FileAlreadyOpened(path));
         }
         file.descriptor = Some(des);
-        self.descriptors.push(file_idx);
+        self.descriptors.push(FileDescriptor {
+            file: file_idx,
+            offset: 0,
+        });
         self.recording.push(Operation::OPEN { path, des });
         Ok(des)
     }
 
-    fn find_file_by_descriptor(&mut self, des: FileDescriptor) -> Result<&mut File> {
-        let file_idx = self
-            .descriptors
-            .get(des.0)
-            .ok_or(FsError::BadDescriptor(des, self.descriptors.len()))?
-            .clone();
-        let file = self.file_mut(&file_idx);
-        if file.descriptor != Some(des) {
-            return Err(FsError::DescriptorWasClosed(des));
+    pub fn close(&mut self, des_idx: FileDescriptorIndex) -> Result<()> {
+        let des = self.descriptor(&des_idx)?.clone();
+        let file = self.file_mut(&des.file);
+        if file.descriptor != Some(des_idx) {
+            return Err(FsError::DescriptorWasClosed(des_idx));
         }
-        Ok(file)
-    }
-
-    pub fn close(&mut self, des: FileDescriptor) -> Result<()> {
-        let file = self.find_file_by_descriptor(des)?;
         file.descriptor = None;
-        self.recording.push(Operation::CLOSE { des });
+        self.recording.push(Operation::CLOSE { des: des_idx });
         Ok(())
     }
 
-    pub fn read(&mut self, des: FileDescriptor, size: u64) -> Result<Content> {
-        let file = self.find_file_by_descriptor(des)?;
-        self.recording.push(Operation::READ { des, size });
-        Ok(Content::new())
+    pub fn read(&mut self, des_idx: FileDescriptorIndex, size: u64) -> Result<Content> {
+        let des = self.descriptor(&des_idx)?.clone();
+        let offset = des.offset;
+        let file = self.file_mut(&des.file);
+        if file.descriptor != Some(des_idx) {
+            return Err(FsError::DescriptorWasClosed(des_idx));
+        }
+        let content = file.content.read(offset, size);
+        let file_size = file.content.size();
+        let des = self.descriptor_mut(&des_idx)?;
+        des.offset += content.size();
+        assert!(des.offset <= file_size);
+        self.recording.push(Operation::READ { des: des_idx, size });
+        Ok(content)
     }
 
-    pub fn write(&mut self, des: FileDescriptor, src_offset: u64, size: u64) -> Result<()> {
-        let file = self.find_file_by_descriptor(des)?;
-        file.content.write(src_offset, size);
+    pub fn write(
+        &mut self,
+        des_idx: FileDescriptorIndex,
+        src_offset: u64,
+        size: u64,
+    ) -> Result<()> {
+        let des = self.descriptor(&des_idx)?.clone();
+        let file = self.file_mut(&des.file);
+        if file.descriptor != Some(des_idx) {
+            return Err(FsError::DescriptorWasClosed(des_idx));
+        }
+        let offset = des.offset;
+        file.content.write(src_offset, offset, size);
+        let file_size = file.content.size();
+        let des = self.descriptor_mut(&des_idx)?;
+        des.offset += size;
+        assert!(des.offset <= file_size);
         self.recording.push(Operation::WRITE {
-            des,
+            des: des_idx,
             src_offset,
             size,
         });
@@ -269,6 +287,21 @@ impl AbstractFS {
     #[allow(dead_code)]
     fn root(&self) -> &Dir {
         self.dirs.get(0).unwrap()
+    }
+
+    fn descriptor(&self, idx: &FileDescriptorIndex) -> Result<&FileDescriptor> {
+        Ok(self
+            .descriptors
+            .get(idx.0)
+            .ok_or(FsError::BadDescriptor(idx.clone(), self.descriptors.len()))?)
+    }
+
+    fn descriptor_mut(&mut self, idx: &FileDescriptorIndex) -> Result<&mut FileDescriptor> {
+        let len = self.descriptors.len();
+        Ok(self
+            .descriptors
+            .get_mut(idx.0)
+            .ok_or(FsError::BadDescriptor(idx.clone(), len))?)
     }
 
     pub fn resolve_node(&self, path: PathName) -> Result<Node> {
@@ -765,7 +798,7 @@ mod tests {
     #[test]
     fn test_close_bad_descriptor() {
         let mut fs = AbstractFS::new();
-        let des = FileDescriptor(0);
+        let des = FileDescriptorIndex(0);
         assert_eq!(Err(FsError::BadDescriptor(des, 0)), fs.close(des));
     }
 
@@ -792,7 +825,7 @@ mod tests {
     #[test]
     fn test_read_bad_descriptor() {
         let mut fs = AbstractFS::new();
-        let des = FileDescriptor(0);
+        let des = FileDescriptorIndex(0);
         assert_eq!(Err(FsError::BadDescriptor(des, 0)), fs.read(des, 0));
     }
 
@@ -837,7 +870,7 @@ mod tests {
     #[test]
     fn test_write_bad_descriptor() {
         let mut fs = AbstractFS::new();
-        let des = FileDescriptor(0);
+        let des = FileDescriptorIndex(0);
         assert_eq!(Err(FsError::BadDescriptor(des, 0)), fs.write(des, 0, 0));
     }
 
@@ -942,6 +975,93 @@ mod tests {
                         size: 55
                     },
                     Operation::CLOSE { des: des_2 },
+                ]
+            },
+            fs.recording
+        );
+        test_replay(fs.recording);
+    }
+
+    #[test]
+    fn test_read() {
+        let mut fs = AbstractFS::new();
+        fs.create("/foo".into(), vec![]).unwrap();
+        let des_write = fs.open("/foo".into()).unwrap();
+        fs.write(des_write, 13, 100).unwrap();
+        fs.write(des_write, 42, 55).unwrap();
+        fs.close(des_write).unwrap();
+        let des_read = fs.open("/foo".into()).unwrap();
+        assert_eq!(
+            Vec::<SourceSlice>::new(),
+            fs.read(des_read, 0).unwrap().slices()
+        );
+        assert_eq!(
+            vec![SourceSlice {
+                from: 13,
+                to: 13 + 10 - 1
+            }],
+            fs.read(des_read, 10).unwrap().slices()
+        );
+        assert_eq!(
+            vec![SourceSlice {
+                from: (13 + 10),
+                to: (13 + 10) + 10 - 1
+            }],
+            fs.read(des_read, 10).unwrap().slices()
+        );
+        assert_eq!(
+            vec![
+                SourceSlice {
+                    from: (13 + 20),
+                    to: 13 + 100 - 1
+                },
+                SourceSlice {
+                    from: 42,
+                    to: 42 + 55 - 1
+                },
+            ],
+            fs.read(des_read, 1024).unwrap().slices()
+        );
+        fs.close(des_read).unwrap();
+
+        assert_eq!(
+            Workload {
+                ops: vec![
+                    Operation::CREATE {
+                        path: "/foo".into(),
+                        mode: vec![]
+                    },
+                    Operation::OPEN {
+                        path: "/foo".into(),
+                        des: des_write
+                    },
+                    Operation::WRITE {
+                        des: des_write,
+                        src_offset: 13,
+                        size: 100
+                    },
+                    Operation::CLOSE { des: des_write },
+                    Operation::OPEN {
+                        path: "/foo".into(),
+                        des: des_read
+                    },
+                    Operation::READ {
+                        des: des_read,
+                        size: 0
+                    },
+                    Operation::READ {
+                        des: des_read,
+                        size: 10
+                    },
+                    Operation::READ {
+                        des: des_read,
+                        size: 10
+                    },
+                    Operation::READ {
+                        des: des_read,
+                        size: 1024
+                    },
+                    Operation::CLOSE { des: des_read },
                 ]
             },
             fs.recording

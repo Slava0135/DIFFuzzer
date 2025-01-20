@@ -3,7 +3,7 @@ use rand::{seq::SliceRandom, Rng};
 use super::{
     flags::ModeFlag,
     fs::AbstractFS,
-    node::FileDescriptor,
+    node::FileDescriptorIndex,
     operation::{OperationKind, OperationWeights},
     pathname::{Name, PathName},
     workload::Workload,
@@ -48,7 +48,7 @@ pub fn append_one(
         .filter(|(idx, _)| fs.file(idx).descriptor.is_none())
         .map(|(_, p)| p.clone())
         .collect();
-    let alive_open_files: Vec<FileDescriptor> = alive
+    let alive_open_files: Vec<FileDescriptorIndex> = alive
         .files
         .iter()
         .map(|(idx, _)| fs.file(idx).descriptor)

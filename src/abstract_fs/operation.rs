@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{flags::Mode, node::FileDescriptor, pathname::PathName};
+use super::{flags::Mode, node::FileDescriptorIndex, pathname::PathName};
 
 #[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
 pub enum Operation {
@@ -25,17 +25,17 @@ pub enum Operation {
     },
     OPEN {
         path: PathName,
-        des: FileDescriptor,
+        des: FileDescriptorIndex,
     },
     CLOSE {
-        des: FileDescriptor,
+        des: FileDescriptorIndex,
     },
     READ {
-        des: FileDescriptor,
+        des: FileDescriptorIndex,
         size: u64,
     },
     WRITE {
-        des: FileDescriptor,
+        des: FileDescriptorIndex,
         src_offset: u64,
         size: u64,
     },

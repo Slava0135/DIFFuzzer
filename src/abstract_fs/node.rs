@@ -14,9 +14,9 @@ pub struct FileIndex(pub usize);
 pub struct DirIndex(pub usize);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct FileDescriptor(pub usize);
+pub struct FileDescriptorIndex(pub usize);
 
-impl Display for FileDescriptor {
+impl Display for FileDescriptorIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
@@ -24,14 +24,26 @@ impl Display for FileDescriptor {
 
 #[derive(Debug, Clone)]
 pub struct File {
-    pub descriptor: Option<FileDescriptor>,
+    pub descriptor: Option<FileDescriptorIndex>,
     pub content: Content,
+}
+
+#[derive(Debug, Clone)]
+pub struct FileDescriptor {
+    pub file: FileIndex,
+    pub offset: u64,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct SourceSlice {
     pub from: u64,
     pub to: u64,
+}
+
+impl SourceSlice {
+    pub fn size(&self) -> u64 {
+        self.to - self.from + 1
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -45,15 +57,26 @@ impl Content {
             slices: VecDeque::new(),
         }
     }
+
     pub fn slices(&self) -> Vec<SourceSlice> {
         self.slices.iter().map(|s| s.to_owned()).collect()
     }
-    pub fn write(&mut self, src_offset: u64, size: u64) {
+
+    pub fn write_back(&mut self, src_offset: u64, size: u64) {
+        if size > 0 {
+            self.slices.push_back(SourceSlice {
+                from: src_offset,
+                to: src_offset + size - 1,
+            });
+        }
+    }
+
+    pub fn write(&mut self, src_offset: u64, offset: u64, size: u64) {
         let old_sise = self.size();
         if size > 0 {
             let mut truncate_size = size;
             for slice in self.slices.iter_mut() {
-                let can_truncate = slice.to - slice.from + 1;
+                let can_truncate = slice.size();
                 if can_truncate > truncate_size {
                     slice.from += truncate_size;
                     break;
@@ -95,10 +118,42 @@ impl Content {
             );
         }
     }
+
+    pub fn read(&self, offset: u64, size: u64) -> Content {
+        let mut content = Content::new();
+        let mut current_offset = 0;
+        let mut read_size = 0;
+        let mut reading = false;
+        for s in self.slices.iter() {
+            if reading {
+                if read_size >= size {
+                    break;
+                }
+                let slice_read_size = if s.size() > size { size } else { s.size() };
+                content.write_back(s.from, slice_read_size);
+                read_size += slice_read_size;
+            } else {
+                let next_offset = current_offset + s.size();
+                if next_offset > offset {
+                    reading = true;
+                    let read_from = offset - current_offset;
+                    let mut slice_read_size = s.size() - read_from;
+                    if slice_read_size > size {
+                        slice_read_size = size;
+                    }
+                    content.write_back(s.from + read_from, slice_read_size);
+                    read_size += slice_read_size;
+                    continue;
+                }
+                current_offset = next_offset;
+            }
+        }
+        assert!(content.size() == read_size);
+        content
+    }
+
     pub fn size(&self) -> u64 {
-        self.slices
-            .iter()
-            .fold(0, |acc: u64, x| acc + x.to - x.from + 1)
+        self.slices.iter().fold(0, |acc: u64, s| acc + s.size())
     }
 }
 

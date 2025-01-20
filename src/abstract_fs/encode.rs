@@ -1,8 +1,8 @@
 use std::cmp::max;
 
-use super::{flags::Mode, node::FileDescriptor, operation::Operation, workload::Workload};
+use super::{flags::Mode, node::FileDescriptorIndex, operation::Operation, workload::Workload};
 
-fn descriptor_to_var(des: &FileDescriptor) -> String {
+fn descriptor_to_var(des: &FileDescriptorIndex) -> String {
     format!("fd_{}", des.0)
 }
 
@@ -101,7 +101,7 @@ fn encode_mode(mode: &Mode) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::abstract_fs::{flags::ModeFlag, node::FileDescriptor};
+    use crate::abstract_fs::{flags::ModeFlag, node::FileDescriptorIndex};
 
     use super::*;
 
@@ -162,15 +162,15 @@ do_remove("/foo");
                 },
                 Operation::OPEN {
                     path: "/foo/bar".into(),
-                    des: FileDescriptor(0),
+                    des: FileDescriptorIndex(0),
                 },
                 Operation::WRITE {
-                    des: FileDescriptor(0),
+                    des: FileDescriptorIndex(0),
                     src_offset: 999,
                     size: 1024,
                 },
                 Operation::CLOSE {
-                    des: FileDescriptor(0),
+                    des: FileDescriptorIndex(0),
                 },
                 Operation::HARDLINK {
                     old_path: "/foo/bar".into(),
@@ -178,14 +178,14 @@ do_remove("/foo");
                 },
                 Operation::OPEN {
                     path: "/baz".into(),
-                    des: FileDescriptor(1),
+                    des: FileDescriptorIndex(1),
                 },
                 Operation::READ {
-                    des: FileDescriptor(1),
+                    des: FileDescriptorIndex(1),
                     size: 1024,
                 },
                 Operation::CLOSE {
-                    des: FileDescriptor(1),
+                    des: FileDescriptorIndex(1),
                 },
                 Operation::RENAME {
                     old_path: "/baz".into(),
