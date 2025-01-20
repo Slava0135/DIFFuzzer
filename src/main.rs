@@ -11,6 +11,7 @@ use rand::random;
 mod abstract_fs;
 mod args;
 mod config;
+mod filesystems;
 mod fuzzing;
 mod harness;
 mod hasher;
@@ -18,7 +19,6 @@ mod mount;
 mod save;
 mod single;
 mod temp_dir;
-mod filesystems;
 
 fn main() {
     let args = Args::parse();
@@ -33,7 +33,7 @@ fn main() {
         args::Mode::Greybox {
             first_filesystem,
             second_filesystem,
-            test_count
+            test_count,
         } => {
             let mut fuzzer = Fuzzer::new(
                 config,
@@ -45,7 +45,7 @@ fn main() {
         args::Mode::Blackbox {
             first_filesystem,
             second_filesystem,
-            test_count
+            test_count,
         } => {
             BlackBoxFuzzer::new(
                 first_filesystem.try_into().unwrap(),

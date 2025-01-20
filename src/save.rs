@@ -7,6 +7,8 @@ use crate::abstract_fs::{
     trace::TRACE_FILENAME,
     workload::Workload,
 };
+use crate::hasher::hasher::FileDiff::{DifferentHash, OneExists};
+use crate::hasher::hasher::{FileDiff, DIFF_HASH_FILENAME};
 
 pub fn save_testcase(dir: &Path, input_path: &Path, input: &Workload) -> anyhow::Result<()> {
     let source_path = dir.join(TEST_SOURCE_FILENAME);
@@ -57,5 +59,29 @@ pub fn save_output(
     fs::write(&stderr_path, stderr)
         .with_context(|| format!("failed to save stderr at '{}'", stderr_path.display()))?;
 
+    Ok(())
+}
+
+pub fn save_diff(dir: &Path, diff_hash: Vec<FileDiff>) -> anyhow::Result<()> {
+    let diff_hash_path = dir.join(DIFF_HASH_FILENAME);
+    for diff in diff_hash {
+        let txt: String;
+        match diff {
+            DifferentHash { fst, snd } => {
+                txt = format!(
+                    "File with different hash:\n {}\n\n {}\n\n",
+                    fst,
+                    snd
+                )
+            }
+            OneExists(f) => txt = format!("File exists only in one FS:\n {}\n\n", f),
+        }
+        fs::write(&diff_hash_path, txt).with_context(|| {
+            format!(
+                "failed to save source file to '{}'",
+                diff_hash_path.display()
+            )
+        })?;
+    }
     Ok(())
 }

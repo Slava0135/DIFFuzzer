@@ -5,6 +5,7 @@ use crate::abstract_fs::workload::Workload;
 use crate::fuzzing::abstract_fuzzer::objective::console::ConsoleObjective;
 use crate::fuzzing::abstract_fuzzer::objective::trace::TraceObjective;
 use crate::harness::{ConsolePipe, Harness};
+use crate::hasher::hasher::FileDiff;
 use crate::mount::btrfs::Btrfs;
 use crate::mount::ext4::Ext4;
 use crate::mount::mount::FileSystemMount;
@@ -133,6 +134,7 @@ impl FuzzData {
         input: Workload,
         input_path: &Path,
         crash_dir: Box<Path>,
+        hash_diff: Vec<FileDiff>,
     ) -> anyhow::Result<()> {
         let name = input.generate_name();
         debug!("report crash '{}'", name);

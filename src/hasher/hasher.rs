@@ -13,8 +13,10 @@ use rand::random;
 use twox_hash::XxHash64;
 use walkdir::WalkDir;
 
+pub const DIFF_HASH_FILENAME: &str = "diff_hash.txt";
+
 #[derive(Clone)]
-struct FileInfo {
+pub struct FileInfo {
     abs_path: String,
     rel_path: String,
 

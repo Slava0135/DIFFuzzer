@@ -9,26 +9,24 @@ use std::{
 
 use anyhow::{Context, Ok};
 use log::{debug, error, info, warn};
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{random, rngs::StdRng, SeedableRng};
 
+use crate::fuzzing::abstract_fuzzer::fuzzer_data::FuzzData;
+use crate::fuzzing::abstract_fuzzer::utils::{parse_trace, setup_dir};
 use crate::fuzzing::greybox::feedback::kcov::KCOV_FILENAME;
 use crate::{
     abstract_fs::{
         trace::{Trace, TRACE_FILENAME},
         workload::Workload,
     },
-    fuzzing::abstract_fuzzer::objective::{
-        console::ConsoleObjective,
-        trace::TraceObjective,
-    },
     config::Config,
+    fuzzing::abstract_fuzzer::objective::{console::ConsoleObjective, trace::TraceObjective},
     harness::{ConsolePipe, Harness},
     mount::mount::FileSystemMount,
     save::{save_output, save_testcase},
     temp_dir::setup_temp_dir,
 };
-use crate::fuzzing::abstract_fuzzer::fuzzer_data::FuzzData;
-use crate::fuzzing::abstract_fuzzer::utils::{parse_trace, setup_dir};
+use crate::hasher::hasher::{calc_hash_for_dir, FileDiff, get_diff};
 
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 
@@ -46,7 +44,6 @@ pub struct Fuzzer {
     heartbeat_interval: u16,
 }
 
-
 impl Fuzzer {
     pub fn new(
         config: Config,
@@ -58,10 +55,8 @@ impl Fuzzer {
         let fst_kcov_path = fuzz_data.fst_exec_dir.join(KCOV_FILENAME);
         let snd_kcov_path = fuzz_data.snd_exec_dir.join(KCOV_FILENAME);
 
-
         let fst_kcov_feedback = KCovFeedback::new(fst_kcov_path.clone().into_boxed_path());
         let snd_kcov_feedback = KCovFeedback::new(snd_kcov_path.clone().into_boxed_path());
-
 
         let mutator = Mutator::new(
             StdRng::seed_from_u64(
@@ -130,12 +125,18 @@ impl Fuzzer {
         setup_dir(self.data.snd_exec_dir.as_ref())
             .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
 
-        self.data.fst_harness
+        self.data
+            .fst_harness
             .run(&input_path)
             .with_context(|| format!("failed to run first harness '{}'", self.data.fst_fs_name))?;
-        self.data.snd_harness
+        self.data
+            .snd_harness
             .run(&input_path)
             .with_context(|| format!("failed to run second harness '{}'", self.data.snd_fs_name))?;
+
+        let seed = random();
+        let fst_hash = calc_hash_for_dir(self.data.fst_exec_dir.as_ref(), seed, false, false); //todo: options
+        let snd_hash = calc_hash_for_dir(self.data.snd_exec_dir.as_ref(), seed, false, false);
 
         debug!("checking results");
         let fst_trace = parse_trace(&self.data.fst_trace_path)
@@ -145,11 +146,13 @@ impl Fuzzer {
 
         if fst_trace.has_errors() && snd_trace.has_errors() {
             warn!("both traces contain errors, potential bug in model");
-            self.data.report_crash(input, &input_path, self.data.accidents_path.clone())
+            self.data
+                .report_crash(input, &input_path, self.data.accidents_path.clone(), vec![])
                 .with_context(|| format!("failed to report accident"))?;
             return Ok(());
         }
 
+        let hash_diff_interesting = fst_hash != snd_hash;
         debug!("doing objectives");
         let console_is_interesting = self
             .data
@@ -161,8 +164,18 @@ impl Fuzzer {
             .trace_objective
             .is_interesting(&fst_trace, &snd_trace)
             .with_context(|| format!("failed to do trace objective"))?;
-        if console_is_interesting || trace_is_interesting {
-            self.data.report_crash(input, &input_path, self.data.crashes_path.clone())
+        if console_is_interesting || trace_is_interesting || hash_diff_interesting {
+            let mut diff: Vec<FileDiff> = vec![];
+            if hash_diff_interesting {
+                diff = get_diff(
+                    &self.data.fst_exec_dir,
+                    &self.data.snd_exec_dir,
+                    false,
+                    false,
+                );
+            }
+            self.data
+                .report_crash(input, &input_path, self.data.crashes_path.clone(), diff)
                 .with_context(|| format!("failed to report crash"))?;
             self.data.stats.crashes += 1;
             self.show_stats_corpus();
@@ -202,7 +215,6 @@ impl Fuzzer {
         self.next_seed += 1;
         workload
     }
-
 
     fn add_to_corpus(&mut self, input: Workload) {
         debug!("adding new input to corpus");
