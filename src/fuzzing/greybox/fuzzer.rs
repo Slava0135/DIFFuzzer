@@ -14,6 +14,7 @@ use rand::{random, rngs::StdRng, SeedableRng};
 use crate::fuzzing::abstract_fuzzer::fuzzer_data::FuzzData;
 use crate::fuzzing::abstract_fuzzer::utils::{parse_trace, setup_dir};
 use crate::fuzzing::greybox::feedback::kcov::KCOV_FILENAME;
+use crate::hasher::hasher::{calc_hash_for_dir, get_diff, FileDiff};
 use crate::{
     abstract_fs::{
         trace::{Trace, TRACE_FILENAME},
@@ -26,7 +27,6 @@ use crate::{
     save::{save_output, save_testcase},
     temp_dir::setup_temp_dir,
 };
-use crate::hasher::hasher::{calc_hash_for_dir, FileDiff, get_diff};
 
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 

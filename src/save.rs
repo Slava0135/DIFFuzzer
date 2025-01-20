@@ -65,17 +65,12 @@ pub fn save_output(
 pub fn save_diff(dir: &Path, diff_hash: Vec<FileDiff>) -> anyhow::Result<()> {
     let diff_hash_path = dir.join(DIFF_HASH_FILENAME);
     for diff in diff_hash {
-        let txt: String;
-        match diff {
+        let txt = match diff {
             DifferentHash { fst, snd } => {
-                txt = format!(
-                    "File with different hash:\n {}\n\n {}\n\n",
-                    fst,
-                    snd
-                )
+                format!("File with different hash:\n {}\n\n {}\n\n", fst, snd)
             }
-            OneExists(f) => txt = format!("File exists only in one FS:\n {}\n\n", f),
-        }
+            OneExists(f) => format!("File exists only in one FS:\n {}\n\n", f),
+        };
         fs::write(&diff_hash_path, txt).with_context(|| {
             format!(
                 "failed to save source file to '{}'",
