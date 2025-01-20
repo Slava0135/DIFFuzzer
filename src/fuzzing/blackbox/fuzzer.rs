@@ -122,7 +122,7 @@ impl BlackBoxFuzzer {
             }
             self.data
                 .report_crash(workload, &wl_path, self.data.crashes_path.clone(), diff)
-                .with_context(|| format!("Can't report crush"))
+                .with_context(|| format!("failed to report crash"))
                 .unwrap();
             self.data.show_stats();
         }
