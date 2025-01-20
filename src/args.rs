@@ -26,7 +26,7 @@ pub enum Mode {
         #[arg(short, long)]
         #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
         second_filesystem: String,
-        /// Test count (Option)
+        /// Test count
         #[arg(short, long)]
         test_count: Option<u64>,
     },
@@ -53,7 +53,7 @@ pub enum Mode {
         #[arg(short, long)]
         #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
         second_filesystem: String,
-        /// Test count (Option)
+        /// Test count
         #[arg(short, long)]
         test_count: Option<u64>,
     },
