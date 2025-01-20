@@ -1,24 +1,20 @@
 use crate::abstract_fs::trace::TRACE_FILENAME;
-use crate::config::Config;
 
 use crate::abstract_fs::workload::Workload;
 use crate::fuzzing::abstract_fuzzer::objective::console::ConsoleObjective;
 use crate::fuzzing::abstract_fuzzer::objective::trace::TraceObjective;
 use crate::harness::{ConsolePipe, Harness};
 use crate::hasher::hasher::FileDiff;
-use crate::mount::btrfs::Btrfs;
-use crate::mount::ext4::Ext4;
 use crate::mount::mount::FileSystemMount;
 use crate::save::{save_diff, save_output, save_testcase};
 use crate::temp_dir::setup_temp_dir;
 use anyhow::Context;
 use log::{debug, info};
-use rand::prelude::StdRng;
 use std::cell::RefCell;
 use std::fs;
 use std::path::Path;
 use std::rc::Rc;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::Instant;
 
 pub struct FuzzData {
     pub fst_exec_dir: Box<Path>,

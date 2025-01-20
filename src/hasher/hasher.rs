@@ -2,7 +2,6 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::hash::Hasher;
-use std::io::Write;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::sync::OnceLock;

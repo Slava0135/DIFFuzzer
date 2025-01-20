@@ -1,26 +1,15 @@
 use anyhow::Context;
-use log::{debug, info, warn};
-use std::cell::RefCell;
-use std::fs::read_to_string;
-use std::path::Path;
-use std::rc::Rc;
-use std::time::Instant;
-use std::{fs, io};
-
+use log::{debug, warn};
 use rand::prelude::StdRng;
 use rand::SeedableRng;
 
 use crate::abstract_fs::generator::generate_new;
-use crate::abstract_fs::trace::{Trace, TRACE_FILENAME};
 use crate::config::Config;
 use crate::fuzzing::abstract_fuzzer::fuzzer_data::FuzzData;
 use crate::fuzzing::abstract_fuzzer::utils::{parse_trace, setup_dir};
 
-use crate::harness::Harness;
 use crate::hasher::hasher::{calc_hash_for_dir, get_diff, FileDiff};
 use crate::mount::mount::FileSystemMount;
-use crate::save::{save_output, save_testcase};
-use crate::temp_dir::setup_temp_dir;
 
 pub struct BlackBoxFuzzer {
     data: FuzzData,

@@ -1,11 +1,4 @@
-use std::{
-    cell::RefCell,
-    fs::{self, read_to_string},
-    io,
-    path::Path,
-    rc::Rc,
-    time::{Instant, SystemTime, UNIX_EPOCH},
-};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Ok};
 use log::{debug, error, info, warn};
@@ -15,18 +8,7 @@ use crate::fuzzing::abstract_fuzzer::fuzzer_data::FuzzData;
 use crate::fuzzing::abstract_fuzzer::utils::{parse_trace, setup_dir};
 use crate::fuzzing::greybox::feedback::kcov::KCOV_FILENAME;
 use crate::hasher::hasher::{calc_hash_for_dir, get_diff, FileDiff};
-use crate::{
-    abstract_fs::{
-        trace::{Trace, TRACE_FILENAME},
-        workload::Workload,
-    },
-    config::Config,
-    fuzzing::abstract_fuzzer::objective::{console::ConsoleObjective, trace::TraceObjective},
-    harness::{ConsolePipe, Harness},
-    mount::mount::FileSystemMount,
-    save::{save_output, save_testcase},
-    temp_dir::setup_temp_dir,
-};
+use crate::{abstract_fs::workload::Workload, config::Config, mount::mount::FileSystemMount};
 
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 
