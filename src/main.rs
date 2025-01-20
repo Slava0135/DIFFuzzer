@@ -33,6 +33,7 @@ fn main() {
         args::Mode::Greybox {
             first_filesystem,
             second_filesystem,
+            test_count
         } => {
             let mut fuzzer = Fuzzer::new(
                 config,
@@ -43,13 +44,14 @@ fn main() {
         }
         args::Mode::Blackbox {
             first_filesystem,
-            second_filesystem
+            second_filesystem,
+            test_count
         } => {
             BlackBoxFuzzer::new(
                 first_filesystem.try_into().unwrap(),
                 second_filesystem.try_into().unwrap(),
             )
-            .fuzz(random(), config);
+            .fuzz(random(), test_count, config);
         }
         args::Mode::Single {
             save_to_dir,

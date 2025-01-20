@@ -7,7 +7,6 @@ pub struct Config {
     pub greybox: GreyboxConfig,
     pub operation_weights: OperationWeights,
     pub mutation_weights: MutationWeights,
-    pub count: usize,
     pub max_workload_length: u16,
 }
 

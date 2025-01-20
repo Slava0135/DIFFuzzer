@@ -33,12 +33,11 @@ impl BlackBoxFuzzer {
         }
     }
 
-    pub fn fuzz(&mut self, seed: u64, config: Config) {
+    pub fn fuzz(&mut self, seed: u64, test_count: usize, config: Config) {
         let mut rng = StdRng::seed_from_u64(seed);
-        let count: usize = config.count;
         let trace_len = config.max_workload_length as usize;
 
-        for _ in 1..=count {
+        for _ in 1..=test_count {
             let workload = generate_new(&mut rng, trace_len, &config.operation_weights);
             let wl_path = workload
                 .compile(&self.data.test_dir)

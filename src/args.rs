@@ -26,6 +26,8 @@ pub enum Mode {
         #[arg(short, long)]
         #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
         second_filesystem: String,
+        #[arg(short, long)]
+        test_count:usize
     },
     /// Run single test
     Single {
@@ -50,5 +52,7 @@ pub enum Mode {
         #[arg(short, long)]
         #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
         second_filesystem: String,
+        #[arg(short, long)]
+        test_count:usize
     },
 }
