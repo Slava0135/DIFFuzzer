@@ -859,13 +859,11 @@ mod tests {
         fs.close(des).unwrap();
 
         assert_eq!(
-            Content {
-                slices: vec![SourceSlice {
-                    from: 999,
-                    to: 999 + 1024
-                }]
-            },
-            fs.file(&foo).content
+            vec![SourceSlice {
+                from: 999,
+                to: 999 + 1024 - 1
+            }],
+            fs.file(&foo).content.slices()
         );
 
         assert_eq!(
@@ -885,6 +883,65 @@ mod tests {
                         size: 1024
                     },
                     Operation::CLOSE { des },
+                ]
+            },
+            fs.recording
+        );
+        test_replay(fs.recording);
+    }
+
+    #[test]
+    fn test_write_rewrite() {
+        let mut fs = AbstractFS::new();
+        let foo = fs.create("/foo".into(), vec![]).unwrap();
+        let des_1 = fs.open("/foo".into()).unwrap();
+        fs.write(des_1, 13, 100).unwrap();
+        fs.close(des_1).unwrap();
+        let des_2 = fs.open("/foo".into()).unwrap();
+        fs.write(des_2, 42, 55).unwrap();
+        fs.close(des_2).unwrap();
+
+        assert_eq!(
+            vec![
+                SourceSlice {
+                    from: 42,
+                    to: 42 + 55 - 1
+                },
+                SourceSlice {
+                    from: 13 + 55,
+                    to: 13 + 100 - 1
+                }
+            ],
+            fs.file(&foo).content.slices()
+        );
+
+        assert_eq!(
+            Workload {
+                ops: vec![
+                    Operation::CREATE {
+                        path: "/foo".into(),
+                        mode: vec![]
+                    },
+                    Operation::OPEN {
+                        path: "/foo".into(),
+                        des: des_1
+                    },
+                    Operation::WRITE {
+                        des: des_1,
+                        src_offset: 13,
+                        size: 100
+                    },
+                    Operation::CLOSE { des: des_1 },
+                    Operation::OPEN {
+                        path: "/foo".into(),
+                        des: des_2
+                    },
+                    Operation::WRITE {
+                        des: des_2,
+                        src_offset: 42,
+                        size: 55
+                    },
+                    Operation::CLOSE { des: des_2 },
                 ]
             },
             fs.recording
