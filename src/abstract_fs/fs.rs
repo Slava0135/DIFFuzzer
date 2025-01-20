@@ -3,7 +3,12 @@ use std::collections::{HashMap, VecDeque};
 use thiserror::Error;
 
 use super::{
-    content::Content, flags::Mode, node::{Dir, DirIndex, File, FileDescriptor, FileDescriptorIndex, FileIndex, Node}, operation::Operation, pathname::{Name, PathName}, workload::Workload
+    content::{Content, ContentError},
+    flags::Mode,
+    node::{Dir, DirIndex, File, FileDescriptor, FileDescriptorIndex, FileIndex, Node},
+    operation::Operation,
+    pathname::{Name, PathName},
+    workload::Workload,
 };
 
 type Result<T> = std::result::Result<T, FsError>;
@@ -32,6 +37,8 @@ pub enum FsError {
     FileAlreadyOpened(PathName),
     #[error("tried to rename '{0}' into subdirectory of itself '{1}'")]
     RenameToSubdirectoryError(PathName, PathName),
+    #[error(transparent)]
+    ContentError(#[from] ContentError),
 }
 
 pub struct AbstractFS {
@@ -189,11 +196,16 @@ impl AbstractFS {
         if file.descriptor != Some(des_idx) {
             return Err(FsError::DescriptorWasClosed(des_idx));
         }
-        let content = file.content.read(offset, size);
+        let content = file.content.read(offset, size)?;
         let file_size = file.content.size();
         let des = self.descriptor_mut(&des_idx)?;
         des.offset += content.size();
-        assert!(des.offset <= file_size);
+        assert!(
+            des.offset <= file_size,
+            "offset: {}, size: {}",
+            des.offset,
+            file_size
+        );
         self.recording.push(Operation::READ { des: des_idx, size });
         Ok(content)
     }
@@ -210,11 +222,16 @@ impl AbstractFS {
             return Err(FsError::DescriptorWasClosed(des_idx));
         }
         let offset = des.offset;
-        file.content.write(src_offset, offset, size);
+        file.content.write(src_offset, offset, size)?;
         let file_size = file.content.size();
         let des = self.descriptor_mut(&des_idx)?;
         des.offset += size;
-        assert!(des.offset <= file_size);
+        assert!(
+            des.offset <= file_size,
+            "offset: {}, size: {}",
+            des.offset,
+            file_size
+        );
         self.recording.push(Operation::WRITE {
             des: des_idx,
             src_offset,
