@@ -9,7 +9,7 @@ use crate::hasher::hasher::FileDiff;
 use crate::mount::btrfs::Btrfs;
 use crate::mount::ext4::Ext4;
 use crate::mount::mount::FileSystemMount;
-use crate::save::{save_output, save_testcase};
+use crate::save::{save_diff, save_output, save_testcase};
 use crate::temp_dir::setup_temp_dir;
 use anyhow::Context;
 use log::{debug, info};
@@ -173,6 +173,8 @@ impl FuzzData {
         )
         .with_context(|| format!("failed to save output for first harness"))?;
 
+        save_diff(&crash_dir, hash_diff)
+            .with_context(|| format!("failed to save hash differences"))?;
         info!("crash saved at '{}'", crash_dir.display());
 
         anyhow::Ok(())
