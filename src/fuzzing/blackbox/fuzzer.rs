@@ -33,28 +33,28 @@ impl BlackBoxFuzzer {
                 .unwrap()
                 .as_millis() as u64,
         );
-        let trace_len = config.max_workload_length as usize;
+        let workload_len = config.max_workload_length as usize;
 
         match test_count {
             None => loop {
-                self.fuzz_one(&mut rng, trace_len, &config);
+                self.fuzz_one(&mut rng, workload_len, &config);
             },
             Some(count) => {
                 for _ in 0..count {
-                    self.fuzz_one(&mut rng, trace_len, &config);
+                    self.fuzz_one(&mut rng, workload_len, &config);
                 }
             }
         }
     }
 
-    fn fuzz_one(&mut self, rng: &mut StdRng, trace_len: usize, config: &Config) {
-        let workload = generate_new(rng, trace_len, &config.operation_weights);
-        let wl_path = workload
+    fn fuzz_one(&mut self, rng: &mut StdRng, workload_len: usize, config: &Config) {
+        let input = generate_new(rng, workload_len, &config.operation_weights);
+        let input_path = input
             .compile(&self.data.test_dir)
             .with_context(|| "failed to compile test".to_string())
             .unwrap();
 
-        debug!("running harness at '{}'", wl_path.display());
+        debug!("running harness at '{}'", input_path.display());
 
         setup_dir(self.data.fst_exec_dir.as_ref())
             .with_context(|| {
@@ -75,12 +75,12 @@ impl BlackBoxFuzzer {
 
         self.data
             .fst_harness
-            .run(&wl_path)
+            .run(&input_path)
             .with_context(|| format!("failed to run first harness '{}'", self.data.fst_fs_name))
             .unwrap();
         self.data
             .snd_harness
-            .run(&wl_path)
+            .run(&input_path)
             .with_context(|| format!("failed to run second harness '{}'", self.data.snd_fs_name))
             .unwrap();
 
@@ -98,7 +98,7 @@ impl BlackBoxFuzzer {
         if fst_trace.has_errors() && snd_trace.has_errors() {
             warn!("both traces contain errors, potential bug in model");
             self.data
-                .report_crash(workload, &wl_path, self.data.accidents_path.clone(), vec![])
+                .report_crash(input, &input_path, self.data.accidents_path.clone(), vec![])
                 .with_context(|| format!("failed to report accident"))
                 .unwrap();
             return;
@@ -129,7 +129,7 @@ impl BlackBoxFuzzer {
                 );
             }
             self.data
-                .report_crash(workload, &wl_path, self.data.crashes_path.clone(), diff)
+                .report_crash(input, &input_path, self.data.crashes_path.clone(), diff)
                 .with_context(|| format!("failed to report crash"))
                 .unwrap();
             self.show_stats();
