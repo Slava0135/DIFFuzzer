@@ -12,7 +12,7 @@ use crate::hasher::hasher::FileDiff::OneExists;
 
 pub const DIFF_HASH_FILENAME: &str = "diff_hash.txt";
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileInfo {
     abs_path: String,
     rel_path: String,
@@ -45,11 +45,7 @@ impl Default for HasherOptions {
 
 impl Display for FileInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "abs_path: {}\ngid: {}\n, uid: {}\n, size:{}\n, nlink: {}\n, mode: {}\n",
-            self.abs_path, self.gid, self.uid, self.size, self.nlink, self.mode
-        )
+        write!(f, "{:?}", self)
     }
 }
 
@@ -159,5 +155,6 @@ fn get_dir_content(path: &Path) -> Vec<FileInfo> {
             mode: metadata.mode(),
         });
     }
+    println!("{:?}", v);
     return v;
 }
