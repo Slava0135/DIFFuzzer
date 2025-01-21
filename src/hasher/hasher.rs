@@ -1,10 +1,8 @@
 use std::cmp::Ordering;
-use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::hash::Hasher;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
-use std::sync::OnceLock;
 
 use twox_hash::XxHash64;
 use walkdir::WalkDir;
@@ -55,19 +53,12 @@ impl Display for FileInfo {
     }
 }
 
-// if nlink = True, include nlink to hash. Same for mode.
 pub fn calc_dir_hash(path: &Path, hasher_options: &HasherOptions) -> u64 {
     let mut hasher = XxHash64::default();
 
     for entry in WalkDir::new(path).sort_by(|a, b| a.file_name().cmp(b.file_name())) {
         let entry = entry.unwrap();
         let rel_path = entry.path().strip_prefix(path).unwrap().to_str().unwrap();
-
-        //todo: uncomment after adding nfs support
-        // if is_nfs_tmp(rel_path) {
-        //     continue;
-        // }
-
         let metadata = entry.metadata().unwrap();
         hasher.write(rel_path.as_bytes());
         hasher.write_u32(metadata.gid());
@@ -169,19 +160,4 @@ fn get_dir_content(path: &Path) -> Vec<FileInfo> {
         });
     }
     return v;
-}
-
-fn get_nfs_internal_dirs() -> &'static HashSet<&'static str> {
-    static HASHSET: OnceLock<HashSet<&str>> = OnceLock::new();
-    HASHSET.get_or_init(|| {
-        let mut m = HashSet::new();
-        m.insert("/lost+found");
-        m.insert("/.nilfs");
-        m.insert("/.mcfs_dummy");
-        m
-    })
-}
-
-fn is_nfs_tmp(path: &str) -> bool {
-    return get_nfs_internal_dirs().contains(path) || path.starts_with("/.nfs");
 }
