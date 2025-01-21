@@ -9,6 +9,7 @@ pub struct Config {
     pub mutation_weights: MutationWeights,
     pub max_workload_length: u16,
     pub fs_name: String,
+    pub hashing_enabled: bool,
 }
 
 #[derive(Serialize, Deserialize)]

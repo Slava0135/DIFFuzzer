@@ -22,6 +22,8 @@ pub struct Fuzzer {
 
     mutator: Mutator,
 
+    hashing_enabled: bool,
+
     heartbeat_interval: u16,
 }
 
@@ -61,6 +63,8 @@ impl Fuzzer {
             snd_kcov_feedback,
 
             mutator,
+
+            hashing_enabled: config.hashing_enabled,
 
             heartbeat_interval: config.greybox.heartbeat_interval,
         }
@@ -115,10 +119,8 @@ impl Fuzzer {
             .run(&input_path)
             .with_context(|| format!("failed to run second harness '{}'", self.data.snd_fs_name))?;
 
-        let fst_hash =
-            calc_dir_hash(self.data.fst_exec_dir.as_ref(), &self.data.hasher_options);
-        let snd_hash =
-            calc_dir_hash(self.data.snd_exec_dir.as_ref(), &self.data.hasher_options);
+        let fst_hash = calc_dir_hash(self.data.fst_exec_dir.as_ref(), &self.data.hasher_options);
+        let snd_hash = calc_dir_hash(self.data.snd_exec_dir.as_ref(), &self.data.hasher_options);
 
         debug!("checking results");
         let fst_trace = parse_trace(&self.data.fst_trace_path)
@@ -134,8 +136,7 @@ impl Fuzzer {
             return Ok(());
         }
 
-        let hash_diff_interesting = fst_hash != snd_hash;
-        let hash_diff_interesting = false;
+        let hash_diff_interesting = self.hashing_enabled && fst_hash != snd_hash;
         debug!("doing objectives");
         let console_is_interesting = self
             .data

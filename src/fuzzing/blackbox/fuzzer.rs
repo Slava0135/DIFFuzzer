@@ -99,8 +99,7 @@ impl BlackBoxFuzzer {
             return;
         }
 
-        let hash_diff_interesting = fst_hash != snd_hash;
-        let hash_diff_interesting = false;
+        let hash_diff_interesting = config.hashing_enabled && fst_hash != snd_hash;
         debug!("doing objectives");
         let console_is_interesting = self
             .data
