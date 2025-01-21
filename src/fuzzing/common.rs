@@ -1,4 +1,4 @@
-use crate::abstract_fs::trace::TRACE_FILENAME;
+use crate::abstract_fs::trace::{Trace, TRACE_FILENAME};
 
 use crate::abstract_fs::workload::Workload;
 use crate::fuzzing::objective::console::ConsoleObjective;
@@ -11,10 +11,11 @@ use crate::temp_dir::setup_temp_dir;
 use anyhow::Context;
 use log::{debug, info};
 use std::cell::RefCell;
-use std::fs;
+use std::fs::read_to_string;
 use std::path::Path;
 use std::rc::Rc;
 use std::time::Instant;
+use std::{fs, io};
 
 pub struct FuzzData {
     pub fst_exec_dir: Box<Path>,
@@ -196,4 +197,15 @@ impl Stats {
             last_time_showed: Instant::now(),
         }
     }
+}
+
+pub fn setup_dir(path: &Path) -> io::Result<()> {
+    fs::remove_dir_all(path).unwrap_or(());
+    fs::create_dir(path)
+}
+
+pub fn parse_trace(path: &Path) -> anyhow::Result<Trace> {
+    let trace = read_to_string(&path)
+        .with_context(|| format!("failed to read trace at '{}'", path.display()))?;
+    anyhow::Ok(Trace::try_parse(trace).with_context(|| format!("failed to parse trace"))?)
 }

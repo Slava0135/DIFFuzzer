@@ -4,8 +4,7 @@ use anyhow::{Context, Ok};
 use log::{debug, error, info, warn};
 use rand::{rngs::StdRng, SeedableRng};
 
-use crate::fuzzing::fuzzer_data::FuzzData;
-use crate::fuzzing::utils::{parse_trace, setup_dir};
+use crate::fuzzing::common::{parse_trace, setup_dir, FuzzData};
 use crate::fuzzing::greybox::feedback::kcov::KCOV_FILENAME;
 use crate::hasher::hasher::{calc_hash_for_dir, get_diff, FileDiff};
 use crate::{abstract_fs::workload::Workload, config::Config, mount::mount::FileSystemMount};
