@@ -5,8 +5,8 @@ use crate::fuzzing::greybox::fuzzer::GreyBoxFuzzer;
 use args::Args;
 use clap::Parser;
 use config::Config;
+use fuzzing::common::Fuzzer;
 use log::info;
-use rand::random;
 
 mod abstract_fs;
 mod args;
@@ -35,12 +35,12 @@ fn main() {
             second_filesystem,
             test_count,
         } => {
-            let mut fuzzer = GreyBoxFuzzer::new(
+            GreyBoxFuzzer::new(
                 config,
                 first_filesystem.try_into().unwrap(),
                 second_filesystem.try_into().unwrap(),
-            );
-            fuzzer.fuzz();
+            )
+            .run(test_count);
         }
         args::Mode::Blackbox {
             first_filesystem,
@@ -52,7 +52,7 @@ fn main() {
                 first_filesystem.try_into().unwrap(),
                 second_filesystem.try_into().unwrap(),
             )
-            .fuzz(test_count);
+            .run(test_count);
         }
         args::Mode::Single {
             save_to_dir,

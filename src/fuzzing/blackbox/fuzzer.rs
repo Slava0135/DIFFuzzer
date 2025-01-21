@@ -6,14 +6,13 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
 use crate::config::Config;
-use crate::fuzzing::common::{parse_trace, setup_dir, FuzzData};
+use crate::fuzzing::common::{parse_trace, setup_dir, FuzzData, Fuzzer};
 
 use crate::hasher::hasher::{calc_dir_hash, get_diff, FileDiff};
 use crate::mount::mount::FileSystemMount;
 
 pub struct BlackBoxFuzzer {
     data: FuzzData,
-    config: Config,
     rng: StdRng,
 }
 
@@ -24,8 +23,7 @@ impl BlackBoxFuzzer {
         snd_mount: &'static dyn FileSystemMount,
     ) -> Self {
         Self {
-            data: FuzzData::new(fst_mount, snd_mount, config.fs_name.clone()),
-            config,
+            data: FuzzData::new(fst_mount, snd_mount, config),
             rng: StdRng::seed_from_u64(
                 SystemTime::now()
                     .duration_since(UNIX_EPOCH)
@@ -34,25 +32,14 @@ impl BlackBoxFuzzer {
             ),
         }
     }
+}
 
-    pub fn fuzz(&mut self, test_count: Option<u64>) {
-        match test_count {
-            None => loop {
-                self.fuzz_one().unwrap();
-            },
-            Some(count) => {
-                for _ in 0..count {
-                    self.fuzz_one().unwrap();
-                }
-            }
-        }
-    }
-
+impl Fuzzer for BlackBoxFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
         let input = generate_new(
             &mut self.rng,
-            self.config.max_workload_length.into(),
-            &self.config.operation_weights,
+            self.data.config.max_workload_length.into(),
+            &self.data.config.operation_weights,
         );
         let input_path = input
             .compile(&self.data.test_dir)
@@ -99,7 +86,7 @@ impl BlackBoxFuzzer {
             return Ok(());
         }
 
-        let hash_diff_interesting = self.config.hashing_enabled && fst_hash != snd_hash;
+        let hash_diff_interesting = self.data.config.hashing_enabled && fst_hash != snd_hash;
         debug!("doing objectives");
         let console_is_interesting = self
             .data
@@ -129,7 +116,7 @@ impl BlackBoxFuzzer {
         Ok(())
     }
 
-    pub fn show_stats(&mut self) {
+    fn show_stats(&mut self) {
         self.data.stats.last_time_showed = Instant::now();
         let since_start = Instant::now().duration_since(self.data.stats.start);
         let secs = since_start.as_secs();
@@ -142,5 +129,9 @@ impl BlackBoxFuzzer {
             (secs / (60)) % 60,
             secs % 60,
         );
+    }
+    
+    fn data(&mut self) -> &mut FuzzData {
+        &mut self.data
     }
 }

@@ -1,10 +1,10 @@
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Ok};
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use rand::{rngs::StdRng, SeedableRng};
 
-use crate::fuzzing::common::{parse_trace, setup_dir, FuzzData};
+use crate::fuzzing::common::{parse_trace, setup_dir, FuzzData, Fuzzer};
 use crate::fuzzing::greybox::feedback::kcov::KCOV_FILENAME;
 use crate::hasher::hasher::{calc_dir_hash, get_diff, FileDiff};
 use crate::{abstract_fs::workload::Workload, config::Config, mount::mount::FileSystemMount};
@@ -21,8 +21,6 @@ pub struct GreyBoxFuzzer {
     snd_kcov_feedback: KCovFeedback,
 
     mutator: Mutator,
-
-    config: Config,
 }
 
 impl GreyBoxFuzzer {
@@ -31,14 +29,6 @@ impl GreyBoxFuzzer {
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
     ) -> Self {
-        let fuzz_data = FuzzData::new(fst_mount, snd_mount, config.fs_name.clone());
-
-        let fst_kcov_path = fuzz_data.fst_exec_dir.join(KCOV_FILENAME);
-        let snd_kcov_path = fuzz_data.snd_exec_dir.join(KCOV_FILENAME);
-
-        let fst_kcov_feedback = KCovFeedback::new(fst_kcov_path.clone().into_boxed_path());
-        let snd_kcov_feedback = KCovFeedback::new(snd_kcov_path.clone().into_boxed_path());
-
         let mutator = Mutator::new(
             StdRng::seed_from_u64(
                 SystemTime::now()
@@ -52,6 +42,14 @@ impl GreyBoxFuzzer {
             config.greybox.max_mutations,
         );
 
+        let fuzz_data = FuzzData::new(fst_mount, snd_mount, config);
+
+        let fst_kcov_path = fuzz_data.fst_exec_dir.join(KCOV_FILENAME);
+        let snd_kcov_path = fuzz_data.snd_exec_dir.join(KCOV_FILENAME);
+
+        let fst_kcov_feedback = KCovFeedback::new(fst_kcov_path.clone().into_boxed_path());
+        let snd_kcov_feedback = KCovFeedback::new(snd_kcov_path.clone().into_boxed_path());
+
         Self {
             data: fuzz_data,
             corpus: vec![Workload::new()],
@@ -61,32 +59,25 @@ impl GreyBoxFuzzer {
             snd_kcov_feedback,
 
             mutator,
-
-            config,
         }
     }
 
-    pub fn fuzz(&mut self) {
-        info!("starting fuzzing loop");
-        self.data.stats.start = Instant::now();
-        loop {
-            match self.fuzz_one() {
-                Err(err) => {
-                    error!("{:?}", err);
-                    return;
-                }
-                _ => self.data.stats.executions += 1,
-            }
-            if Instant::now()
-                .duration_since(self.data.stats.last_time_showed)
-                .as_secs()
-                > self.config.heartbeat_interval.into()
-            {
-                self.show_stats();
-            }
+    fn pick_input(&mut self) -> Workload {
+        if self.next_seed >= self.corpus.len() {
+            self.next_seed = 0
         }
+        let workload = self.corpus.get(self.next_seed).unwrap().clone();
+        self.next_seed += 1;
+        workload
     }
 
+    fn add_to_corpus(&mut self, input: Workload) {
+        debug!("adding new input to corpus");
+        self.corpus.push(input);
+    }
+}
+
+impl Fuzzer for GreyBoxFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
         debug!("picking input");
         let input = self.pick_input();
@@ -132,7 +123,7 @@ impl GreyBoxFuzzer {
             return Ok(());
         }
 
-        let hash_diff_interesting = self.config.hashing_enabled && fst_hash != snd_hash;
+        let hash_diff_interesting = self.data.config.hashing_enabled && fst_hash != snd_hash;
         debug!("doing objectives");
         let console_is_interesting = self
             .data
@@ -185,21 +176,7 @@ impl GreyBoxFuzzer {
         Ok(())
     }
 
-    fn pick_input(&mut self) -> Workload {
-        if self.next_seed >= self.corpus.len() {
-            self.next_seed = 0
-        }
-        let workload = self.corpus.get(self.next_seed).unwrap().clone();
-        self.next_seed += 1;
-        workload
-    }
-
-    fn add_to_corpus(&mut self, input: Workload) {
-        debug!("adding new input to corpus");
-        self.corpus.push(input);
-    }
-
-    pub fn show_stats(&mut self) {
+    fn show_stats(&mut self) {
         self.data.stats.last_time_showed = Instant::now();
         let since_start = Instant::now().duration_since(self.data.stats.start);
         let secs = since_start.as_secs();
@@ -213,5 +190,9 @@ impl GreyBoxFuzzer {
             (secs / (60)) % 60,
             secs % 60,
         );
+    }
+
+    fn data(&mut self) -> &mut FuzzData {
+        &mut self.data
     }
 }

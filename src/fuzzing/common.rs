@@ -1,6 +1,7 @@
 use crate::abstract_fs::trace::{Trace, TRACE_FILENAME};
 
 use crate::abstract_fs::workload::Workload;
+use crate::config::Config;
 use crate::fuzzing::objective::console::ConsoleObjective;
 use crate::fuzzing::objective::trace::TraceObjective;
 use crate::harness::{ConsolePipe, Harness};
@@ -9,7 +10,7 @@ use crate::mount::mount::FileSystemMount;
 use crate::save::{save_diff, save_output, save_testcase};
 use crate::temp_dir::setup_temp_dir;
 use anyhow::Context;
-use log::{debug, info};
+use log::{debug, error, info};
 use std::cell::RefCell;
 use std::fs::read_to_string;
 use std::path::Path;
@@ -18,6 +19,8 @@ use std::time::Instant;
 use std::{fs, io};
 
 pub struct FuzzData {
+    pub config: Config,
+
     pub fst_exec_dir: Box<Path>,
     pub snd_exec_dir: Box<Path>,
     pub fst_trace_path: Box<Path>,
@@ -45,11 +48,52 @@ pub struct FuzzData {
     pub hasher_options: HasherOptions,
 }
 
+pub trait Fuzzer {
+    fn run(&mut self, test_count: Option<u64>) {
+        info!("starting fuzzing loop");
+        self.data().stats.start = Instant::now();
+        match test_count {
+            None => loop {
+                if self.runs() {
+                    return;
+                }
+            },
+            Some(count) => {
+                for _ in 0..count {
+                    if self.runs() {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+    fn runs(&mut self) -> bool {
+        match self.fuzz_one() {
+            Err(err) => {
+                error!("{:?}", err);
+                return true;
+            }
+            _ => self.data().stats.executions += 1,
+        }
+        if Instant::now()
+            .duration_since(self.data().stats.last_time_showed)
+            .as_secs()
+            > self.data().config.heartbeat_interval.into()
+        {
+            self.show_stats();
+        }
+        false
+    }
+    fn fuzz_one(&mut self) -> anyhow::Result<()>;
+    fn show_stats(&mut self);
+    fn data(&mut self) -> &mut FuzzData;
+}
+
 impl FuzzData {
     pub fn new(
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
-        fs_name: String,
+        config: Config,
     ) -> Self {
         info!("new fuzzer");
 
@@ -84,7 +128,7 @@ impl FuzzData {
             fst_mount,
             Path::new("/mnt")
                 .join(fst_fs_name.to_lowercase())
-                .join(&fs_name)
+                .join(&config.fs_name)
                 .into_boxed_path(),
             fst_exec_dir.clone().into_boxed_path(),
             fst_stdout.clone(),
@@ -95,7 +139,7 @@ impl FuzzData {
             snd_mount,
             Path::new("/mnt")
                 .join(snd_fs_name.to_lowercase())
-                .join(&fs_name)
+                .join(&config.fs_name)
                 .into_boxed_path(),
             snd_exec_dir.clone().into_boxed_path(),
             snd_stdout.clone(),
@@ -103,6 +147,8 @@ impl FuzzData {
         );
 
         Self {
+            config,
+
             fst_exec_dir: fst_exec_dir.into_boxed_path(),
             snd_exec_dir: snd_exec_dir.into_boxed_path(),
             fst_trace_path: fst_trace_path.into_boxed_path(),
