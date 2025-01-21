@@ -14,12 +14,7 @@ fn test_hash_eq() {
     let files = vec!["test1.out", "test2.txt", "test3.txt"];
     let data = vec!["", "dsfsdfsdfsdfpsd", "11213213\nddfdsf    \n     "];
 
-    let temp_dir = env::temp_dir().join("test_hash_eq");
-    fs::remove_dir_all(temp_dir.as_path())
-        .with_context(|| format!("failed to remove dir '{}'", temp_dir.display()))
-        .unwrap();
-
-    let cmp_dirs = create_data_for_test(temp_dir, dirs, files, data);
+    let cmp_dirs = create_data_for_test(dirs, files, data);
 
     let hash_options = Default::default();
     let hash_fst = calc_dir_hash(cmp_dirs[0].as_path(), &hash_options);
@@ -37,10 +32,7 @@ fn test_hash_not_eq() {
     let files = vec!["test1.out", "test2.txt", "test3.txt"];
     let data = vec!["", "dsfsdfsdfsdfpsd", "11213213\nddfdsf    \n     "];
 
-    let temp_dir = env::temp_dir().join("test_hash_not_eq_file_content");
-    fs::remove_dir_all(temp_dir.as_path()).unwrap_or(());
-
-    let cmp_dirs = create_data_for_test(temp_dir, dirs, files, data);
+    let cmp_dirs = create_data_for_test(dirs, files, data);
 
     let err_dir = cmp_dirs[0].as_path().join("ERR");
     fs::create_dir(err_dir.clone())
@@ -56,12 +48,10 @@ fn test_hash_not_eq() {
     assert_ne!(diff.len(), 0);
 }
 
-fn create_data_for_test(
-    temp_dir: PathBuf,
-    dirs: Vec<&str>,
-    files: Vec<&str>,
-    data: Vec<&str>,
-) -> Vec<PathBuf> {
+fn create_data_for_test(dirs: Vec<&str>, files: Vec<&str>, data: Vec<&str>) -> Vec<PathBuf> {
+    let temp_dir = env::temp_dir().join("DIFFuzzer-hash-test");
+    fs::remove_dir_all(temp_dir.as_path()).unwrap_or(());
+
     let cmp_dirs = vec![temp_dir.join("fst"), temp_dir.join("snd")];
 
     for cmp_dir in cmp_dirs.iter() {
