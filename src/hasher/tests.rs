@@ -5,7 +5,7 @@ use std::{env, fs};
 
 use anyhow::Context;
 
-use crate::hasher::hasher::{calc_hash_for_dir, get_diff};
+use crate::hasher::hasher::{calc_dir_hash, get_diff};
 
 #[ignore]
 #[test]
@@ -22,8 +22,8 @@ fn test_hash_eq() {
     let cmp_dirs = create_data_for_test(temp_dir, dirs, files, data);
 
     let hash_options = Default::default();
-    let hash_fst = calc_hash_for_dir(cmp_dirs[0].as_path(), &hash_options);
-    let hash_snd = calc_hash_for_dir(cmp_dirs[1].as_path(), &hash_options);
+    let hash_fst = calc_dir_hash(cmp_dirs[0].as_path(), &hash_options);
+    let hash_snd = calc_dir_hash(cmp_dirs[1].as_path(), &hash_options);
     assert_eq!(hash_fst, hash_snd, "Hash not equal");
 
     let diff = get_diff(cmp_dirs[0].as_path(), cmp_dirs[1].as_path(), &hash_options);
@@ -48,8 +48,8 @@ fn test_hash_not_eq() {
         .unwrap();
 
     let hash_options = Default::default();
-    let hash_fst = calc_hash_for_dir(cmp_dirs[0].as_path(), &hash_options);
-    let hash_snd = calc_hash_for_dir(cmp_dirs[1].as_path(), &hash_options);
+    let hash_fst = calc_dir_hash(cmp_dirs[0].as_path(), &hash_options);
+    let hash_snd = calc_dir_hash(cmp_dirs[1].as_path(), &hash_options);
     assert_ne!(hash_fst, hash_snd, "Hash equal");
 
     let diff = get_diff(cmp_dirs[0].as_path(), cmp_dirs[1].as_path(), &hash_options);

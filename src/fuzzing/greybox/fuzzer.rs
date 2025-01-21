@@ -6,7 +6,7 @@ use rand::{rngs::StdRng, SeedableRng};
 
 use crate::fuzzing::common::{parse_trace, setup_dir, FuzzData};
 use crate::fuzzing::greybox::feedback::kcov::KCOV_FILENAME;
-use crate::hasher::hasher::{calc_hash_for_dir, get_diff, FileDiff};
+use crate::hasher::hasher::{calc_dir_hash, get_diff, FileDiff};
 use crate::{abstract_fs::workload::Workload, config::Config, mount::mount::FileSystemMount};
 
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
@@ -116,9 +116,9 @@ impl Fuzzer {
             .with_context(|| format!("failed to run second harness '{}'", self.data.snd_fs_name))?;
 
         let fst_hash =
-            calc_hash_for_dir(self.data.fst_exec_dir.as_ref(), &self.data.hasher_options);
+            calc_dir_hash(self.data.fst_exec_dir.as_ref(), &self.data.hasher_options);
         let snd_hash =
-            calc_hash_for_dir(self.data.snd_exec_dir.as_ref(), &self.data.hasher_options);
+            calc_dir_hash(self.data.snd_exec_dir.as_ref(), &self.data.hasher_options);
 
         debug!("checking results");
         let fst_trace = parse_trace(&self.data.fst_trace_path)

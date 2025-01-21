@@ -56,7 +56,7 @@ impl Display for FileInfo {
 }
 
 // if nlink = True, include nlink to hash. Same for mode.
-pub fn calc_hash_for_dir(path: &Path, hasher_options: &HasherOptions) -> u64 {
+pub fn calc_dir_hash(path: &Path, hasher_options: &HasherOptions) -> u64 {
     let mut hasher = XxHash64::default();
 
     for entry in WalkDir::new(path).sort_by(|a, b| a.file_name().cmp(b.file_name())) {
@@ -95,8 +95,8 @@ pub fn get_diff(path_fst: &Path, path_snd: &Path, hasher_options: &HasherOptions
         let cmp_res = vec_fst[i_fst].rel_path.cmp(&vec_snd[i_snd].rel_path);
         match cmp_res {
             Ordering::Equal => {
-                let hash_fst = calc_hash_for_dir(vec_fst[i_fst].abs_path.as_ref(), &hasher_options);
-                let hash_snd = calc_hash_for_dir(vec_snd[i_snd].abs_path.as_ref(), &hasher_options);
+                let hash_fst = calc_dir_hash(vec_fst[i_fst].abs_path.as_ref(), &hasher_options);
+                let hash_snd = calc_dir_hash(vec_snd[i_snd].abs_path.as_ref(), &hasher_options);
                 if hash_fst != hash_snd {
                     res.push(DifferentHash {
                         fst: vec_fst[i_fst].clone(),
