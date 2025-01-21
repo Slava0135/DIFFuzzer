@@ -116,14 +116,10 @@ impl Fuzzer {
             .run(&input_path)
             .with_context(|| format!("failed to run second harness '{}'", self.data.snd_fs_name))?;
 
-        let fst_hash = calc_hash_for_dir(
-            self.data.fst_exec_dir.as_ref(),
-            &self.data.hasher_options,
-        );
-        let snd_hash = calc_hash_for_dir(
-            self.data.snd_exec_dir.as_ref(),
-            &self.data.hasher_options,
-        );
+        let fst_hash =
+            calc_hash_for_dir(self.data.fst_exec_dir.as_ref(), &self.data.hasher_options);
+        let snd_hash =
+            calc_hash_for_dir(self.data.snd_exec_dir.as_ref(), &self.data.hasher_options);
 
         debug!("checking results");
         let fst_trace = parse_trace(&self.data.fst_trace_path)
@@ -157,7 +153,7 @@ impl Fuzzer {
                 diff = get_diff(
                     &self.data.fst_exec_dir,
                     &self.data.snd_exec_dir,
-                    &self.data.hasher_options
+                    &self.data.hasher_options,
                 );
             }
             self.data

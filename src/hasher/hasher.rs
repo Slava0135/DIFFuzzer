@@ -95,10 +95,8 @@ pub fn get_diff(path_fst: &Path, path_snd: &Path, hasher_options: &HasherOptions
         let cmp_res = vec_fst[i_fst].rel_path.cmp(&vec_snd[i_snd].rel_path);
         match cmp_res {
             Ordering::Equal => {
-                let hash_fst =
-                    calc_hash_for_dir(vec_fst[i_fst].abs_path.as_ref(), &hasher_options);
-                let hash_snd =
-                    calc_hash_for_dir(vec_snd[i_snd].abs_path.as_ref(), &hasher_options);
+                let hash_fst = calc_hash_for_dir(vec_fst[i_fst].abs_path.as_ref(), &hasher_options);
+                let hash_snd = calc_hash_for_dir(vec_snd[i_snd].abs_path.as_ref(), &hasher_options);
                 if hash_fst != hash_snd {
                     res.push(DifferentHash {
                         fst: vec_fst[i_fst].clone(),

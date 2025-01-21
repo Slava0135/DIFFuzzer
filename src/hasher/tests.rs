@@ -1,7 +1,7 @@
-use std::{env, fs};
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+use std::{env, fs};
 
 use anyhow::Context;
 
