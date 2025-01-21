@@ -1,8 +1,8 @@
 use crate::abstract_fs::trace::TRACE_FILENAME;
 
 use crate::abstract_fs::workload::Workload;
-use crate::fuzzing::abstract_fuzzer::objective::console::ConsoleObjective;
-use crate::fuzzing::abstract_fuzzer::objective::trace::TraceObjective;
+use crate::fuzzing::objective::console::ConsoleObjective;
+use crate::fuzzing::objective::trace::TraceObjective;
 use crate::harness::{ConsolePipe, Harness};
 use crate::hasher::hasher::{FileDiff, HasherOptions};
 use crate::mount::mount::FileSystemMount;

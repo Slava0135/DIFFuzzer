@@ -6,8 +6,8 @@ use std::time::Instant;
 
 use crate::abstract_fs::generator::generate_new;
 use crate::config::Config;
-use crate::fuzzing::abstract_fuzzer::fuzzer_data::FuzzData;
-use crate::fuzzing::abstract_fuzzer::utils::{parse_trace, setup_dir};
+use crate::fuzzing::fuzzer_data::FuzzData;
+use crate::fuzzing::utils::{parse_trace, setup_dir};
 
 use crate::hasher::hasher::{calc_hash_for_dir, get_diff, FileDiff};
 use crate::mount::mount::FileSystemMount;
