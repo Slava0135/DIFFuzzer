@@ -1,7 +1,7 @@
 use std::{fs, path::Path};
 
 use crate::fuzzing::blackbox::fuzzer::BlackBoxFuzzer;
-use crate::fuzzing::greybox::fuzzer::Fuzzer;
+use crate::fuzzing::greybox::fuzzer::GreyBoxFuzzer;
 use args::Args;
 use clap::Parser;
 use config::Config;
@@ -35,7 +35,7 @@ fn main() {
             second_filesystem,
             test_count,
         } => {
-            let mut fuzzer = Fuzzer::new(
+            let mut fuzzer = GreyBoxFuzzer::new(
                 config,
                 first_filesystem.try_into().unwrap(),
                 second_filesystem.try_into().unwrap(),

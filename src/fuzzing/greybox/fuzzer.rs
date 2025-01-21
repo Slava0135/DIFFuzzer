@@ -11,7 +11,7 @@ use crate::{abstract_fs::workload::Workload, config::Config, mount::mount::FileS
 
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 
-pub struct Fuzzer {
+pub struct GreyBoxFuzzer {
     data: FuzzData,
 
     corpus: Vec<Workload>,
@@ -25,7 +25,7 @@ pub struct Fuzzer {
     config: Config,
 }
 
-impl Fuzzer {
+impl GreyBoxFuzzer {
     pub fn new(
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
