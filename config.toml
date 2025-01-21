@@ -1,4 +1,5 @@
 max_workload_length = 100
+fs_name = "fstest"
 
 [greybox]
 heartbeat_interval = 30 # in seconds

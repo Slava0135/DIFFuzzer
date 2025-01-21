@@ -31,7 +31,7 @@ impl Fuzzer {
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
     ) -> Self {
-        let fuzz_data = FuzzData::new(fst_mount, snd_mount);
+        let fuzz_data = FuzzData::new(fst_mount, snd_mount, config.fs_name);
 
         let fst_kcov_path = fuzz_data.fst_exec_dir.join(KCOV_FILENAME);
         let snd_kcov_path = fuzz_data.snd_exec_dir.join(KCOV_FILENAME);

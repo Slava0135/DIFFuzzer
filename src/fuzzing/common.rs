@@ -49,6 +49,7 @@ impl FuzzData {
     pub fn new(
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
+        fs_name: String,
     ) -> Self {
         info!("new fuzzer");
 
@@ -83,7 +84,7 @@ impl FuzzData {
             fst_mount,
             Path::new("/mnt")
                 .join(fst_fs_name.to_lowercase())
-                .join("fstest")
+                .join(&fs_name)
                 .into_boxed_path(),
             fst_exec_dir.clone().into_boxed_path(),
             fst_stdout.clone(),
@@ -94,7 +95,7 @@ impl FuzzData {
             snd_mount,
             Path::new("/mnt")
                 .join(snd_fs_name.to_lowercase())
-                .join("fstest")
+                .join(&fs_name)
                 .into_boxed_path(),
             snd_exec_dir.clone().into_boxed_path(),
             snd_stdout.clone(),

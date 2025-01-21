@@ -16,7 +16,12 @@ use crate::{
     temp_dir::setup_temp_dir,
 };
 
-pub fn run(test_path: &Path, save_to_dir: &Path, mount: &'static dyn FileSystemMount) {
+pub fn run(
+    test_path: &Path,
+    save_to_dir: &Path,
+    mount: &'static dyn FileSystemMount,
+    fs_name: String,
+) {
     info!("running single test");
 
     info!("reading testcase at '{}'", test_path.display());
@@ -46,12 +51,12 @@ pub fn run(test_path: &Path, save_to_dir: &Path, mount: &'static dyn FileSystemM
     let stdout = Rc::new(RefCell::new("".to_owned()));
     let stderr = Rc::new(RefCell::new("".to_owned()));
 
-    let fs_name = mount.to_string();
+    let fs_str = mount.to_string();
     let harness = Harness::new(
         mount,
         Path::new("/mnt")
-            .join(fs_name.to_lowercase())
-            .join("fstest")
+            .join(fs_str.to_lowercase())
+            .join(fs_name)
             .into_boxed_path(),
         exec_dir.to_owned().into_boxed_path(),
         stdout.clone(),
@@ -71,7 +76,7 @@ pub fn run(test_path: &Path, save_to_dir: &Path, mount: &'static dyn FileSystemM
     save_output(
         save_to_dir,
         &trace_path,
-        &fs_name,
+        &fs_str,
         stdout.borrow().clone(),
         stderr.borrow().clone(),
     )

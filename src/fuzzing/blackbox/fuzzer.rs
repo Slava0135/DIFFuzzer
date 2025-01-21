@@ -16,9 +16,13 @@ pub struct BlackBoxFuzzer {
 }
 
 impl BlackBoxFuzzer {
-    pub fn new(fst_fs: &'static dyn FileSystemMount, snd_fs: &'static dyn FileSystemMount) -> Self {
+    pub fn new(
+        fst_fs: &'static dyn FileSystemMount,
+        snd_fs: &'static dyn FileSystemMount,
+        fs_name: String,
+    ) -> Self {
         Self {
-            data: FuzzData::new(fst_fs, snd_fs),
+            data: FuzzData::new(fst_fs, snd_fs, fs_name),
         }
     }
 
@@ -75,10 +79,8 @@ impl BlackBoxFuzzer {
             .with_context(|| format!("failed to run second harness '{}'", self.data.snd_fs_name))
             .unwrap();
 
-        let fst_hash =
-            calc_dir_hash(self.data.fst_exec_dir.as_ref(), &self.data.hasher_options);
-        let snd_hash =
-            calc_dir_hash(self.data.snd_exec_dir.as_ref(), &self.data.hasher_options);
+        let fst_hash = calc_dir_hash(self.data.fst_exec_dir.as_ref(), &self.data.hasher_options);
+        let snd_hash = calc_dir_hash(self.data.snd_exec_dir.as_ref(), &self.data.hasher_options);
 
         debug!("checking results");
         let fst_trace = parse_trace(&self.data.fst_trace_path)

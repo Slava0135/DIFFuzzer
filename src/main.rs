@@ -50,6 +50,7 @@ fn main() {
             BlackBoxFuzzer::new(
                 first_filesystem.try_into().unwrap(),
                 second_filesystem.try_into().unwrap(),
+                config.fs_name.clone(),
             )
             .fuzz(random(), test_count, config);
         }
@@ -61,6 +62,7 @@ fn main() {
             Path::new(&path_to_test),
             Path::new(&save_to_dir),
             filesystem.try_into().unwrap(),
+            config.fs_name,
         ),
     }
 }
