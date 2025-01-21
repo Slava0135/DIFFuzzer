@@ -2,7 +2,7 @@ use anyhow::Context;
 use log::{debug, info, warn};
 use rand::prelude::StdRng;
 use rand::SeedableRng;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
 use crate::config::Config;
@@ -26,8 +26,13 @@ impl BlackBoxFuzzer {
         }
     }
 
-    pub fn fuzz(&mut self, seed: u64, test_count: Option<u64>, config: Config) {
-        let mut rng = StdRng::seed_from_u64(seed);
+    pub fn fuzz(&mut self, test_count: Option<u64>, config: Config) {
+        let mut rng = StdRng::seed_from_u64(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+        );
         let trace_len = config.max_workload_length as usize;
 
         match test_count {

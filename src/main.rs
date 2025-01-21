@@ -52,7 +52,7 @@ fn main() {
                 second_filesystem.try_into().unwrap(),
                 config.fs_name.clone(),
             )
-            .fuzz(random(), test_count, config);
+            .fuzz(test_count, config);
         }
         args::Mode::Single {
             save_to_dir,
