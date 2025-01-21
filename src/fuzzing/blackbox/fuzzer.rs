@@ -1,4 +1,4 @@
-use anyhow::Context;
+use anyhow::{Context, Ok};
 use log::{debug, info, warn};
 use rand::prelude::StdRng;
 use rand::SeedableRng;
@@ -14,6 +14,7 @@ use crate::mount::mount::FileSystemMount;
 pub struct BlackBoxFuzzer {
     data: FuzzData,
     config: Config,
+    rng: StdRng,
 }
 
 impl BlackBoxFuzzer {
@@ -25,88 +26,77 @@ impl BlackBoxFuzzer {
         Self {
             data: FuzzData::new(fst_mount, snd_mount, config.fs_name.clone()),
             config,
+            rng: StdRng::seed_from_u64(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64,
+            ),
         }
     }
 
     pub fn fuzz(&mut self, test_count: Option<u64>) {
-        let mut rng = StdRng::seed_from_u64(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
-        );
-
         match test_count {
             None => loop {
-                self.fuzz_one(&mut rng);
+                self.fuzz_one().unwrap();
             },
             Some(count) => {
                 for _ in 0..count {
-                    self.fuzz_one(&mut rng);
+                    self.fuzz_one().unwrap();
                 }
             }
         }
     }
 
-    fn fuzz_one(&mut self, rng: &mut StdRng) {
+    fn fuzz_one(&mut self) -> anyhow::Result<()> {
         let input = generate_new(
-            rng,
+            &mut self.rng,
             self.config.max_workload_length.into(),
             &self.config.operation_weights,
         );
         let input_path = input
             .compile(&self.data.test_dir)
-            .with_context(|| "failed to compile test".to_string())
-            .unwrap();
+            .with_context(|| "failed to compile test".to_string())?;
 
         debug!("running harness at '{}'", input_path.display());
 
-        setup_dir(self.data.fst_exec_dir.as_ref())
-            .with_context(|| {
-                format!(
-                    "failed to setup dir at '{}'",
-                    self.data.fst_exec_dir.display()
-                )
-            })
-            .unwrap();
-        setup_dir(self.data.snd_exec_dir.as_ref())
-            .with_context(|| {
-                format!(
-                    "failed to setup dir at '{}'",
-                    self.data.snd_exec_dir.display()
-                )
-            })
-            .unwrap();
+        setup_dir(self.data.fst_exec_dir.as_ref()).with_context(|| {
+            format!(
+                "failed to setup dir at '{}'",
+                self.data.fst_exec_dir.display()
+            )
+        })?;
+        setup_dir(self.data.snd_exec_dir.as_ref()).with_context(|| {
+            format!(
+                "failed to setup dir at '{}'",
+                self.data.snd_exec_dir.display()
+            )
+        })?;
 
         self.data
             .fst_harness
             .run(&input_path)
-            .with_context(|| format!("failed to run first harness '{}'", self.data.fst_fs_name))
-            .unwrap();
+            .with_context(|| format!("failed to run first harness '{}'", self.data.fst_fs_name))?;
         self.data
             .snd_harness
             .run(&input_path)
-            .with_context(|| format!("failed to run second harness '{}'", self.data.snd_fs_name))
-            .unwrap();
+            .with_context(|| format!("failed to run second harness '{}'", self.data.snd_fs_name))?;
 
         let fst_hash = calc_dir_hash(self.data.fst_exec_dir.as_ref(), &self.data.hasher_options);
         let snd_hash = calc_dir_hash(self.data.snd_exec_dir.as_ref(), &self.data.hasher_options);
 
         debug!("checking results");
         let fst_trace = parse_trace(&self.data.fst_trace_path)
-            .with_context(|| format!("failed to parse first trace"))
-            .unwrap();
+            .with_context(|| format!("failed to parse first trace"))?;
         let snd_trace = parse_trace(&self.data.snd_trace_path)
-            .with_context(|| format!("failed to parse second trace"))
-            .unwrap();
+            .with_context(|| format!("failed to parse second trace"))?;
 
         if fst_trace.has_errors() && snd_trace.has_errors() {
             warn!("both traces contain errors, potential bug in model");
             self.data
                 .report_crash(input, &input_path, self.data.accidents_path.clone(), vec![])
-                .with_context(|| format!("failed to report accident"))
-                .unwrap();
-            return;
+                .with_context(|| format!("failed to report accident"))?;
+            return Ok(());
         }
 
         let hash_diff_interesting = self.config.hashing_enabled && fst_hash != snd_hash;
@@ -115,14 +105,12 @@ impl BlackBoxFuzzer {
             .data
             .console_objective
             .is_interesting()
-            .with_context(|| format!("failed to do console objective"))
-            .unwrap();
+            .with_context(|| format!("failed to do console objective"))?;
         let trace_is_interesting = self
             .data
             .trace_objective
             .is_interesting(&fst_trace, &snd_trace)
-            .with_context(|| format!("failed to do trace objective"))
-            .unwrap();
+            .with_context(|| format!("failed to do trace objective"))?;
 
         if console_is_interesting || trace_is_interesting || hash_diff_interesting {
             let mut diff: Vec<FileDiff> = vec![];
@@ -135,10 +123,10 @@ impl BlackBoxFuzzer {
             }
             self.data
                 .report_crash(input, &input_path, self.data.crashes_path.clone(), diff)
-                .with_context(|| format!("failed to report crash"))
-                .unwrap();
+                .with_context(|| format!("failed to report crash"))?;
             self.show_stats();
         }
+        Ok(())
     }
 
     pub fn show_stats(&mut self) {
