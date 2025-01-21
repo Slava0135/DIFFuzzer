@@ -48,11 +48,11 @@ fn main() {
             test_count,
         } => {
             BlackBoxFuzzer::new(
+                config,
                 first_filesystem.try_into().unwrap(),
                 second_filesystem.try_into().unwrap(),
-                config.fs_name.clone(),
             )
-            .fuzz(test_count, config);
+            .fuzz(test_count);
         }
         args::Mode::Single {
             save_to_dir,

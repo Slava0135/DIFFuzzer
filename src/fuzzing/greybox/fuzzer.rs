@@ -22,9 +22,7 @@ pub struct Fuzzer {
 
     mutator: Mutator,
 
-    hashing_enabled: bool,
-
-    heartbeat_interval: u16,
+    config: Config,
 }
 
 impl Fuzzer {
@@ -33,7 +31,7 @@ impl Fuzzer {
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
     ) -> Self {
-        let fuzz_data = FuzzData::new(fst_mount, snd_mount, config.fs_name);
+        let fuzz_data = FuzzData::new(fst_mount, snd_mount, config.fs_name.clone());
 
         let fst_kcov_path = fuzz_data.fst_exec_dir.join(KCOV_FILENAME);
         let snd_kcov_path = fuzz_data.snd_exec_dir.join(KCOV_FILENAME);
@@ -64,9 +62,7 @@ impl Fuzzer {
 
             mutator,
 
-            hashing_enabled: config.hashing_enabled,
-
-            heartbeat_interval: config.greybox.heartbeat_interval,
+            config,
         }
     }
 
@@ -84,7 +80,7 @@ impl Fuzzer {
             if Instant::now()
                 .duration_since(self.data.stats.last_time_showed)
                 .as_secs()
-                > self.heartbeat_interval.into()
+                > self.config.heartbeat_interval.into()
             {
                 self.show_stats();
             }
@@ -136,7 +132,7 @@ impl Fuzzer {
             return Ok(());
         }
 
-        let hash_diff_interesting = self.hashing_enabled && fst_hash != snd_hash;
+        let hash_diff_interesting = self.config.hashing_enabled && fst_hash != snd_hash;
         debug!("doing objectives");
         let console_is_interesting = self
             .data

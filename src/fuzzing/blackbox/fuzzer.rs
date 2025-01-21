@@ -13,42 +13,47 @@ use crate::mount::mount::FileSystemMount;
 
 pub struct BlackBoxFuzzer {
     data: FuzzData,
+    config: Config,
 }
 
 impl BlackBoxFuzzer {
     pub fn new(
-        fst_fs: &'static dyn FileSystemMount,
-        snd_fs: &'static dyn FileSystemMount,
-        fs_name: String,
+        config: Config,
+        fst_mount: &'static dyn FileSystemMount,
+        snd_mount: &'static dyn FileSystemMount,
     ) -> Self {
         Self {
-            data: FuzzData::new(fst_fs, snd_fs, fs_name),
+            data: FuzzData::new(fst_mount, snd_mount, config.fs_name.clone()),
+            config,
         }
     }
 
-    pub fn fuzz(&mut self, test_count: Option<u64>, config: Config) {
+    pub fn fuzz(&mut self, test_count: Option<u64>) {
         let mut rng = StdRng::seed_from_u64(
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_millis() as u64,
         );
-        let workload_len = config.max_workload_length as usize;
 
         match test_count {
             None => loop {
-                self.fuzz_one(&mut rng, workload_len, &config);
+                self.fuzz_one(&mut rng);
             },
             Some(count) => {
                 for _ in 0..count {
-                    self.fuzz_one(&mut rng, workload_len, &config);
+                    self.fuzz_one(&mut rng);
                 }
             }
         }
     }
 
-    fn fuzz_one(&mut self, rng: &mut StdRng, workload_len: usize, config: &Config) {
-        let input = generate_new(rng, workload_len, &config.operation_weights);
+    fn fuzz_one(&mut self, rng: &mut StdRng) {
+        let input = generate_new(
+            rng,
+            self.config.max_workload_length.into(),
+            &self.config.operation_weights,
+        );
         let input_path = input
             .compile(&self.data.test_dir)
             .with_context(|| "failed to compile test".to_string())
@@ -104,7 +109,7 @@ impl BlackBoxFuzzer {
             return;
         }
 
-        let hash_diff_interesting = config.hashing_enabled && fst_hash != snd_hash;
+        let hash_diff_interesting = self.config.hashing_enabled && fst_hash != snd_hash;
         debug!("doing objectives");
         let console_is_interesting = self
             .data
