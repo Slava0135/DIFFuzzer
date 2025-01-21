@@ -16,7 +16,7 @@ fn test_hash_eq() {
 
     let temp_dir = env::temp_dir().join("test_hash_eq");
     fs::remove_dir_all(temp_dir.as_path())
-        .with_context(|| format!("Can\t remove dir {}", temp_dir.display()))
+        .with_context(|| format!("failed to remove dir '{}'", temp_dir.display()))
         .unwrap();
 
     let cmp_dirs = create_data_for_test(temp_dir, dirs, files, data);
@@ -24,10 +24,10 @@ fn test_hash_eq() {
     let hash_options = Default::default();
     let hash_fst = calc_dir_hash(cmp_dirs[0].as_path(), &hash_options);
     let hash_snd = calc_dir_hash(cmp_dirs[1].as_path(), &hash_options);
-    assert_eq!(hash_fst, hash_snd, "Hash not equal");
+    assert_eq!(hash_fst, hash_snd);
 
     let diff = get_diff(cmp_dirs[0].as_path(), cmp_dirs[1].as_path(), &hash_options);
-    assert_eq!(diff.len(), 0, "diff not empty");
+    assert_eq!(diff.len(), 0);
 }
 
 #[ignore]
@@ -42,18 +42,18 @@ fn test_hash_not_eq() {
 
     let cmp_dirs = create_data_for_test(temp_dir, dirs, files, data);
 
-    //make change
-    fs::create_dir(cmp_dirs[0].as_path().join("ER"))
-        .with_context(|| format!("Can't create folder {}", "ERR"))
+    let err_dir = cmp_dirs[0].as_path().join("ERR");
+    fs::create_dir(err_dir.clone())
+        .with_context(|| format!("failed create folder '{}'", err_dir.display()))
         .unwrap();
 
     let hash_options = Default::default();
     let hash_fst = calc_dir_hash(cmp_dirs[0].as_path(), &hash_options);
     let hash_snd = calc_dir_hash(cmp_dirs[1].as_path(), &hash_options);
-    assert_ne!(hash_fst, hash_snd, "Hash equal");
+    assert_ne!(hash_fst, hash_snd);
 
     let diff = get_diff(cmp_dirs[0].as_path(), cmp_dirs[1].as_path(), &hash_options);
-    assert_ne!(diff.len(), 0, "diff not empty");
+    assert_ne!(diff.len(), 0);
 }
 
 fn create_data_for_test(
