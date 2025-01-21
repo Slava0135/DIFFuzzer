@@ -26,6 +26,9 @@ pub enum Mode {
         #[arg(short, long)]
         #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
         second_filesystem: String,
+        /// Test count
+        #[arg(short, long)]
+        test_count: Option<u64>,
     },
     /// Run single test
     Single {
@@ -39,5 +42,19 @@ pub enum Mode {
         #[arg(short, long)]
         #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
         filesystem: String,
+    },
+    /// Run blackbox fuzzing
+    Blackbox {
+        /// First filesystem to test
+        #[arg(short, long)]
+        #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
+        first_filesystem: String,
+        /// Second filesystem to test
+        #[arg(short, long)]
+        #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
+        second_filesystem: String,
+        /// Test count
+        #[arg(short, long)]
+        test_count: Option<u64>,
     },
 }

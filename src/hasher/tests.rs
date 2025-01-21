@@ -1,10 +1,9 @@
+use std::{env, fs};
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use std::{env, fs};
 
 use anyhow::Context;
-use rand::random;
 
 use crate::hasher::hasher::{calc_hash_for_dir, get_diff};
 
@@ -22,12 +21,12 @@ fn test_hash_eq() {
 
     let cmp_dirs = create_data_for_test(temp_dir, dirs, files, data);
 
-    let seed = random();
-    let hash_fst = calc_hash_for_dir(cmp_dirs[0].as_path(), seed, false, false);
-    let hash_snd = calc_hash_for_dir(cmp_dirs[1].as_path(), seed, false, false);
+    let hash_options = Default::default();
+    let hash_fst = calc_hash_for_dir(cmp_dirs[0].as_path(), &hash_options);
+    let hash_snd = calc_hash_for_dir(cmp_dirs[1].as_path(), &hash_options);
     assert_eq!(hash_fst, hash_snd, "Hash not equal");
 
-    let diff = get_diff(cmp_dirs[0].as_path(), cmp_dirs[1].as_path(), false, false);
+    let diff = get_diff(cmp_dirs[0].as_path(), cmp_dirs[1].as_path(), &hash_options);
     assert_eq!(diff.len(), 0, "diff not empty");
 }
 
@@ -48,12 +47,12 @@ fn test_hash_not_eq() {
         .with_context(|| format!("Can't create folder {}", "ERR"))
         .unwrap();
 
-    let seed = random();
-    let hash_fst = calc_hash_for_dir(cmp_dirs[0].as_path(), seed, false, false);
-    let hash_snd = calc_hash_for_dir(cmp_dirs[1].as_path(), seed, false, false);
+    let hash_options = Default::default();
+    let hash_fst = calc_hash_for_dir(cmp_dirs[0].as_path(), &hash_options);
+    let hash_snd = calc_hash_for_dir(cmp_dirs[1].as_path(), &hash_options);
     assert_ne!(hash_fst, hash_snd, "Hash equal");
 
-    let diff = get_diff(cmp_dirs[0].as_path(), cmp_dirs[1].as_path(), false, false);
+    let diff = get_diff(cmp_dirs[0].as_path(), cmp_dirs[1].as_path(), &hash_options);
     assert_ne!(diff.len(), 0, "diff not empty");
 }
 
