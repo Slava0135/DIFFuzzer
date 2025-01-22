@@ -229,7 +229,7 @@ static std::string path_join(const std::string &prefix,
   return prefix + "/" + file_name;
 }
 
-static int idx = 0;
+static int idx = -1;
 
 static void success(int status, const char *cmd) {
   append_trace(idx, cmd, status, 0);
