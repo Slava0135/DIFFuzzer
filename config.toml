@@ -1,9 +1,9 @@
-max_workload_length = 100
-fs_name = "fstest"
-hashing_enabled = false
+fs_name = "fstest" 
+hashing_enabled = false 
+heartbeat_interval = 30 # in seconds
+max_workload_length = 100 
 
 [greybox]
-heartbeat_interval = 30 # in seconds
 max_mutations = 10 
 timeout = 10 # in seconds
 
@@ -50,5 +50,3 @@ weights = [
     30,
   ],
 ]
-
-

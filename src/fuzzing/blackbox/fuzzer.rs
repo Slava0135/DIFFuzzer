@@ -1,142 +1,65 @@
-use anyhow::Context;
-use log::{debug, info, warn};
+use anyhow::{Context, Ok};
+use log::{debug, info};
 use rand::prelude::StdRng;
 use rand::SeedableRng;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
 use crate::config::Config;
-use crate::fuzzing::common::{parse_trace, setup_dir, FuzzData};
+use crate::fuzzing::common::{parse_trace, FuzzData, Fuzzer};
 
-use crate::hasher::hasher::{calc_dir_hash, get_diff, FileDiff};
 use crate::mount::mount::FileSystemMount;
 
 pub struct BlackBoxFuzzer {
     data: FuzzData,
+    rng: StdRng,
 }
 
 impl BlackBoxFuzzer {
     pub fn new(
-        fst_fs: &'static dyn FileSystemMount,
-        snd_fs: &'static dyn FileSystemMount,
-        fs_name: String,
+        config: Config,
+        fst_mount: &'static dyn FileSystemMount,
+        snd_mount: &'static dyn FileSystemMount,
     ) -> Self {
         Self {
-            data: FuzzData::new(fst_fs, snd_fs, fs_name),
+            data: FuzzData::new(fst_mount, snd_mount, config),
+            rng: StdRng::seed_from_u64(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64,
+            ),
         }
     }
+}
 
-    pub fn fuzz(&mut self, test_count: Option<u64>, config: Config) {
-        let mut rng = StdRng::seed_from_u64(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
+impl Fuzzer for BlackBoxFuzzer {
+    fn fuzz_one(&mut self) -> anyhow::Result<()> {
+        debug!("generating input");
+        let input = generate_new(
+            &mut self.rng,
+            self.data.config.max_workload_length.into(),
+            &self.data.config.operation_weights,
         );
-        let workload_len = config.max_workload_length as usize;
 
-        match test_count {
-            None => loop {
-                self.fuzz_one(&mut rng, workload_len, &config);
-            },
-            Some(count) => {
-                for _ in 0..count {
-                    self.fuzz_one(&mut rng, workload_len, &config);
-                }
-            }
+        let input_path = self.compile_test(&input)?;
+
+        self.run_harness(&input_path)?;
+
+        let fst_trace = parse_trace(&self.data().fst_trace_path)
+            .with_context(|| format!("failed to parse first trace"))?;
+        let snd_trace = parse_trace(&self.data().snd_trace_path)
+            .with_context(|| format!("failed to parse second trace"))?;
+
+        if self.detect_errors(&input, &input_path, &fst_trace, &snd_trace)? {
+            return Ok(());
         }
+
+        self.do_objective(&input, &input_path, &fst_trace, &snd_trace)?;
+        Ok(())
     }
 
-    fn fuzz_one(&mut self, rng: &mut StdRng, workload_len: usize, config: &Config) {
-        let input = generate_new(rng, workload_len, &config.operation_weights);
-        let input_path = input
-            .compile(&self.data.test_dir)
-            .with_context(|| "failed to compile test".to_string())
-            .unwrap();
-
-        debug!("running harness at '{}'", input_path.display());
-
-        setup_dir(self.data.fst_exec_dir.as_ref())
-            .with_context(|| {
-                format!(
-                    "failed to setup dir at '{}'",
-                    self.data.fst_exec_dir.display()
-                )
-            })
-            .unwrap();
-        setup_dir(self.data.snd_exec_dir.as_ref())
-            .with_context(|| {
-                format!(
-                    "failed to setup dir at '{}'",
-                    self.data.snd_exec_dir.display()
-                )
-            })
-            .unwrap();
-
-        self.data
-            .fst_harness
-            .run(&input_path)
-            .with_context(|| format!("failed to run first harness '{}'", self.data.fst_fs_name))
-            .unwrap();
-        self.data
-            .snd_harness
-            .run(&input_path)
-            .with_context(|| format!("failed to run second harness '{}'", self.data.snd_fs_name))
-            .unwrap();
-
-        let fst_hash = calc_dir_hash(self.data.fst_exec_dir.as_ref(), &self.data.hasher_options);
-        let snd_hash = calc_dir_hash(self.data.snd_exec_dir.as_ref(), &self.data.hasher_options);
-
-        debug!("checking results");
-        let fst_trace = parse_trace(&self.data.fst_trace_path)
-            .with_context(|| format!("failed to parse first trace"))
-            .unwrap();
-        let snd_trace = parse_trace(&self.data.snd_trace_path)
-            .with_context(|| format!("failed to parse second trace"))
-            .unwrap();
-
-        if fst_trace.has_errors() && snd_trace.has_errors() {
-            warn!("both traces contain errors, potential bug in model");
-            self.data
-                .report_crash(input, &input_path, self.data.accidents_path.clone(), vec![])
-                .with_context(|| format!("failed to report accident"))
-                .unwrap();
-            return;
-        }
-
-        let hash_diff_interesting = config.hashing_enabled && fst_hash != snd_hash;
-        debug!("doing objectives");
-        let console_is_interesting = self
-            .data
-            .console_objective
-            .is_interesting()
-            .with_context(|| format!("failed to do console objective"))
-            .unwrap();
-        let trace_is_interesting = self
-            .data
-            .trace_objective
-            .is_interesting(&fst_trace, &snd_trace)
-            .with_context(|| format!("failed to do trace objective"))
-            .unwrap();
-
-        if console_is_interesting || trace_is_interesting || hash_diff_interesting {
-            let mut diff: Vec<FileDiff> = vec![];
-            if hash_diff_interesting {
-                diff = get_diff(
-                    &self.data.fst_exec_dir,
-                    &self.data.snd_exec_dir,
-                    &self.data.hasher_options,
-                );
-            }
-            self.data
-                .report_crash(input, &input_path, self.data.crashes_path.clone(), diff)
-                .with_context(|| format!("failed to report crash"))
-                .unwrap();
-            self.show_stats();
-        }
-    }
-
-    pub fn show_stats(&mut self) {
+    fn show_stats(&mut self) {
         self.data.stats.last_time_showed = Instant::now();
         let since_start = Instant::now().duration_since(self.data.stats.start);
         let secs = since_start.as_secs();
@@ -149,5 +72,9 @@ impl BlackBoxFuzzer {
             (secs / (60)) % 60,
             secs % 60,
         );
+    }
+
+    fn data(&mut self) -> &mut FuzzData {
+        &mut self.data
     }
 }
