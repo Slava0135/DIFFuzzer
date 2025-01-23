@@ -25,6 +25,8 @@ pub struct FuzzData {
     pub snd_exec_dir: Box<Path>,
     pub fst_trace_path: Box<Path>,
     pub snd_trace_path: Box<Path>,
+    pub fst_fs_dir: Box<Path>,
+    pub snd_fs_dir: Box<Path>,
 
     pub fst_stdout: ConsolePipe,
     pub snd_stdout: ConsolePipe,
@@ -123,8 +125,8 @@ pub trait Fuzzer {
         let data = self.data();
 
         let hash_diff_interesting = if data.config.hashing_enabled {
-            let fst_hash = calc_dir_hash(&data.fst_exec_dir, &data.hasher_options);
-            let snd_hash = calc_dir_hash(&data.snd_exec_dir, &data.hasher_options);
+            let fst_hash = calc_dir_hash(&data.fst_fs_dir, &data.hasher_options);
+            let snd_hash = calc_dir_hash(&data.snd_fs_dir, &data.hasher_options);
             fst_hash != snd_hash
         } else {
             false
@@ -214,23 +216,25 @@ impl FuzzData {
         let fst_fs_name = fst_mount.to_string();
         let snd_fs_name = snd_mount.to_string();
 
+        let fst_fs_dir = Path::new("/mnt")
+            .join(fst_fs_name.to_lowercase())
+            .join(&config.fs_name)
+            .into_boxed_path();
         let fst_harness = Harness::new(
             fst_mount,
-            Path::new("/mnt")
-                .join(fst_fs_name.to_lowercase())
-                .join(&config.fs_name)
-                .into_boxed_path(),
+            fst_fs_dir.clone(),
             fst_exec_dir.clone().into_boxed_path(),
             fst_stdout.clone(),
             fst_stderr.clone(),
         );
 
+        let snd_fs_dir = Path::new("/mnt")
+            .join(snd_fs_name.to_lowercase())
+            .join(&config.fs_name)
+            .into_boxed_path();
         let snd_harness = Harness::new(
             snd_mount,
-            Path::new("/mnt")
-                .join(snd_fs_name.to_lowercase())
-                .join(&config.fs_name)
-                .into_boxed_path(),
+            snd_fs_dir.clone(),
             snd_exec_dir.clone().into_boxed_path(),
             snd_stdout.clone(),
             snd_stderr.clone(),
@@ -243,6 +247,8 @@ impl FuzzData {
             snd_exec_dir: snd_exec_dir.into_boxed_path(),
             fst_trace_path: fst_trace_path.into_boxed_path(),
             snd_trace_path: snd_trace_path.into_boxed_path(),
+            fst_fs_dir: fst_fs_dir,
+            snd_fs_dir: snd_fs_dir,
 
             fst_stdout,
             snd_stdout,
