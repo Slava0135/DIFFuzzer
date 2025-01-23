@@ -155,6 +155,5 @@ fn get_dir_content(path: &Path) -> Vec<FileInfo> {
             mode: metadata.mode(),
         });
     }
-    println!("{:?}", v);
     return v;
 }
