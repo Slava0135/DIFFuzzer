@@ -21,6 +21,7 @@ pub struct MutationWeights {
     pub weights: Vec<(MutationKind, u32)>,
 }
 
+#[allow(dead_code)]
 impl MutationWeights {
     pub fn new(weights: Vec<(MutationKind, u32)>) -> Self {
         Self { weights }

@@ -230,10 +230,7 @@ impl AbstractFS {
         self.files.get_mut(idx.0).unwrap()
     }
 
-    fn root_mut(&mut self) -> &mut Dir {
-        self.dirs.get_mut(0).unwrap()
-    }
-
+    #[allow(dead_code)]
     fn root(&self) -> &Dir {
         self.dirs.get(0).unwrap()
     }

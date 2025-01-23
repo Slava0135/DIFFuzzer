@@ -48,6 +48,7 @@ pub struct OperationWeights {
     pub weights: Vec<(OperationKind, u32)>,
 }
 
+#[allow(dead_code)]
 impl OperationWeights {
     pub fn new(weights: Vec<(OperationKind, u32)>) -> Self {
         Self { weights }
