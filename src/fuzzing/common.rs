@@ -121,10 +121,15 @@ pub trait Fuzzer {
         snd_trace: &Trace,
     ) -> anyhow::Result<bool> {
         let data = self.data();
-        let fst_hash = calc_dir_hash(&data.fst_exec_dir, &data.hasher_options);
-        let snd_hash = calc_dir_hash(&data.snd_exec_dir, &data.hasher_options);
 
-        let hash_diff_interesting = data.config.hashing_enabled && fst_hash != snd_hash;
+        let hash_diff_interesting = if data.config.hashing_enabled {
+            let fst_hash = calc_dir_hash(&data.fst_exec_dir, &data.hasher_options);
+            let snd_hash = calc_dir_hash(&data.snd_exec_dir, &data.hasher_options);
+            fst_hash != snd_hash
+        } else {
+            false
+        };
+
         debug!("doing objectives");
         let console_is_interesting = data
             .console_objective
@@ -333,8 +338,8 @@ impl Stats {
 
 pub fn parse_trace(path: &Path) -> anyhow::Result<Trace> {
     let trace = read_to_string(&path)
-    .with_context(|| format!("failed to read trace at '{}'", path.display()))?;
-anyhow::Ok(Trace::try_parse(trace).with_context(|| format!("failed to parse trace"))?)
+        .with_context(|| format!("failed to read trace at '{}'", path.display()))?;
+    anyhow::Ok(Trace::try_parse(trace).with_context(|| format!("failed to parse trace"))?)
 }
 
 fn setup_dir(path: &Path) -> io::Result<()> {
