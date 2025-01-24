@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -55,6 +56,9 @@
     printf("\n");        \
   } while (0)
 
+#define BUFFER_SIZE 1024 * 1024
+#define RANDOM_SEED 123
+
 const char *MKDIR = "MKDIR";
 const char *RMDIR = "RMDIR";
 const char *CREATE = "CREATE";
@@ -64,6 +68,8 @@ const char *STAT = "STAT";
 const char *HARDLINK = "HARDLINK";
 const char *RENAME = "RENAME";
 const char *OPEN = "OPEN";
+const char *WRITE = "WRITE";
+const char *READ = "READ";
 
 enum ExitCode : int {
   OK = 0,
@@ -89,6 +95,9 @@ const char *workspace = nullptr;
 
 static int failure_n = 0;
 static int success_n = 0;
+
+const char *write_buffer;
+char *read_buffer;
 
 int main(int argc, char *argv[]) {
   if (argc != 2) {
@@ -144,6 +153,17 @@ int main(int argc, char *argv[]) {
     // reset coverage from the tail of the ioctl() call
     __atomic_store_n(&cover[0], 0, __ATOMIC_RELAXED);
     SUBGOAL("done");
+  }
+
+  GOAL("init buffers");
+  auto write_buffer_mut = new char[BUFFER_SIZE];
+  write_buffer = write_buffer_mut;
+  read_buffer = new char[BUFFER_SIZE];
+  std::default_random_engine gen(RANDOM_SEED);
+  std::uniform_int_distribution<char> dist(0);
+  for (size_t i = 0; i < BUFFER_SIZE; i++) {
+    write_buffer_mut[i] = dist(gen);
+    read_buffer[i] = 0;
   }
 
   GOAL("test workload");
@@ -400,4 +420,39 @@ int do_close(int fd) {
     success(status, CLOSE);
   }
   return status;
+}
+
+int do_write(int fd, size_t src_offset, size_t size) {
+  idx++;
+  if (src_offset + size > BUFFER_SIZE) {
+    DPRINTF(
+        "[ERROR] offset %ld + %ld is too big to write from (buffer size is %d)",
+        src_offset, size, BUFFER_SIZE);
+    exit(ERROR);
+  }
+  int nw = write(fd, &write_buffer[src_offset], size);
+  if (nw == -1) {
+    failure(nw, WRITE, std::to_string(fd).c_str());
+    return -1;
+  } else {
+    success(nw, WRITE);
+    return nw;
+  }
+}
+
+int do_read(int fd, size_t size) {
+  idx++;
+  if (size > BUFFER_SIZE) {
+    DPRINTF("[ERROR] size %ld is too big to read to (buffer size is %d)", size,
+            BUFFER_SIZE);
+    exit(ERROR);
+  }
+  int nr = read(fd, read_buffer, size);
+  if (nr == -1) {
+    failure(nr, READ, std::to_string(fd).c_str());
+    return -1;
+  } else {
+    success(nr, READ);
+    return nr;
+  }
 }

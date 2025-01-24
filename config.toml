@@ -37,6 +37,14 @@ weights = [
     "CLOSE",
     30,
   ],
+  [
+    "WRITE",
+    100,
+  ],
+  [
+    "READ",
+    100,
+  ],
 ]
 
 [mutation_weights]

@@ -1,8 +1,8 @@
 use std::cmp::max;
 
-use super::{flags::Mode, node::FileDescriptor, operation::Operation, workload::Workload};
+use super::{flags::Mode, node::FileDescriptorIndex, operation::Operation, workload::Workload};
 
-fn descriptor_to_var(des: &FileDescriptor) -> String {
+fn descriptor_to_var(des: &FileDescriptorIndex) -> String {
     format!("fd_{}", des.0)
 }
 
@@ -63,6 +63,26 @@ impl Workload {
                 Operation::CLOSE { des } => {
                     result.push_str(format!("do_close({});\n", descriptor_to_var(des)).as_str());
                 }
+                Operation::READ { des, size } => {
+                    result.push_str(
+                        format!("do_read({}, {});\n", descriptor_to_var(des), size).as_str(),
+                    );
+                }
+                Operation::WRITE {
+                    des,
+                    src_offset,
+                    size,
+                } => {
+                    result.push_str(
+                        format!(
+                            "do_write({}, {}, {});\n",
+                            descriptor_to_var(des),
+                            src_offset,
+                            size
+                        )
+                        .as_str(),
+                    );
+                }
             }
         }
         result.push_str("}");
@@ -81,7 +101,7 @@ fn encode_mode(mode: &Mode) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::abstract_fs::{flags::ModeFlag, node::FileDescriptor};
+    use crate::abstract_fs::{flags::ModeFlag, node::FileDescriptorIndex};
 
     use super::*;
 
@@ -113,9 +133,11 @@ void test_workload()
 do_mkdir("/foo", 0);
 do_create("/foo/bar", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 fd_0 = do_open("/foo/bar");
+do_write(fd_0, 999, 1024);
 do_close(fd_0);
 do_hardlink("/foo/bar", "/baz");
 fd_1 = do_open("/baz");
+do_read(fd_1, 1024);
 do_close(fd_1);
 do_rename("/baz", "/gaz");
 do_remove("/foo");
@@ -140,10 +162,15 @@ do_remove("/foo");
                 },
                 Operation::OPEN {
                     path: "/foo/bar".into(),
-                    des: FileDescriptor(0),
+                    des: FileDescriptorIndex(0),
+                },
+                Operation::WRITE {
+                    des: FileDescriptorIndex(0),
+                    src_offset: 999,
+                    size: 1024,
                 },
                 Operation::CLOSE {
-                    des: FileDescriptor(0),
+                    des: FileDescriptorIndex(0),
                 },
                 Operation::HARDLINK {
                     old_path: "/foo/bar".into(),
@@ -151,10 +178,14 @@ do_remove("/foo");
                 },
                 Operation::OPEN {
                     path: "/baz".into(),
-                    des: FileDescriptor(1),
+                    des: FileDescriptorIndex(1),
+                },
+                Operation::READ {
+                    des: FileDescriptorIndex(1),
+                    size: 1024,
                 },
                 Operation::CLOSE {
-                    des: FileDescriptor(1),
+                    des: FileDescriptorIndex(1),
                 },
                 Operation::RENAME {
                     old_path: "/baz".into(),

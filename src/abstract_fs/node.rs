@@ -1,8 +1,11 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+};
 
 use serde::{Deserialize, Serialize};
 
-use super::pathname::Name;
+use super::{content::Content, pathname::Name};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FileIndex(pub usize);
@@ -11,9 +14,9 @@ pub struct FileIndex(pub usize);
 pub struct DirIndex(pub usize);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct FileDescriptor(pub usize);
+pub struct FileDescriptorIndex(pub usize);
 
-impl Display for FileDescriptor {
+impl Display for FileDescriptorIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
@@ -21,7 +24,14 @@ impl Display for FileDescriptor {
 
 #[derive(Debug, Clone)]
 pub struct File {
-    pub descriptor: Option<FileDescriptor>,
+    pub descriptor: Option<FileDescriptorIndex>,
+    pub content: Content,
+}
+
+#[derive(Debug, Clone)]
+pub struct FileDescriptor {
+    pub file: FileIndex,
+    pub offset: u64,
 }
 
 #[derive(Debug, Clone)]
