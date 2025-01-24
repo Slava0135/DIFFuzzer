@@ -14,5 +14,5 @@ fd_1 = do_open("/baz");
 do_read(fd_1, 1024);
 do_close(fd_1);
 do_rename("/baz", "/gaz");
-// do_remove("/foo");
+do_remove("/foo");
 }
