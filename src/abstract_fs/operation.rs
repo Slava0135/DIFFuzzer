@@ -50,6 +50,8 @@ pub enum OperationKind {
     RENAME,
     OPEN,
     CLOSE,
+    READ,
+    WRITE,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -73,6 +75,8 @@ impl OperationWeights {
                 (OperationKind::RENAME, 100),
                 (OperationKind::OPEN, 100),
                 (OperationKind::CLOSE, 100),
+                (OperationKind::READ, 100),
+                (OperationKind::WRITE, 100),
             ],
         }
     }

@@ -9,6 +9,26 @@ use super::{
     workload::Workload,
 };
 
+/// from AFL++ include/config.h
+const INTERESTING_UNSIGNED: &[u64] = &[
+    0, 1, // cool numbers
+    16, 32, 64, 100, // one-off with common buffer size
+    127, // overflow signed 8-bit when incremented
+    128, // overflow signed 8-bit
+    255, // overflow unsigned 8-bit when incremented
+    256, // overflow unsigned 8-bit
+    512, 1000, 1024, 4096,  // one-off with common buffer size
+    32767, // overflow signed 16-bit when incremented
+    32768, // overflow signed 16-bit
+    65535, // overflow unsigned 16-bit when incremented
+    65536, // overflow unsigned 16-bit
+    100000,
+];
+
+fn random_interesting_unsigned(rng: &mut impl Rng) -> u64 {
+    INTERESTING_UNSIGNED.choose(rng).unwrap().clone()
+}
+
 pub fn generate_new(rng: &mut impl Rng, size: usize, weights: &OperationWeights) -> Workload {
     let mut fs = AbstractFS::new();
     let mut name_idx: usize = 0;
@@ -69,6 +89,8 @@ pub fn append_one(
     }
     if alive_open_files.is_empty() {
         ops.weights.retain(|(op, _)| *op != OperationKind::CLOSE);
+        ops.weights.retain(|(op, _)| *op != OperationKind::READ);
+        ops.weights.retain(|(op, _)| *op != OperationKind::WRITE);
     }
     match ops.weights.choose_weighted(rng, |item| item.1).unwrap().0 {
         OperationKind::MKDIR => {
@@ -120,6 +142,19 @@ pub fn append_one(
         OperationKind::CLOSE => {
             let des = alive_open_files.choose(rng).unwrap().to_owned();
             fs.close(des).unwrap();
+        }
+        OperationKind::WRITE => {
+            let des = alive_open_files.choose(rng).unwrap().to_owned();
+            fs.read(des, random_interesting_unsigned(rng)).unwrap();
+        }
+        OperationKind::READ => {
+            let des = alive_open_files.choose(rng).unwrap().to_owned();
+            fs.write(
+                des,
+                random_interesting_unsigned(rng),
+                random_interesting_unsigned(rng),
+            )
+            .unwrap();
         }
     }
 }
