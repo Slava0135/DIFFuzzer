@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{cmp::max, collections::VecDeque};
 
 use thiserror::Error;
 
@@ -61,7 +61,7 @@ impl Content {
         if write_offset > self.size() {
             return Err(ContentError::BadOffset(write_offset, self.size()));
         }
-        let old_sise = self.size();
+        let old_size = self.size();
         if size > 0 {
             let mut current_offset = 0;
             let mut write_at_index = 0;
@@ -88,7 +88,7 @@ impl Content {
                     assert!(
                         old_size == fst_half_size + snd_half_size,
                         "old: {}, fst: {}, snd: {}",
-                        old_sise,
+                        old_size,
                         fst_half_size,
                         snd_half_size
                     );
@@ -119,23 +119,14 @@ impl Content {
             self.slices.retain(|s| s.from != s.to);
         }
         let new_size = self.size();
-        if size < old_sise {
-            assert!(
-                new_size == old_sise,
-                "new_size = {}, old_size = {}:\n{:?}",
-                new_size,
-                old_sise,
-                self.slices
-            )
-        } else {
-            assert!(
-                new_size == size,
-                "new_size = {}, size = {}:\n{:?}",
-                new_size,
-                size,
-                self.slices
-            )
-        }
+        let expected_size = max(write_offset + size, old_size);
+        assert!(
+            new_size == expected_size,
+            "new_size = {}, expected_size = {}:\n{:?}",
+            new_size,
+            expected_size,
+            self.slices
+        );
         for s in self.slices.iter() {
             assert!(
                 s.from < s.to,
