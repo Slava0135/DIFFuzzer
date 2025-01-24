@@ -10,7 +10,7 @@ pub struct SourceSlice {
 
 impl SourceSlice {
     pub fn size(&self) -> u64 {
-        if self.from < self.to {
+        if self.from <= self.to {
             self.to - self.from + 1
         } else {
             0
@@ -57,6 +57,7 @@ impl Content {
     ) -> Result<(), ContentError> {
         if write_offset == self.size() {
             self.write_back(src_offset, size);
+            return Ok(());
         }
         if write_offset > self.size() {
             return Err(ContentError::BadOffset(write_offset, self.size()));
@@ -113,10 +114,10 @@ impl Content {
                     slice.from += truncate_size;
                     break;
                 }
-                slice.from = slice.to;
+                slice.to = 0;
                 truncate_size -= can_truncate;
             }
-            self.slices.retain(|s| s.from != s.to);
+            self.slices.retain(|s| s.size() > 0);
         }
         let new_size = self.size();
         let expected_size = max(write_offset + size, old_size);
@@ -128,13 +129,7 @@ impl Content {
             self.slices
         );
         for s in self.slices.iter() {
-            assert!(
-                s.from < s.to,
-                "from = {}, to = {}:\n{:?}",
-                s.from,
-                s.to,
-                self.slices
-            );
+            assert!(s.size() > 0, "{:?}", self.slices);
         }
         Ok(())
     }
@@ -282,5 +277,15 @@ mod tests {
         expected.write_back(42, 100);
         expected.write_back(13, 55);
         assert_eq!(expected, content);
+    }
+
+    #[test]
+    fn test_write_single() {
+        let mut content = Content::new();
+        content.write_back(1000, 1);
+        content.write(1000, 0, 1).unwrap();
+        let mut expected = Content::new();
+        expected.write_back(1000, 1);
+        assert_eq!(expected, content)
     }
 }
