@@ -1,4 +1,6 @@
 use std::{fs, path::Path};
+use std::fs::OpenOptions;
+use std::io::Write;
 
 use anyhow::Context;
 
@@ -7,8 +9,8 @@ use crate::abstract_fs::{
     trace::TRACE_FILENAME,
     workload::Workload,
 };
+use crate::hasher::hasher::{DIFF_HASH_FILENAME, FileDiff};
 use crate::hasher::hasher::FileDiff::{DifferentHash, OneExists};
-use crate::hasher::hasher::{FileDiff, DIFF_HASH_FILENAME};
 
 pub fn save_testcase(dir: &Path, input_path: &Path, input: &Workload) -> anyhow::Result<()> {
     let source_path = dir.join(TEST_SOURCE_FILENAME);
@@ -64,6 +66,12 @@ pub fn save_output(
 
 pub fn save_diff(dir: &Path, diff_hash: Vec<FileDiff>) -> anyhow::Result<()> {
     let diff_hash_path = dir.join(DIFF_HASH_FILENAME);
+    let mut file = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(&diff_hash_path)
+        .unwrap();
+
     for diff in diff_hash {
         let txt = match diff {
             DifferentHash { fst, snd } => {
@@ -71,7 +79,7 @@ pub fn save_diff(dir: &Path, diff_hash: Vec<FileDiff>) -> anyhow::Result<()> {
             }
             OneExists(f) => format!("File exists only in one FS:\n {}\n\n", f),
         };
-        fs::write(&diff_hash_path, txt).with_context(|| {
+        file.write(txt.as_bytes()).with_context(|| {
             format!(
                 "failed to save source file to '{}'",
                 diff_hash_path.display()
