@@ -155,9 +155,11 @@ impl Content {
         let mut current_offset = 0;
         let mut read_size = 0;
         let mut reading = false;
+        let mut end_of_file = true;
         for s in self.slices.iter() {
             if reading {
                 if read_size >= size {
+                    end_of_file = false;
                     break;
                 }
                 let mut slice_read_size = s.size();
@@ -182,7 +184,13 @@ impl Content {
                 current_offset = next_offset;
             }
         }
-        assert!(content.size() == read_size);
+        assert!(
+            content.size() == read_size || end_of_file && content.size() <= read_size,
+            "read: {}, want: {}, end: {}",
+            content.size(),
+            read_size,
+            end_of_file,
+        );
         Ok(content)
     }
 
