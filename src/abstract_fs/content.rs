@@ -70,6 +70,7 @@ impl Content {
                 let next_offset = current_offset + slice.size();
                 if current_offset == write_offset {
                     write_at_index = i;
+                    break;
                 } else if next_offset > write_offset {
                     let old_size = slice.size();
                     let fst_half_to = slice.from + (write_offset - current_offset - 1);
