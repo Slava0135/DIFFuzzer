@@ -1053,6 +1053,11 @@ mod tests {
                         src_offset: 13,
                         size: 100
                     },
+                    Operation::WRITE {
+                        des: des_write,
+                        src_offset: 42,
+                        size: 55
+                    },
                     Operation::CLOSE { des: des_write },
                     Operation::OPEN {
                         path: "/foo".into(),
