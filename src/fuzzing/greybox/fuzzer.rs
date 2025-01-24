@@ -1,3 +1,5 @@
+use std::fs;
+use std::path::Path;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Ok};
@@ -6,6 +8,7 @@ use rand::{rngs::StdRng, SeedableRng};
 
 use crate::fuzzing::common::{parse_trace, FuzzData, Fuzzer};
 use crate::fuzzing::greybox::feedback::kcov::KCOV_FILENAME;
+use crate::save::{save_output, save_testcase};
 use crate::{abstract_fs::workload::Workload, config::Config, mount::mount::FileSystemMount};
 
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
@@ -20,6 +23,8 @@ pub struct GreyBoxFuzzer {
     snd_kcov_feedback: KCovFeedback,
 
     mutator: Mutator,
+
+    corpus_path: Option<Box<Path>>,
 }
 
 impl GreyBoxFuzzer {
@@ -41,6 +46,14 @@ impl GreyBoxFuzzer {
             config.greybox.max_mutations,
         );
 
+        let corpus_path = if config.greybox.save_corpus {
+            let path = Path::new("./corpus");
+            fs::create_dir(path).unwrap_or(());
+            Some(path.to_path_buf().into_boxed_path())
+        } else {
+            None
+        };
+
         let fuzz_data = FuzzData::new(fst_mount, snd_mount, config);
 
         let fst_kcov_path = fuzz_data.fst_exec_dir.join(KCOV_FILENAME);
@@ -58,6 +71,8 @@ impl GreyBoxFuzzer {
             snd_kcov_feedback,
 
             mutator,
+
+            corpus_path,
         }
     }
 
@@ -73,6 +88,46 @@ impl GreyBoxFuzzer {
     fn add_to_corpus(&mut self, input: Workload) {
         debug!("adding new input to corpus");
         self.corpus.push(input);
+    }
+
+    fn save_input(&mut self, input: Workload, input_path: &Path) -> anyhow::Result<()> {
+        let name = input.generate_name();
+        debug!("save corpus input '{}'", name);
+
+        let corpus_dir = self.corpus_path.clone().unwrap().join(name);
+        if fs::exists(corpus_dir.as_path()).with_context(|| {
+            format!(
+                "failed to determine existence of corpus directory at '{}'",
+                corpus_dir.display()
+            )
+        })? {
+            return anyhow::Ok(());
+        }
+        fs::create_dir(corpus_dir.as_path()).with_context(|| {
+            format!(
+                "failed to create corpus directory at '{}'",
+                corpus_dir.display()
+            )
+        })?;
+
+        save_testcase(&corpus_dir, input_path, &input)?;
+        save_output(
+            &corpus_dir,
+            &self.data.fst_trace_path,
+            &self.data.fst_fs_name,
+            self.data.fst_stdout.borrow().clone(),
+            self.data.fst_stderr.borrow().clone(),
+        )
+        .with_context(|| format!("failed to save output for first harness"))?;
+        save_output(
+            &corpus_dir,
+            &self.data.snd_trace_path,
+            &self.data.snd_fs_name,
+            self.data.snd_stdout.borrow().clone(),
+            self.data.snd_stderr.borrow().clone(),
+        )
+        .with_context(|| format!("failed to save output for first harness"))?;
+        Ok(())
     }
 }
 
@@ -117,8 +172,12 @@ impl Fuzzer for GreyBoxFuzzer {
                 )
             })?;
         if fst_kcov_is_interesting || snd_kcov_is_interesting {
-            self.add_to_corpus(input);
+            self.add_to_corpus(input.clone());
             self.show_stats();
+            if self.corpus_path.is_some() {
+                self.save_input(input, &input_path)
+                    .with_context(|| format!("failed to save input"))?;
+            }
             return Ok(());
         }
 

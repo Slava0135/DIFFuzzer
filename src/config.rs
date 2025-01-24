@@ -17,4 +17,5 @@ pub struct Config {
 #[derive(Serialize, Deserialize)]
 pub struct GreyboxConfig {
     pub max_mutations: u16,
+    pub save_corpus: bool,
 }
