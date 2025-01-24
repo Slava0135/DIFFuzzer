@@ -55,6 +55,9 @@ impl Content {
         write_offset: u64,
         size: u64,
     ) -> Result<(), ContentError> {
+        if write_offset == self.size() {
+            self.write_back(src_offset, size);
+        }
         if write_offset > self.size() {
             return Err(ContentError::BadOffset(write_offset, self.size()));
         }
