@@ -64,17 +64,17 @@ impl Content {
         }
         let old_size = self.size();
         if size > 0 {
-            let mut current_offset = 0;
+            let mut curr_offset = 0;
             let mut write_at_index = 0;
             for i in 0..self.slices.len() {
                 let slice = &mut self.slices[i];
-                let next_offset = current_offset + slice.size();
-                if current_offset == write_offset {
+                let next_offset = curr_offset + slice.size();
+                if curr_offset == write_offset {
                     write_at_index = i;
                     break;
                 } else if next_offset > write_offset {
                     let old_size = slice.size();
-                    let fst_half_to = slice.from + (write_offset - current_offset - 1);
+                    let fst_half_to = slice.from + (write_offset - curr_offset - 1);
                     let snd_half_to = slice.to;
                     slice.to = fst_half_to;
                     self.slices.insert(
@@ -96,7 +96,7 @@ impl Content {
                     write_at_index = i + 1;
                     break;
                 }
-                current_offset = next_offset;
+                curr_offset = next_offset;
             }
             self.slices.insert(
                 write_at_index,
@@ -109,13 +109,15 @@ impl Content {
             let mut truncate_size = size;
             for i in truncate_from_index..self.slices.len() {
                 let slice = &mut self.slices[i];
-                let can_truncate = slice.size();
-                if can_truncate > truncate_size {
+                let can_truncate_size = slice.size();
+                if can_truncate_size > truncate_size {
                     slice.from += truncate_size;
                     break;
                 }
+                // make slice size zero
+                slice.from = 100000;
                 slice.to = 0;
-                truncate_size -= can_truncate;
+                truncate_size -= can_truncate_size;
             }
             self.slices.retain(|s| s.size() > 0);
         }
@@ -286,6 +288,16 @@ mod tests {
         content.write(1000, 0, 1).unwrap();
         let mut expected = Content::new();
         expected.write_back(1000, 1);
+        assert_eq!(expected, content)
+    }
+
+    #[test]
+    fn test_write_overwrite() {
+        let mut content = Content::new();
+        content.write_back(0, 4096);
+        content.write(512, 0, 100000).unwrap();
+        let mut expected = Content::new();
+        expected.write_back(512, 100000);
         assert_eq!(expected, content)
     }
 }
