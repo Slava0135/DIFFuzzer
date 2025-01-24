@@ -55,14 +55,6 @@ impl Harness {
             .output()
             .with_context(|| format!("failed to run executable '{:?}'", exec))?;
 
-        self.fs_mount.teardown(&self.fs_dir).with_context(|| {
-            format!(
-                "failed to teardown fs '{}' at '{}'",
-                self.fs_mount,
-                self.fs_dir.display()
-            )
-        })?;
-
         self.stdout.replace(
             String::from_utf8(output.stdout)
                 .with_context(|| format!("failed to convert stdout to string"))?,
@@ -73,5 +65,16 @@ impl Harness {
         );
 
         Ok(output.status.success())
+    }
+
+    pub fn teardown(&self) -> anyhow::Result<()> {
+        self.fs_mount.teardown(&self.fs_dir).with_context(|| {
+            format!(
+                "failed to teardown fs '{}' at '{}'",
+                self.fs_mount,
+                self.fs_dir.display()
+            )
+        })?;
+        Ok(())
     }
 }

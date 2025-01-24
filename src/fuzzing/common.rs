@@ -175,6 +175,12 @@ pub trait Fuzzer {
             Ok(false)
         }
     }
+    
+    fn teardown_harnesses(&mut self) -> anyhow::Result<()> {
+        self.data().fst_harness.teardown()?;
+        self.data().snd_harness.teardown()?;
+        Ok(())
+    }
 
     fn show_stats(&mut self);
 

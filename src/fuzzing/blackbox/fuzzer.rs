@@ -56,6 +56,9 @@ impl Fuzzer for BlackBoxFuzzer {
         }
 
         self.do_objective(&input, &input_path, &fst_trace, &snd_trace)?;
+        
+        self.teardown_harnesses()?;
+        
         Ok(())
     }
 
