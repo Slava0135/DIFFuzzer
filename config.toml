@@ -5,7 +5,8 @@ max_workload_length = 100
 timeout = 10 # in seconds
 
 [greybox]
-max_mutations = 10 
+max_mutations = 10
+save_corpus = false
 
 [operation_weights]
 weights = [
