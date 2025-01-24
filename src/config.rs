@@ -11,10 +11,10 @@ pub struct Config {
     pub fs_name: String,
     pub hashing_enabled: bool,
     pub heartbeat_interval: u16,
+    pub timeout: u8,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct GreyboxConfig {
     pub max_mutations: u16,
-    pub timeout: u8,
 }
