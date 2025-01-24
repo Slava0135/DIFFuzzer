@@ -1,14 +1,18 @@
 #include "executor.h"
+
+int fd_0, fd_1;
+
 void test_workload()
 {
-do_mkdir("/1", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-do_create("/1/2", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-do_mkdir("/1/3", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-do_create("/1/3/4", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-do_mkdir("/1/5", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-do_create("/1/6", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-do_remove("/1/3/4");
-do_create("/1/7", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-do_create("/1/3/8", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-do_remove("/1");
+do_mkdir("/foo", 0);
+do_create("/foo/bar", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+fd_0 = do_open("/foo/bar");
+do_write(fd_0, 999, 1024);
+do_close(fd_0);
+do_hardlink("/foo/bar", "/baz");
+fd_1 = do_open("/baz");
+do_read(fd_1, 1024);
+do_close(fd_1);
+do_rename("/baz", "/gaz");
+// do_remove("/foo");
 }
