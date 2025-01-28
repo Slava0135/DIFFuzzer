@@ -14,6 +14,7 @@ pub struct TraceRow {
     command: String,
     return_code: i32,
     errno: Errno,
+    extra: String,
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
@@ -56,13 +57,14 @@ impl Trace {
                 break;
             }
             let columns: Vec<&str> = line.split(",").collect();
-            if columns.len() != 4 {
+            if columns.len() != 5 {
                 return Err(TraceError::InvalidColumnNumber);
             }
             let index = columns[0].trim().parse()?;
             let command = columns[1].trim().to_owned();
             let return_code = columns[2].trim().parse()?;
             let errno_string = columns[3].trim().to_owned();
+            let extra = columns[4].trim().to_owned();
             let errno_parts: Vec<String> = errno_string
                 .split(&['(', ')'])
                 .map(|s| s.to_owned())
@@ -81,6 +83,7 @@ impl Trace {
                 command,
                 return_code,
                 errno: Errno { name, code },
+                extra,
             });
         }
         Ok(trace)
@@ -113,9 +116,9 @@ mod tests {
     #[test]
     fn test_invalid_columns_count() {
         let trace = r#"
-Index,Command,ReturnCode,Errno
-    1,    Foo,        42,Success(0), ???
-    2,    Bar,        -1,Error(42)
+Index,Command,ReturnCode,Errno,Extra
+    1,    Foo,        42,Success(0),a=1, ???
+    2,    Bar,        -1,Error(42),b=2
 "#
         .trim();
         assert_eq!(
@@ -127,9 +130,9 @@ Index,Command,ReturnCode,Errno
     #[test]
     fn test_ok_trace() {
         let trace = r#"
-Index,Command,ReturnCode,Errno
-    1,    Foo,        42,Success(0)
-    2,    Bar,        -1,Error(42)
+Index,Command,ReturnCode,Errno,Extra
+    1,    Foo,        42,Success(0),a=1
+    2,    Bar,        -1,Error(42),b=2
 "#
         .trim();
         assert_eq!(
@@ -143,6 +146,7 @@ Index,Command,ReturnCode,Errno
                             name: "Success".to_owned(),
                             code: 0
                         },
+                        extra: "a=1".to_owned()
                     },
                     TraceRow {
                         index: 2,
@@ -152,6 +156,7 @@ Index,Command,ReturnCode,Errno
                             name: "Error".to_owned(),
                             code: 42
                         },
+                        extra: "b=2".to_owned()
                     },
                 ]
             }),
@@ -162,9 +167,9 @@ Index,Command,ReturnCode,Errno
     #[test]
     fn test_invalid_errno_no_brackets() {
         let trace = r#"
-        Index,Command,ReturnCode,Errno
-            1,    Foo,        42,Success 0
-            2,    Bar,        -1,Error(42)
+        Index,Command,ReturnCode,Errno,Extra
+            1,    Foo,        42,Success 0,a=1
+            2,    Bar,        -1,Error(42),b=2
         "#
         .trim();
         assert_eq!(

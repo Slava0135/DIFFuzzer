@@ -25,6 +25,7 @@
 #include <filesystem>
 #include <random>
 #include <string>
+#include <utility>
 #include <vector>
 
 #define KCOV_INIT_TRACE _IOR('c', 1, unsigned long)
@@ -83,12 +84,14 @@ struct Trace {
   std::string cmd;
   int ret_code;
   int err;
+  std::string extra;
 };
 
 std::vector<Trace> traces;
 
-static void append_trace(int idx, const char *cmd, int ret_code, int err) {
-  traces.push_back(Trace{idx, cmd, ret_code, err});
+static void append_trace(int idx, const char *cmd, int ret_code, int err,
+                         std::string extra) {
+  traces.push_back(Trace{idx, cmd, ret_code, err, extra});
 }
 
 const char *workspace = nullptr;
@@ -98,6 +101,14 @@ static int success_n = 0;
 
 const char *write_buffer;
 char *read_buffer;
+
+static uint64_t buffer_hashcode(const char *buffer, size_t len) {
+  uint64_t h = 1;
+  for (size_t i = 0; i < len; i++) {
+    h = 31 * h + buffer[i];
+  }
+  return h;
+}
 
 int main(int argc, char *argv[]) {
   if (argc != 2) {
@@ -214,10 +225,10 @@ int main(int argc, char *argv[]) {
     DPRINTF("[ERROR] when opening trace dump file: %s", strerror(errno));
     return ERROR;
   }
-  fprintf(trace_dump_fp, "Index,Command,ReturnCode,Errno\n");
+  fprintf(trace_dump_fp, "Index,Command,ReturnCode,Errno,Extra\n");
   for (const Trace &t : traces) {
-    fprintf(trace_dump_fp, "%4d,%12s,%8d,%s(%d)\n", t.idx, t.cmd.c_str(),
-            t.ret_code, strerror(t.err), t.err);
+    fprintf(trace_dump_fp, "%4d,%12s,%8d,%s(%d),%s\n", t.idx, t.cmd.c_str(),
+            t.ret_code, strerror(t.err), t.err, t.extra.c_str());
   }
   if (!fclose(trace_dump_fp)) {
     SUBGOAL("trace dump saved at '%s'",
@@ -251,20 +262,21 @@ static std::string path_join(const std::string &prefix,
 
 static int idx = -1;
 
-static void success(int status, const char *cmd) {
-  append_trace(idx, cmd, status, 0);
+static void success(int status, const char *cmd, std::string extra) {
+  append_trace(idx, cmd, status, 0, extra);
   success_n += 1;
 }
 
-static void failure(int status, const char *cmd, const char *path) {
-  append_trace(idx, cmd, status, errno);
+static void failure(int status, const char *cmd, const char *path,
+                    std::string extra) {
+  append_trace(idx, cmd, status, errno, extra);
   DPRINTF("[WARNING] %s('%s') FAIL(%s)", cmd, path, strerror(errno));
   failure_n += 1;
 }
 
 static void failure2(int status, const char *cmd, const char *fst_path,
-                     const char *snd_path) {
-  append_trace(idx, cmd, status, errno);
+                     const char *snd_path, std::string extra) {
+  append_trace(idx, cmd, status, errno, extra);
   DPRINTF("[WARNING] %s('%s', '%s') FAIL(%s)", cmd, fst_path, snd_path,
           strerror(errno));
   failure_n += 1;
@@ -278,9 +290,9 @@ int do_mkdir(const char *path, mode_t param) {
   idx++;
   int status = mkdir(patch_path(path).c_str(), param);
   if (status == -1) {
-    failure(status, MKDIR, path);
+    failure(status, MKDIR, path, "");
   } else {
-    success(status, MKDIR);
+    success(status, MKDIR, "");
   }
   return status;
 }
@@ -289,14 +301,14 @@ int do_create(const char *path, mode_t param) {
   idx++;
   int status = creat(patch_path(path).c_str(), param);
   if (status == -1) {
-    failure(status, CREATE, path);
+    failure(status, CREATE, path, "");
   } else {
     int close_status = close(status);
     if (!close_status) {
-      success(status, CREATE);
+      success(status, CREATE, "");
     } else {
       minor_failure(CLOSE, path);
-      failure(status, CREATE, path);
+      failure(status, CREATE, path, "");
     }
   }
   return status;
@@ -354,23 +366,23 @@ int do_remove(const char *p) {
 
   status = lstat(path.c_str(), &file_stat);
   if (status < 0) {
-    failure(status, STAT, path.c_str());
+    failure(status, STAT, path.c_str(), "");
     return -1;
   }
 
   if (S_ISDIR(file_stat.st_mode)) {
     status = remove_dir(path.c_str());
     if (status) {
-      failure(status, RMDIR, path.c_str());
+      failure(status, RMDIR, path.c_str(), "");
     } else {
-      success(status, RMDIR);
+      success(status, RMDIR, "");
     }
   } else {
     status = unlink(path.c_str());
     if (status == -1) {
-      failure(status, UNLINK, path.c_str());
+      failure(status, UNLINK, path.c_str(), "");
     } else {
-      success(status, UNLINK);
+      success(status, UNLINK, "");
     }
   }
 
@@ -381,9 +393,9 @@ int do_hardlink(const char *old_path, const char *new_path) {
   idx++;
   int status = link(patch_path(old_path).c_str(), patch_path(new_path).c_str());
   if (status == -1) {
-    failure2(status, HARDLINK, old_path, new_path);
+    failure2(status, HARDLINK, old_path, new_path, "");
   } else {
-    success(status, HARDLINK);
+    success(status, HARDLINK, "");
   }
   return status;
 }
@@ -393,9 +405,9 @@ int do_rename(const char *old_path, const char *new_path) {
   int status =
       rename(patch_path(old_path).c_str(), patch_path(new_path).c_str());
   if (status == -1) {
-    failure2(status, RENAME, old_path, new_path);
+    failure2(status, RENAME, old_path, new_path, "");
   } else {
-    success(status, RENAME);
+    success(status, RENAME, "");
   }
   return status;
 }
@@ -404,9 +416,9 @@ int do_open(const char *path) {
   idx++;
   int fd = open(patch_path(path).c_str(), O_RDWR);
   if (fd == -1) {
-    failure(fd, OPEN, path);
+    failure(fd, OPEN, path, "");
   } else {
-    success(fd, OPEN);
+    success(fd, OPEN, "");
   }
   return fd;
 }
@@ -415,9 +427,9 @@ int do_close(int fd) {
   idx++;
   int status = close(fd);
   if (status == -1) {
-    failure(status, CLOSE, std::to_string(fd).c_str());
+    failure(status, CLOSE, std::to_string(fd).c_str(), "");
   } else {
-    success(status, CLOSE);
+    success(status, CLOSE, "");
   }
   return status;
 }
@@ -432,10 +444,10 @@ int do_write(int fd, size_t src_offset, size_t size) {
   }
   int nw = write(fd, &write_buffer[src_offset], size);
   if (nw == -1) {
-    failure(nw, WRITE, std::to_string(fd).c_str());
+    failure(nw, WRITE, std::to_string(fd).c_str(), "");
     return -1;
   } else {
-    success(nw, WRITE);
+    success(nw, WRITE, "");
     return nw;
   }
 }
@@ -448,11 +460,13 @@ int do_read(int fd, size_t size) {
     exit(ERROR);
   }
   int nr = read(fd, read_buffer, size);
-  if (nr == -1) {
-    failure(nr, READ, std::to_string(fd).c_str());
+  if (nr == -1 || std::cmp_greater(nr, size)) {
+    failure(nr, READ, std::to_string(fd).c_str(), "");
     return -1;
   } else {
-    success(nr, READ);
+    std::stringstream extra;
+    extra << "hash=" << std::hex << buffer_hashcode(read_buffer, nr);
+    success(nr, READ, extra.str());
     return nr;
   }
 }
