@@ -26,6 +26,7 @@
 #include <format>
 #include <random>
 #include <string>
+#include <utility>
 #include <vector>
 
 #define KCOV_INIT_TRACE _IOR('c', 1, unsigned long)
@@ -228,7 +229,7 @@ int main(int argc, char *argv[]) {
   fprintf(trace_dump_fp, "Index,Command,ReturnCode,Errno,Extra\n");
   for (const Trace &t : traces) {
     fprintf(trace_dump_fp, "%4d,%12s,%8d,%s(%d),%s\n", t.idx, t.cmd.c_str(),
-            t.ret_code, strerror(t.err), t.err, t.extra);
+            t.ret_code, strerror(t.err), t.err, t.extra.c_str());
   }
   if (!fclose(trace_dump_fp)) {
     SUBGOAL("trace dump saved at '%s'",
@@ -460,7 +461,7 @@ int do_read(int fd, size_t size) {
     exit(ERROR);
   }
   int nr = read(fd, read_buffer, size);
-  if (nr == -1 || nr > size) {
+  if (nr == -1 || std::cmp_greater(nr, size)) {
     failure(nr, READ, std::to_string(fd).c_str(), "");
     return -1;
   } else {
