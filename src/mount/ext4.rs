@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use regex::RegexSet;
+
 use super::mount::FileSystemMount;
 
 pub struct Ext4;
@@ -16,6 +18,10 @@ impl FileSystemMount for Ext4 {
     }
     fn mount_t(&self) -> String {
         "ext4".to_owned()
+    }
+
+    fn get_internal_dirs(&self) -> RegexSet {
+        RegexSet::new([r"^/?lost\+found($|/)"]).unwrap()
     }
 }
 

@@ -11,6 +11,7 @@ use crate::save::{save_diff, save_output, save_testcase};
 use crate::temp_dir::setup_temp_dir;
 use anyhow::{Context, Ok};
 use log::{debug, error, info, warn};
+use regex::RegexSet;
 use std::cell::RefCell;
 use std::fs::read_to_string;
 use std::path::Path;
@@ -40,6 +41,8 @@ pub struct FuzzData {
     pub trace_objective: TraceObjective,
     pub console_objective: ConsoleObjective,
 
+    pub fst_fs_internal: RegexSet,
+    pub snd_fs_internal: RegexSet,
     pub fst_fs_name: String,
     pub snd_fs_name: String,
     pub fst_harness: Harness,
@@ -125,8 +128,16 @@ pub trait Fuzzer {
         let data = self.data();
 
         let hash_diff_interesting = if data.config.hashing_enabled {
-            let fst_hash = calc_dir_hash(&data.fst_fs_dir, &data.hasher_options);
-            let snd_hash = calc_dir_hash(&data.snd_fs_dir, &data.hasher_options);
+            let fst_hash = calc_dir_hash(
+                &data.fst_fs_dir,
+                &data.fst_fs_internal,
+                &data.hasher_options,
+            );
+            let snd_hash = calc_dir_hash(
+                &data.snd_fs_dir,
+                &data.snd_fs_internal,
+                &data.hasher_options,
+            );
             fst_hash != snd_hash
         } else {
             false
@@ -148,7 +159,13 @@ pub trait Fuzzer {
             );
             let mut diff: Vec<FileDiff> = vec![];
             if hash_diff_interesting {
-                diff = get_diff(&data.fst_fs_dir, &data.snd_fs_dir, &data.hasher_options);
+                diff = get_diff(
+                    &data.fst_fs_dir,
+                    &data.snd_fs_dir,
+                    &data.fst_fs_internal,
+                    &data.snd_fs_internal,
+                    &data.hasher_options,
+                );
             }
             data.report_crash(input.clone(), input_path, data.crashes_path.clone(), diff)
                 .with_context(|| format!("failed to report crash"))?;
@@ -223,6 +240,9 @@ impl FuzzData {
         let trace_objective = TraceObjective::new();
         let console_objective = ConsoleObjective::new(fst_stdout.clone(), snd_stdout.clone());
 
+        let fst_fs_internal = fst_mount.get_internal_dirs();
+        let snd_fs_internal = snd_mount.get_internal_dirs();
+
         let fst_fs_name = fst_mount.to_string();
         let snd_fs_name = snd_mount.to_string();
 
@@ -257,8 +277,11 @@ impl FuzzData {
             snd_exec_dir: snd_exec_dir.into_boxed_path(),
             fst_trace_path: fst_trace_path.into_boxed_path(),
             snd_trace_path: snd_trace_path.into_boxed_path(),
-            fst_fs_dir: fst_fs_dir,
-            snd_fs_dir: snd_fs_dir,
+
+            fst_fs_internal,
+            snd_fs_internal,
+            fst_fs_dir,
+            snd_fs_dir,
 
             fst_stdout,
             snd_stdout,

@@ -1,11 +1,10 @@
 use std::cmp::Ordering;
-use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::hash::Hasher;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
-use std::sync::OnceLock;
 
+use regex::RegexSet;
 use twox_hash::XxHash64;
 use walkdir::WalkDir;
 
@@ -53,14 +52,14 @@ impl Display for FileInfo {
     }
 }
 
-pub fn calc_dir_hash(path: &Path, hasher_options: &HasherOptions) -> u64 {
+pub fn calc_dir_hash(path: &Path, skip: &RegexSet, hasher_options: &HasherOptions) -> u64 {
     let mut hasher = XxHash64::default();
 
     for entry in WalkDir::new(path).sort_by(|a, b| a.file_name().cmp(b.file_name())) {
         let entry = entry.unwrap();
         let rel_path = entry.path().strip_prefix(path).unwrap().to_str().unwrap();
 
-        if is_tmp(rel_path) {
+        if skip.is_match(rel_path) {
             continue;
         }
 
@@ -82,7 +81,13 @@ pub fn calc_dir_hash(path: &Path, hasher_options: &HasherOptions) -> u64 {
     return hasher.finish();
 }
 
-pub fn get_diff(path_fst: &Path, path_snd: &Path, hasher_options: &HasherOptions) -> Vec<FileDiff> {
+pub fn get_diff(
+    path_fst: &Path,
+    path_snd: &Path,
+    fst_skip: &RegexSet,
+    snd_skip: &RegexSet,
+    hasher_options: &HasherOptions,
+) -> Vec<FileDiff> {
     let vec_fst = get_dir_content(path_fst);
     let vec_snd = get_dir_content(path_snd);
     let mut i_fst = vec_fst.len() - 1;
@@ -93,8 +98,10 @@ pub fn get_diff(path_fst: &Path, path_snd: &Path, hasher_options: &HasherOptions
         let cmp_res = vec_fst[i_fst].rel_path.cmp(&vec_snd[i_snd].rel_path);
         match cmp_res {
             Ordering::Equal => {
-                let hash_fst = calc_dir_hash(vec_fst[i_fst].abs_path.as_ref(), &hasher_options);
-                let hash_snd = calc_dir_hash(vec_snd[i_snd].abs_path.as_ref(), &hasher_options);
+                let hash_fst =
+                    calc_dir_hash(vec_fst[i_fst].abs_path.as_ref(), fst_skip, &hasher_options);
+                let hash_snd =
+                    calc_dir_hash(vec_snd[i_snd].abs_path.as_ref(), snd_skip, &hasher_options);
                 if hash_fst != hash_snd {
                     res.push(DifferentHash {
                         fst: vec_fst[i_fst].clone(),
@@ -167,19 +174,4 @@ fn get_dir_content(path: &Path) -> Vec<FileInfo> {
         });
     }
     return v;
-}
-
-fn get_internal_dirs() -> &'static HashSet<&'static str> {
-    static HASHSET: OnceLock<HashSet<&str>> = OnceLock::new();
-    HASHSET.get_or_init(|| {
-        let mut m = HashSet::new();
-        m.insert("lost+found");
-        m.insert(".nilfs");
-        m.insert(".mcfs_dummy");
-        m
-    })
-}
-
-fn is_tmp(path: &str) -> bool {
-    return get_internal_dirs().contains(path) || path.starts_with("/.nfs");
 }
