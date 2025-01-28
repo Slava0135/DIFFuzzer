@@ -156,7 +156,7 @@ impl Fuzzer for GreyBoxFuzzer {
             return Ok(());
         }
 
-        self.teardown_harnesses()?;
+        self.teardown_all()?;
 
         debug!("getting feedback");
         let fst_kcov_is_interesting =

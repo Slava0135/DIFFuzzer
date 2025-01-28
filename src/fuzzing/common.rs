@@ -180,7 +180,7 @@ pub trait Fuzzer {
         }
     }
 
-    fn teardown_harnesses(&mut self) -> anyhow::Result<()> {
+    fn teardown_all(&mut self) -> anyhow::Result<()> {
         self.data().fst_harness.teardown()?;
         self.data().snd_harness.teardown()?;
         Ok(())
