@@ -142,9 +142,13 @@ pub trait Fuzzer {
             .is_interesting(fst_trace, snd_trace)
             .with_context(|| format!("failed to do trace objective"))?;
         if console_is_interesting || trace_is_interesting || hash_diff_interesting {
+            debug!(
+                "Error detected by:\n console: {}, trace: {}, hash: {}",
+                console_is_interesting, trace_is_interesting, hash_diff_interesting
+            );
             let mut diff: Vec<FileDiff> = vec![];
             if hash_diff_interesting {
-                diff = get_diff(&data.fst_exec_dir, &data.snd_exec_dir, &data.hasher_options);
+                diff = get_diff(&data.fst_fs_dir, &data.snd_fs_dir, &data.hasher_options);
             }
             data.report_crash(input.clone(), input_path, data.crashes_path.clone(), diff)
                 .with_context(|| format!("failed to report crash"))?;
@@ -174,6 +178,12 @@ pub trait Fuzzer {
         } else {
             Ok(false)
         }
+    }
+
+    fn teardown_all(&mut self) -> anyhow::Result<()> {
+        self.data().fst_harness.teardown()?;
+        self.data().snd_harness.teardown()?;
+        Ok(())
     }
 
     fn show_stats(&mut self);
