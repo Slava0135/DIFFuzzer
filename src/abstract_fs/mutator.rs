@@ -87,6 +87,7 @@ pub fn insert(
                 src_offset: _,
                 size: _,
             } => {}
+            Operation::FSYNC { des: _ } => {}
         }
     }
 

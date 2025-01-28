@@ -39,6 +39,9 @@ pub enum Operation {
         src_offset: u64,
         size: u64,
     },
+    FSYNC {
+        des: FileDescriptorIndex,
+    },
 }
 
 #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Copy)]

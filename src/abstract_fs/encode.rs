@@ -83,6 +83,9 @@ impl Workload {
                         .as_str(),
                     );
                 }
+                Operation::FSYNC { des } => {
+                    result.push_str(format!("do_fsync({});\n", descriptor_to_var(des)).as_str());
+                }
             }
         }
         result.push_str("}");
@@ -138,6 +141,7 @@ do_close(fd_0);
 do_hardlink("/foo/bar", "/baz");
 fd_1 = do_open("/baz");
 do_read(fd_1, 1024);
+do_fsync(fd_1);
 do_close(fd_1);
 do_rename("/baz", "/gaz");
 do_remove("/foo");
@@ -183,6 +187,9 @@ do_remove("/foo");
                 Operation::READ {
                     des: FileDescriptorIndex(1),
                     size: 1024,
+                },
+                Operation::FSYNC {
+                    des: FileDescriptorIndex(1),
                 },
                 Operation::CLOSE {
                     des: FileDescriptorIndex(1),
