@@ -39,6 +39,9 @@ pub enum Operation {
         src_offset: u64,
         size: u64,
     },
+    FSYNC {
+        des: FileDescriptorIndex,
+    },
 }
 
 #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Copy)]
@@ -52,6 +55,7 @@ pub enum OperationKind {
     CLOSE,
     READ,
     WRITE,
+    FSYNC,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -77,6 +81,7 @@ impl OperationWeights {
                 (OperationKind::CLOSE, 100),
                 (OperationKind::READ, 100),
                 (OperationKind::WRITE, 100),
+                (OperationKind::FSYNC, 100),
             ],
         }
     }

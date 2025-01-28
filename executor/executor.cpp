@@ -71,6 +71,7 @@ const char *RENAME = "RENAME";
 const char *OPEN = "OPEN";
 const char *WRITE = "WRITE";
 const char *READ = "READ";
+const char *FSYNC = "FSYNC";
 
 enum ExitCode : int {
   OK = 0,
@@ -469,4 +470,15 @@ int do_read(int fd, size_t size) {
     success(nr, READ, extra.str());
     return nr;
   }
+}
+
+int do_fsync(int fd) {
+  idx++;
+  int status = fsync(fd);
+  if (status == -1) {
+    failure(status, FSYNC, std::to_string(fd).c_str(), "");
+  } else {
+    success(status, FSYNC, "");
+  }
+  return status;
 }

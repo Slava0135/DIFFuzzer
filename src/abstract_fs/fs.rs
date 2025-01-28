@@ -240,6 +240,16 @@ impl AbstractFS {
         Ok(())
     }
 
+    pub fn fsync(&mut self, des_idx: FileDescriptorIndex) -> Result<()> {
+        let des = self.descriptor(&des_idx)?.clone();
+        let file = self.file_mut(&des.file);
+        if file.descriptor != Some(des_idx) {
+            return Err(FsError::DescriptorWasClosed(des_idx));
+        }
+        self.recording.push(Operation::FSYNC { des: des_idx });
+        Ok(())
+    }
+
     pub fn replay(&mut self, workload: &Workload) -> Result<()> {
         for op in &workload.ops {
             match op {
@@ -271,6 +281,9 @@ impl AbstractFS {
                     size,
                 } => {
                     self.write(des.clone(), src_offset.clone(), size.clone())?;
+                }
+                Operation::FSYNC { des } => {
+                    self.fsync(des.clone())?;
                 }
             };
         }
@@ -1080,6 +1093,50 @@ mod tests {
                         size: 1024
                     },
                     Operation::CLOSE { des: des_read },
+                ]
+            },
+            fs.recording
+        );
+        test_replay(fs.recording);
+    }
+
+    #[test]
+    fn test_fsync_bad_descriptor() {
+        let mut fs = AbstractFS::new();
+        let des = FileDescriptorIndex(0);
+        assert_eq!(Err(FsError::BadDescriptor(des, 0)), fs.fsync(des));
+    }
+
+    #[test]
+    fn test_fsync_closed() {
+        let mut fs = AbstractFS::new();
+        fs.create("/foo".into(), vec![]).unwrap();
+        let des = fs.open("/foo".into()).unwrap();
+        fs.close(des).unwrap();
+        assert_eq!(Err(FsError::DescriptorWasClosed(des)), fs.fsync(des));
+    }
+
+    #[test]
+    fn test_fsync() {
+        let mut fs = AbstractFS::new();
+        fs.create("/foo".into(), vec![]).unwrap();
+        let des = fs.open("/foo".into()).unwrap();
+        fs.fsync(des).unwrap();
+        fs.close(des).unwrap();
+
+        assert_eq!(
+            Workload {
+                ops: vec![
+                    Operation::CREATE {
+                        path: "/foo".into(),
+                        mode: vec![]
+                    },
+                    Operation::OPEN {
+                        path: "/foo".into(),
+                        des
+                    },
+                    Operation::FSYNC { des },
+                    Operation::CLOSE { des },
                 ]
             },
             fs.recording

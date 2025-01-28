@@ -20,4 +20,5 @@ int do_open(const char *path);
 int do_close(int fd);
 int do_write(int fd, size_t src_offset, size_t size);
 int do_read(int fd, size_t size);
+int do_fsync(int fd);
 }
