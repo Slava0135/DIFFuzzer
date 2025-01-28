@@ -91,6 +91,7 @@ pub fn append_one(
         ops.weights.retain(|(op, _)| *op != OperationKind::CLOSE);
         ops.weights.retain(|(op, _)| *op != OperationKind::READ);
         ops.weights.retain(|(op, _)| *op != OperationKind::WRITE);
+        ops.weights.retain(|(op, _)| *op != OperationKind::FSYNC);
     }
     match ops.weights.choose_weighted(rng, |item| item.1).unwrap().0 {
         OperationKind::MKDIR => {
@@ -155,6 +156,10 @@ pub fn append_one(
                 random_interesting_unsigned(rng),
             )
             .unwrap();
+        }
+        OperationKind::FSYNC => {
+            let des = alive_open_files.choose(rng).unwrap().to_owned();
+            fs.fsync(des).unwrap();
         }
     }
 }

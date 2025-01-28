@@ -46,6 +46,10 @@ weights = [
     "READ",
     100,
   ],
+  [
+    "FSYNC",
+    30,
+  ],
 ]
 
 [mutation_weights]
