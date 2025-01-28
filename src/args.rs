@@ -1,4 +1,4 @@
-use crate::filesystems::filesystem_available;
+use crate::filesystems::filesystems_available;
 use clap::{builder::PossibleValuesParser, Parser, Subcommand};
 
 #[derive(Parser, Debug)]
@@ -20,11 +20,11 @@ pub enum Mode {
     Greybox {
         /// First filesystem to test
         #[arg(short, long)]
-        #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
+        #[clap(value_parser = PossibleValuesParser::new(filesystems_available()))]
         first_filesystem: String,
         /// Second filesystem to test
         #[arg(short, long)]
-        #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
+        #[clap(value_parser = PossibleValuesParser::new(filesystems_available()))]
         second_filesystem: String,
         /// Test count
         #[arg(short, long)]
@@ -40,18 +40,18 @@ pub enum Mode {
         path_to_test: String,
         /// Filesystem to test
         #[arg(short, long)]
-        #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
+        #[clap(value_parser = PossibleValuesParser::new(filesystems_available()))]
         filesystem: String,
     },
     /// Run blackbox fuzzing
     Blackbox {
         /// First filesystem to test
         #[arg(short, long)]
-        #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
+        #[clap(value_parser = PossibleValuesParser::new(filesystems_available()))]
         first_filesystem: String,
         /// Second filesystem to test
         #[arg(short, long)]
-        #[clap(value_parser = PossibleValuesParser::new(filesystem_available()))]
+        #[clap(value_parser = PossibleValuesParser::new(filesystems_available()))]
         second_filesystem: String,
         /// Test count
         #[arg(short, long)]

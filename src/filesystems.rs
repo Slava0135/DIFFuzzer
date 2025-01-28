@@ -8,7 +8,7 @@ pub const FILESYSTEMS: &[&dyn FileSystemMount] = &[
     // your filesystem here
 ];
 
-pub fn filesystem_available() -> Vec<String> {
+pub fn filesystems_available() -> Vec<String> {
     FILESYSTEMS
         .iter()
         .map(|fs| fs.to_string().to_lowercase())
