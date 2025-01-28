@@ -23,7 +23,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
-#include <format>
 #include <random>
 #include <string>
 #include <utility>
@@ -465,8 +464,9 @@ int do_read(int fd, size_t size) {
     failure(nr, READ, std::to_string(fd).c_str(), "");
     return -1;
   } else {
-    success(nr, READ,
-            std::format("hash={:x}", buffer_hashcode(read_buffer, nr)));
+    std::stringstream extra;
+    extra << "hash=" << std::hex << buffer_hashcode(read_buffer, nr);
+    success(nr, READ, extra.str());
     return nr;
   }
 }
