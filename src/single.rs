@@ -85,6 +85,6 @@ pub fn run(
         stdout.borrow().clone(),
         stderr.borrow().clone(),
     )
-        .with_context(|| format!("failed to save output"))
-        .unwrap();
+    .with_context(|| format!("failed to save output"))
+    .unwrap();
 }
