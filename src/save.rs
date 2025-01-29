@@ -1,6 +1,6 @@
-use std::{fs, path::Path};
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::{fs, path::Path};
 
 use anyhow::Context;
 
