@@ -95,6 +95,18 @@ pub fn get_diff(
     let mut res: Vec<FileDiff> = Vec::new();
     // break when iterated over all elements in at least one directory
     loop {
+        if fst_skip.is_match(vec_fst[i_fst].rel_path.as_str()) {
+            if i_fst == 0 { break }
+            i_fst -= 1;
+            continue;
+        }
+
+        if snd_skip.is_match(vec_fst[i_snd].rel_path.as_str()) {
+            if i_snd == 0 { break }
+            i_snd -= 1;
+            continue;
+        }
+
         let cmp_res = vec_fst[i_fst].rel_path.cmp(&vec_snd[i_snd].rel_path);
         match cmp_res {
             Ordering::Equal => {
