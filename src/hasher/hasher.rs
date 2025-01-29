@@ -101,7 +101,7 @@ pub fn get_diff(
             continue;
         }
 
-        if snd_skip.is_match(vec_fst[i_snd].rel_path.as_str()) {
+        if snd_skip.is_match(vec_snd[i_snd].rel_path.as_str()) {
             if i_snd == 0 { break }
             i_snd -= 1;
             continue;
