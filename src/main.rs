@@ -57,10 +57,12 @@ fn main() {
         args::Mode::Single {
             save_to_dir,
             path_to_test,
+            keep_fs,
             filesystem,
         } => single::run(
             Path::new(&path_to_test),
             Path::new(&save_to_dir),
+            keep_fs,
             filesystem.try_into().unwrap(),
             config.fs_name,
         ),
