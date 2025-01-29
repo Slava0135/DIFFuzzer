@@ -2,6 +2,7 @@ use std::{fmt::Display, fs, path::Path, process::Command};
 
 use anyhow::{bail, Context};
 use log::debug;
+use regex::RegexSet;
 
 const RAM_DISK_SIZE: usize = 1_000_000;
 const DEVICE: &str = "/dev/ram0";
@@ -120,5 +121,9 @@ pub trait FileSystemMount: Display {
     /// Example: `compress_algorithm=zstd:6,compress_chksum,atgc,gc_merge,lazytime`
     fn mount_opts(&self) -> Option<String> {
         None
+    }
+
+    fn get_internal_dirs(&self) -> RegexSet {
+        RegexSet::new::<_, &str>([]).unwrap()
     }
 }

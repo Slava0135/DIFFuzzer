@@ -6,6 +6,8 @@ use std::{env, fs};
 use anyhow::Context;
 
 use crate::hasher::hasher::{calc_dir_hash, get_diff};
+use crate::mount::ext4::Ext4;
+use crate::mount::mount::FileSystemMount;
 
 #[ignore]
 #[test]
@@ -16,12 +18,19 @@ fn test_hash_eq() {
 
     let cmp_dirs = create_data_for_test(dirs, files, data);
 
+    let ext4_dirs = Ext4::new().get_internal_dirs();
     let hash_options = Default::default();
-    let hash_fst = calc_dir_hash(cmp_dirs[0].as_path(), &hash_options);
-    let hash_snd = calc_dir_hash(cmp_dirs[1].as_path(), &hash_options);
+    let hash_fst = calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options);
+    let hash_snd = calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options);
     assert_eq!(hash_fst, hash_snd);
 
-    let diff = get_diff(cmp_dirs[0].as_path(), cmp_dirs[1].as_path(), &hash_options);
+    let diff = get_diff(
+        cmp_dirs[0].as_path(),
+        cmp_dirs[1].as_path(),
+        &ext4_dirs,
+        &ext4_dirs,
+        &hash_options,
+    );
     assert_eq!(diff.len(), 0);
 }
 
@@ -39,12 +48,19 @@ fn test_hash_not_eq() {
         .with_context(|| format!("failed create folder '{}'", err_dir.display()))
         .unwrap();
 
+    let ext4_dirs = Ext4::new().get_internal_dirs();
     let hash_options = Default::default();
-    let hash_fst = calc_dir_hash(cmp_dirs[0].as_path(), &hash_options);
-    let hash_snd = calc_dir_hash(cmp_dirs[1].as_path(), &hash_options);
+    let hash_fst = calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options);
+    let hash_snd = calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options);
     assert_ne!(hash_fst, hash_snd);
 
-    let diff = get_diff(cmp_dirs[0].as_path(), cmp_dirs[1].as_path(), &hash_options);
+    let diff = get_diff(
+        cmp_dirs[0].as_path(),
+        cmp_dirs[1].as_path(),
+        &ext4_dirs,
+        &ext4_dirs,
+        &hash_options,
+    );
     assert_ne!(diff.len(), 0);
 }
 

@@ -69,7 +69,7 @@ pub fn run(
         .with_context(|| format!("failed to run harness"))
         .unwrap();
     harness.teardown().unwrap();
-    
+
     info!("saving results");
     save_testcase(save_to_dir, &input_path, &input)
         .with_context(|| format!("failed to save testcase"))
