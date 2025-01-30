@@ -4,8 +4,7 @@ use anyhow::{Context, Ok};
 use log::info;
 
 use crate::{
-    abstract_fs::workload::Workload,
-    config::Config,
+    abstract_fs::workload::Workload, config::Config, fuzzing::common::parse_trace,
     mount::mount::FileSystemMount,
 };
 
@@ -35,6 +34,16 @@ impl Reducer {
         let input: Workload = serde_json::from_str(&input)
             .with_context(|| format!("failed to parse json"))
             .unwrap();
+
+        let input_path = self.runner.compile_test(&input)?;
+
+        self.runner.run_harness(&input_path)?;
+
+        let fst_trace = parse_trace(&self.runner.fst_trace_path)
+            .with_context(|| format!("failed to parse first trace"))?;
+        let snd_trace = parse_trace(&self.runner.snd_trace_path)
+            .with_context(|| format!("failed to parse second trace"))?;
+
         Ok(())
     }
 }

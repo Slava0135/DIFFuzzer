@@ -5,19 +5,20 @@ use crate::config::Config;
 use crate::fuzzing::objective::console::ConsoleObjective;
 use crate::fuzzing::objective::trace::TraceObjective;
 use crate::harness::{ConsolePipe, Harness};
-use crate::hasher::hasher::{calc_dir_hash, get_diff, FileDiff, HasherOptions};
+use crate::hasher::hasher::FileDiff;
 use crate::mount::mount::FileSystemMount;
 use crate::save::{save_diff, save_output, save_testcase};
 use crate::temp_dir::setup_temp_dir;
 use anyhow::{Context, Ok};
 use log::{debug, error, info, warn};
-use regex::RegexSet;
 use std::cell::RefCell;
 use std::fs::read_to_string;
 use std::path::Path;
 use std::rc::Rc;
 use std::time::Instant;
 use std::{fs, io};
+
+use super::objective::hash::HashObjective;
 
 pub struct Runner {
     pub config: Config,
@@ -26,8 +27,6 @@ pub struct Runner {
     pub snd_exec_dir: Box<Path>,
     pub fst_trace_path: Box<Path>,
     pub snd_trace_path: Box<Path>,
-    pub fst_fs_dir: Box<Path>,
-    pub snd_fs_dir: Box<Path>,
 
     pub fst_stdout: ConsolePipe,
     pub snd_stdout: ConsolePipe,
@@ -40,17 +39,14 @@ pub struct Runner {
 
     pub trace_objective: TraceObjective,
     pub console_objective: ConsoleObjective,
+    pub hash_objective: HashObjective,
 
-    pub fst_fs_internal: RegexSet,
-    pub snd_fs_internal: RegexSet,
     pub fst_fs_name: String,
     pub snd_fs_name: String,
     pub fst_harness: Harness,
     pub snd_harness: Harness,
 
     pub stats: Stats,
-
-    pub hasher_options: HasherOptions,
 }
 
 pub trait Fuzzer {
@@ -100,49 +96,31 @@ pub trait Fuzzer {
         fst_trace: &Trace,
         snd_trace: &Trace,
     ) -> anyhow::Result<bool> {
-        let data = self.runner();
-
-        let hash_diff_interesting = if data.config.hashing_enabled {
-            let fst_hash = calc_dir_hash(
-                &data.fst_fs_dir,
-                &data.fst_fs_internal,
-                &data.hasher_options,
-            );
-            let snd_hash = calc_dir_hash(
-                &data.snd_fs_dir,
-                &data.snd_fs_internal,
-                &data.hasher_options,
-            );
-            fst_hash != snd_hash
-        } else {
-            false
-        };
-
+        let runner = self.runner();
         debug!("doing objectives");
-        let console_is_interesting = data
+        let hash_diff_interesting = runner
+            .hash_objective
+            .is_interesting()
+            .with_context(|| format!("failed to do hash objective"))?;
+        let console_is_interesting = runner
             .console_objective
             .is_interesting()
             .with_context(|| format!("failed to do console objective"))?;
-        let trace_is_interesting = data
+        let trace_is_interesting = runner
             .trace_objective
             .is_interesting(fst_trace, snd_trace)
             .with_context(|| format!("failed to do trace objective"))?;
         if console_is_interesting || trace_is_interesting || hash_diff_interesting {
             debug!(
-                "Error detected by:\n console: {}, trace: {}, hash: {}",
+                "Error detected by: console?: {}, trace?: {}, hash?: {}",
                 console_is_interesting, trace_is_interesting, hash_diff_interesting
             );
             let mut diff: Vec<FileDiff> = vec![];
             if hash_diff_interesting {
-                diff = get_diff(
-                    &data.fst_fs_dir,
-                    &data.snd_fs_dir,
-                    &data.fst_fs_internal,
-                    &data.snd_fs_internal,
-                    &data.hasher_options,
-                );
+                diff = runner.hash_objective.get_diff();
             }
-            data.report_crash(input.clone(), input_path, data.crashes_path.clone(), diff)
+            runner
+                .report_crash(input.clone(), input_path, runner.crashes_path.clone(), diff)
                 .with_context(|| format!("failed to report crash"))?;
             self.runner().stats.crashes += 1;
             self.show_stats();
@@ -206,12 +184,6 @@ impl Runner {
         let snd_stdout = Rc::new(RefCell::new("".to_owned()));
         let snd_stderr = Rc::new(RefCell::new("".to_owned()));
 
-        let trace_objective = TraceObjective::new();
-        let console_objective = ConsoleObjective::new(fst_stdout.clone(), snd_stdout.clone());
-
-        let fst_fs_internal = fst_mount.get_internal_dirs();
-        let snd_fs_internal = snd_mount.get_internal_dirs();
-
         let fst_fs_name = fst_mount.to_string();
         let snd_fs_name = snd_mount.to_string();
 
@@ -219,6 +191,21 @@ impl Runner {
             .join(fst_fs_name.to_lowercase())
             .join(&config.fs_name)
             .into_boxed_path();
+        let snd_fs_dir = Path::new("/mnt")
+            .join(snd_fs_name.to_lowercase())
+            .join(&config.fs_name)
+            .into_boxed_path();
+
+        let hash_objective = HashObjective::new(
+            fst_fs_dir.clone(),
+            snd_fs_dir.clone(),
+            fst_mount.get_internal_dirs(),
+            snd_mount.get_internal_dirs(),
+            config.hashing_enabled,
+        );
+        let trace_objective = TraceObjective::new();
+        let console_objective = ConsoleObjective::new(fst_stdout.clone(), snd_stdout.clone());
+
         let fst_harness = Harness::new(
             fst_mount,
             fst_fs_dir.clone(),
@@ -226,11 +213,6 @@ impl Runner {
             fst_stdout.clone(),
             fst_stderr.clone(),
         );
-
-        let snd_fs_dir = Path::new("/mnt")
-            .join(snd_fs_name.to_lowercase())
-            .join(&config.fs_name)
-            .into_boxed_path();
         let snd_harness = Harness::new(
             snd_mount,
             snd_fs_dir.clone(),
@@ -247,11 +229,6 @@ impl Runner {
             fst_trace_path: fst_trace_path.into_boxed_path(),
             snd_trace_path: snd_trace_path.into_boxed_path(),
 
-            fst_fs_internal,
-            snd_fs_internal,
-            fst_fs_dir,
-            snd_fs_dir,
-
             fst_stdout,
             snd_stdout,
             fst_stderr,
@@ -261,6 +238,7 @@ impl Runner {
             crashes_path: crashes_path.to_path_buf().into_boxed_path(),
             accidents_path: accidents_path.to_path_buf().into_boxed_path(),
 
+            hash_objective,
             trace_objective,
             console_objective,
 
@@ -270,7 +248,6 @@ impl Runner {
             snd_harness,
 
             stats: Stats::new(),
-            hasher_options: Default::default(),
         }
     }
 
