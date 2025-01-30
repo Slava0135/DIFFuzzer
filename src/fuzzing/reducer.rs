@@ -9,10 +9,10 @@ use crate::{
     mount::mount::FileSystemMount,
 };
 
-use super::common::FuzzData;
+use super::common::Runner;
 
 pub struct Reducer {
-    data: FuzzData,
+    runner: Runner,
 }
 
 impl Reducer {
@@ -22,7 +22,7 @@ impl Reducer {
         snd_mount: &'static dyn FileSystemMount,
     ) -> Self {
         Self {
-            data: FuzzData::new(fst_mount, snd_mount, config),
+            runner: Runner::new(fst_mount, snd_mount, config),
         }
     }
 

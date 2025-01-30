@@ -19,7 +19,7 @@ use std::rc::Rc;
 use std::time::Instant;
 use std::{fs, io};
 
-pub struct FuzzData {
+pub struct Runner {
     pub config: Config,
 
     pub fst_exec_dir: Box<Path>,
@@ -56,7 +56,7 @@ pub struct FuzzData {
 pub trait Fuzzer {
     fn run(&mut self, test_count: Option<u64>) {
         info!("starting fuzzing loop");
-        self.data().stats.start = Instant::now();
+        self.runner().stats.start = Instant::now();
         match test_count {
             None => loop {
                 if self.runs() {
@@ -79,12 +79,12 @@ pub trait Fuzzer {
                 error!("{:?}", err);
                 return true;
             }
-            _ => self.data().stats.executions += 1,
+            _ => self.runner().stats.executions += 1,
         }
         if Instant::now()
-            .duration_since(self.data().stats.last_time_showed)
+            .duration_since(self.runner().stats.last_time_showed)
             .as_secs()
-            > self.data().config.heartbeat_interval.into()
+            > self.runner().config.heartbeat_interval.into()
         {
             self.show_stats();
         }
@@ -94,9 +94,9 @@ pub trait Fuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()>;
 
     fn compile_test(&mut self, input: &Workload) -> anyhow::Result<Box<Path>> {
-        debug!("compiling test at '{}'", self.data().test_dir.display());
+        debug!("compiling test at '{}'", self.runner().test_dir.display());
         let input_path = input
-            .compile(&self.data().test_dir)
+            .compile(&self.runner().test_dir)
             .with_context(|| format!("failed to compile test"))?;
         Ok(input_path)
     }
@@ -104,16 +104,16 @@ pub trait Fuzzer {
     fn run_harness(&mut self, input_path: &Path) -> anyhow::Result<()> {
         debug!("running harness at '{}'", input_path.display());
 
-        setup_dir(self.data().fst_exec_dir.as_ref())
+        setup_dir(self.runner().fst_exec_dir.as_ref())
             .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
-        setup_dir(self.data().snd_exec_dir.as_ref())
+        setup_dir(self.runner().snd_exec_dir.as_ref())
             .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
 
-        self.data().fst_harness.run(&input_path).with_context(|| {
-            format!("failed to run first harness '{}'", self.data().fst_fs_name)
+        self.runner().fst_harness.run(&input_path).with_context(|| {
+            format!("failed to run first harness '{}'", self.runner().fst_fs_name)
         })?;
-        self.data().snd_harness.run(&input_path).with_context(|| {
-            format!("failed to run second harness '{}'", self.data().snd_fs_name)
+        self.runner().snd_harness.run(&input_path).with_context(|| {
+            format!("failed to run second harness '{}'", self.runner().snd_fs_name)
         })?;
         Ok(())
     }
@@ -125,7 +125,7 @@ pub trait Fuzzer {
         fst_trace: &Trace,
         snd_trace: &Trace,
     ) -> anyhow::Result<bool> {
-        let data = self.data();
+        let data = self.runner();
 
         let hash_diff_interesting = if data.config.hashing_enabled {
             let fst_hash = calc_dir_hash(
@@ -169,7 +169,7 @@ pub trait Fuzzer {
             }
             data.report_crash(input.clone(), input_path, data.crashes_path.clone(), diff)
                 .with_context(|| format!("failed to report crash"))?;
-            self.data().stats.crashes += 1;
+            self.runner().stats.crashes += 1;
             self.show_stats();
             Ok(true)
         } else {
@@ -187,8 +187,8 @@ pub trait Fuzzer {
         debug!("detecting errors");
         if fst_trace.has_errors() && snd_trace.has_errors() {
             warn!("both traces contain errors, potential bug in model");
-            let accidents_path = self.data().accidents_path.clone();
-            self.data()
+            let accidents_path = self.runner().accidents_path.clone();
+            self.runner()
                 .report_crash(input.clone(), &input_path, accidents_path, vec![])
                 .with_context(|| format!("failed to report accident"))?;
             Ok(true)
@@ -198,17 +198,17 @@ pub trait Fuzzer {
     }
 
     fn teardown_all(&mut self) -> anyhow::Result<()> {
-        self.data().fst_harness.teardown()?;
-        self.data().snd_harness.teardown()?;
+        self.runner().fst_harness.teardown()?;
+        self.runner().snd_harness.teardown()?;
         Ok(())
     }
 
     fn show_stats(&mut self);
 
-    fn data(&mut self) -> &mut FuzzData;
+    fn runner(&mut self) -> &mut Runner;
 }
 
-impl FuzzData {
+impl Runner {
     pub fn new(
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
