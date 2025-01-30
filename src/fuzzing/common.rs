@@ -5,13 +5,12 @@ use crate::config::Config;
 use crate::fuzzing::objective::console::ConsoleObjective;
 use crate::fuzzing::objective::trace::TraceObjective;
 use crate::harness::{ConsolePipe, Harness};
-use crate::hasher::hasher::{calc_dir_hash, get_diff, FileDiff, HasherOptions};
+use crate::hasher::hasher::FileDiff;
 use crate::mount::mount::FileSystemMount;
 use crate::save::{save_diff, save_output, save_testcase};
 use crate::temp_dir::setup_temp_dir;
 use anyhow::{Context, Ok};
 use log::{debug, error, info, warn};
-use regex::RegexSet;
 use std::cell::RefCell;
 use std::fs::read_to_string;
 use std::path::Path;
@@ -19,15 +18,15 @@ use std::rc::Rc;
 use std::time::Instant;
 use std::{fs, io};
 
-pub struct FuzzData {
+use super::objective::hash::HashObjective;
+
+pub struct Runner {
     pub config: Config,
 
     pub fst_exec_dir: Box<Path>,
     pub snd_exec_dir: Box<Path>,
     pub fst_trace_path: Box<Path>,
     pub snd_trace_path: Box<Path>,
-    pub fst_fs_dir: Box<Path>,
-    pub snd_fs_dir: Box<Path>,
 
     pub fst_stdout: ConsolePipe,
     pub snd_stdout: ConsolePipe,
@@ -40,23 +39,20 @@ pub struct FuzzData {
 
     pub trace_objective: TraceObjective,
     pub console_objective: ConsoleObjective,
+    pub hash_objective: HashObjective,
 
-    pub fst_fs_internal: RegexSet,
-    pub snd_fs_internal: RegexSet,
     pub fst_fs_name: String,
     pub snd_fs_name: String,
     pub fst_harness: Harness,
     pub snd_harness: Harness,
 
     pub stats: Stats,
-
-    pub hasher_options: HasherOptions,
 }
 
 pub trait Fuzzer {
     fn run(&mut self, test_count: Option<u64>) {
         info!("starting fuzzing loop");
-        self.data().stats.start = Instant::now();
+        self.runner().stats.start = Instant::now();
         match test_count {
             None => loop {
                 if self.runs() {
@@ -79,12 +75,12 @@ pub trait Fuzzer {
                 error!("{:?}", err);
                 return true;
             }
-            _ => self.data().stats.executions += 1,
+            _ => self.runner().stats.executions += 1,
         }
         if Instant::now()
-            .duration_since(self.data().stats.last_time_showed)
+            .duration_since(self.runner().stats.last_time_showed)
             .as_secs()
-            > self.data().config.heartbeat_interval.into()
+            > self.runner().config.heartbeat_interval.into()
         {
             self.show_stats();
         }
@@ -93,31 +89,6 @@ pub trait Fuzzer {
 
     fn fuzz_one(&mut self) -> anyhow::Result<()>;
 
-    fn compile_test(&mut self, input: &Workload) -> anyhow::Result<Box<Path>> {
-        debug!("compiling test at '{}'", self.data().test_dir.display());
-        let input_path = input
-            .compile(&self.data().test_dir)
-            .with_context(|| format!("failed to compile test"))?;
-        Ok(input_path)
-    }
-
-    fn run_harness(&mut self, input_path: &Path) -> anyhow::Result<()> {
-        debug!("running harness at '{}'", input_path.display());
-
-        setup_dir(self.data().fst_exec_dir.as_ref())
-            .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
-        setup_dir(self.data().snd_exec_dir.as_ref())
-            .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
-
-        self.data().fst_harness.run(&input_path).with_context(|| {
-            format!("failed to run first harness '{}'", self.data().fst_fs_name)
-        })?;
-        self.data().snd_harness.run(&input_path).with_context(|| {
-            format!("failed to run second harness '{}'", self.data().snd_fs_name)
-        })?;
-        Ok(())
-    }
-
     fn do_objective(
         &mut self,
         input: &Workload,
@@ -125,51 +96,33 @@ pub trait Fuzzer {
         fst_trace: &Trace,
         snd_trace: &Trace,
     ) -> anyhow::Result<bool> {
-        let data = self.data();
-
-        let hash_diff_interesting = if data.config.hashing_enabled {
-            let fst_hash = calc_dir_hash(
-                &data.fst_fs_dir,
-                &data.fst_fs_internal,
-                &data.hasher_options,
-            );
-            let snd_hash = calc_dir_hash(
-                &data.snd_fs_dir,
-                &data.snd_fs_internal,
-                &data.hasher_options,
-            );
-            fst_hash != snd_hash
-        } else {
-            false
-        };
-
+        let runner = self.runner();
         debug!("doing objectives");
-        let console_is_interesting = data
+        let hash_diff_interesting = runner
+            .hash_objective
+            .is_interesting()
+            .with_context(|| format!("failed to do hash objective"))?;
+        let console_is_interesting = runner
             .console_objective
             .is_interesting()
             .with_context(|| format!("failed to do console objective"))?;
-        let trace_is_interesting = data
+        let trace_is_interesting = runner
             .trace_objective
             .is_interesting(fst_trace, snd_trace)
             .with_context(|| format!("failed to do trace objective"))?;
         if console_is_interesting || trace_is_interesting || hash_diff_interesting {
             debug!(
-                "Error detected by:\n console: {}, trace: {}, hash: {}",
+                "Error detected by: console?: {}, trace?: {}, hash?: {}",
                 console_is_interesting, trace_is_interesting, hash_diff_interesting
             );
             let mut diff: Vec<FileDiff> = vec![];
             if hash_diff_interesting {
-                diff = get_diff(
-                    &data.fst_fs_dir,
-                    &data.snd_fs_dir,
-                    &data.fst_fs_internal,
-                    &data.snd_fs_internal,
-                    &data.hasher_options,
-                );
+                diff = runner.hash_objective.get_diff();
             }
-            data.report_crash(input.clone(), input_path, data.crashes_path.clone(), diff)
+            runner
+                .report_crash(&input, input_path, runner.crashes_path.clone(), diff)
                 .with_context(|| format!("failed to report crash"))?;
-            self.data().stats.crashes += 1;
+            self.runner().stats.crashes += 1;
             self.show_stats();
             Ok(true)
         } else {
@@ -187,9 +140,9 @@ pub trait Fuzzer {
         debug!("detecting errors");
         if fst_trace.has_errors() && snd_trace.has_errors() {
             warn!("both traces contain errors, potential bug in model");
-            let accidents_path = self.data().accidents_path.clone();
-            self.data()
-                .report_crash(input.clone(), &input_path, accidents_path, vec![])
+            let accidents_path = self.runner().accidents_path.clone();
+            self.runner()
+                .report_crash(&input, &input_path, accidents_path, vec![])
                 .with_context(|| format!("failed to report accident"))?;
             Ok(true)
         } else {
@@ -197,18 +150,12 @@ pub trait Fuzzer {
         }
     }
 
-    fn teardown_all(&mut self) -> anyhow::Result<()> {
-        self.data().fst_harness.teardown()?;
-        self.data().snd_harness.teardown()?;
-        Ok(())
-    }
-
     fn show_stats(&mut self);
 
-    fn data(&mut self) -> &mut FuzzData;
+    fn runner(&mut self) -> &mut Runner;
 }
 
-impl FuzzData {
+impl Runner {
     pub fn new(
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
@@ -237,12 +184,6 @@ impl FuzzData {
         let snd_stdout = Rc::new(RefCell::new("".to_owned()));
         let snd_stderr = Rc::new(RefCell::new("".to_owned()));
 
-        let trace_objective = TraceObjective::new();
-        let console_objective = ConsoleObjective::new(fst_stdout.clone(), snd_stdout.clone());
-
-        let fst_fs_internal = fst_mount.get_internal_dirs();
-        let snd_fs_internal = snd_mount.get_internal_dirs();
-
         let fst_fs_name = fst_mount.to_string();
         let snd_fs_name = snd_mount.to_string();
 
@@ -250,6 +191,21 @@ impl FuzzData {
             .join(fst_fs_name.to_lowercase())
             .join(&config.fs_name)
             .into_boxed_path();
+        let snd_fs_dir = Path::new("/mnt")
+            .join(snd_fs_name.to_lowercase())
+            .join(&config.fs_name)
+            .into_boxed_path();
+
+        let hash_objective = HashObjective::new(
+            fst_fs_dir.clone(),
+            snd_fs_dir.clone(),
+            fst_mount.get_internal_dirs(),
+            snd_mount.get_internal_dirs(),
+            config.hashing_enabled,
+        );
+        let trace_objective = TraceObjective::new();
+        let console_objective = ConsoleObjective::new(fst_stdout.clone(), snd_stdout.clone());
+
         let fst_harness = Harness::new(
             fst_mount,
             fst_fs_dir.clone(),
@@ -257,11 +213,6 @@ impl FuzzData {
             fst_stdout.clone(),
             fst_stderr.clone(),
         );
-
-        let snd_fs_dir = Path::new("/mnt")
-            .join(snd_fs_name.to_lowercase())
-            .join(&config.fs_name)
-            .into_boxed_path();
         let snd_harness = Harness::new(
             snd_mount,
             snd_fs_dir.clone(),
@@ -278,11 +229,6 @@ impl FuzzData {
             fst_trace_path: fst_trace_path.into_boxed_path(),
             snd_trace_path: snd_trace_path.into_boxed_path(),
 
-            fst_fs_internal,
-            snd_fs_internal,
-            fst_fs_dir,
-            snd_fs_dir,
-
             fst_stdout,
             snd_stdout,
             fst_stderr,
@@ -292,6 +238,7 @@ impl FuzzData {
             crashes_path: crashes_path.to_path_buf().into_boxed_path(),
             accidents_path: accidents_path.to_path_buf().into_boxed_path(),
 
+            hash_objective,
             trace_objective,
             console_objective,
 
@@ -301,13 +248,43 @@ impl FuzzData {
             snd_harness,
 
             stats: Stats::new(),
-            hasher_options: Default::default(),
         }
+    }
+
+    pub fn compile_test(&mut self, input: &Workload) -> anyhow::Result<Box<Path>> {
+        debug!("compiling test at '{}'", self.test_dir.display());
+        let input_path = input
+            .compile(&self.test_dir)
+            .with_context(|| format!("failed to compile test"))?;
+        Ok(input_path)
+    }
+
+    pub fn run_harness(&mut self, input_path: &Path) -> anyhow::Result<()> {
+        debug!("running harness at '{}'", input_path.display());
+
+        setup_dir(self.fst_exec_dir.as_ref())
+            .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
+        setup_dir(self.snd_exec_dir.as_ref())
+            .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
+
+        self.fst_harness
+            .run(&input_path)
+            .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
+        self.snd_harness
+            .run(&input_path)
+            .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
+        Ok(())
+    }
+
+    pub fn teardown_all(&mut self) -> anyhow::Result<()> {
+        self.fst_harness.teardown()?;
+        self.snd_harness.teardown()?;
+        Ok(())
     }
 
     pub fn report_crash(
         &mut self,
-        input: Workload,
+        input: &Workload,
         input_path: &Path,
         crash_dir: Box<Path>,
         hash_diff: Vec<FileDiff>,
@@ -381,7 +358,7 @@ pub fn parse_trace(path: &Path) -> anyhow::Result<Trace> {
     anyhow::Ok(Trace::try_parse(trace).with_context(|| format!("failed to parse trace"))?)
 }
 
-fn setup_dir(path: &Path) -> io::Result<()> {
+pub fn setup_dir(path: &Path) -> io::Result<()> {
     fs::remove_dir_all(path).unwrap_or(());
     fs::create_dir(path)
 }

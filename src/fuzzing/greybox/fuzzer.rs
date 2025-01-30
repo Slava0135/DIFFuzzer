@@ -6,7 +6,7 @@ use anyhow::{Context, Ok};
 use log::{debug, info};
 use rand::{rngs::StdRng, SeedableRng};
 
-use crate::fuzzing::common::{parse_trace, FuzzData, Fuzzer};
+use crate::fuzzing::common::{parse_trace, Runner, Fuzzer};
 use crate::fuzzing::greybox::feedback::kcov::KCOV_FILENAME;
 use crate::save::{save_output, save_testcase};
 use crate::{abstract_fs::workload::Workload, config::Config, mount::mount::FileSystemMount};
@@ -14,7 +14,7 @@ use crate::{abstract_fs::workload::Workload, config::Config, mount::mount::FileS
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 
 pub struct GreyBoxFuzzer {
-    data: FuzzData,
+    runner: Runner,
 
     corpus: Vec<Workload>,
     next_seed: usize,
@@ -54,16 +54,16 @@ impl GreyBoxFuzzer {
             None
         };
 
-        let fuzz_data = FuzzData::new(fst_mount, snd_mount, config);
+        let runner = Runner::new(fst_mount, snd_mount, config);
 
-        let fst_kcov_path = fuzz_data.fst_exec_dir.join(KCOV_FILENAME);
-        let snd_kcov_path = fuzz_data.snd_exec_dir.join(KCOV_FILENAME);
+        let fst_kcov_path = runner.fst_exec_dir.join(KCOV_FILENAME);
+        let snd_kcov_path = runner.snd_exec_dir.join(KCOV_FILENAME);
 
         let fst_kcov_feedback = KCovFeedback::new(fst_kcov_path.clone().into_boxed_path());
         let snd_kcov_feedback = KCovFeedback::new(snd_kcov_path.clone().into_boxed_path());
 
         Self {
-            data: fuzz_data,
+            runner,
             corpus: vec![Workload::new()],
             next_seed: 0,
 
@@ -113,18 +113,18 @@ impl GreyBoxFuzzer {
         save_testcase(&corpus_dir, input_path, &input)?;
         save_output(
             &corpus_dir,
-            &self.data.fst_trace_path,
-            &self.data.fst_fs_name,
-            self.data.fst_stdout.borrow().clone(),
-            self.data.fst_stderr.borrow().clone(),
+            &self.runner.fst_trace_path,
+            &self.runner.fst_fs_name,
+            self.runner.fst_stdout.borrow().clone(),
+            self.runner.fst_stderr.borrow().clone(),
         )
         .with_context(|| format!("failed to save output for first harness"))?;
         save_output(
             &corpus_dir,
-            &self.data.snd_trace_path,
-            &self.data.snd_fs_name,
-            self.data.snd_stdout.borrow().clone(),
-            self.data.snd_stderr.borrow().clone(),
+            &self.runner.snd_trace_path,
+            &self.runner.snd_fs_name,
+            self.runner.snd_stdout.borrow().clone(),
+            self.runner.snd_stderr.borrow().clone(),
         )
         .with_context(|| format!("failed to save output for first harness"))?;
         Ok(())
@@ -139,13 +139,13 @@ impl Fuzzer for GreyBoxFuzzer {
         debug!("mutating input");
         let input = self.mutator.mutate(input);
 
-        let input_path = self.compile_test(&input)?;
+        let input_path = self.runner().compile_test(&input)?;
 
-        self.run_harness(&input_path)?;
+        self.runner().run_harness(&input_path)?;
 
-        let fst_trace = parse_trace(&self.data().fst_trace_path)
+        let fst_trace = parse_trace(&self.runner().fst_trace_path)
             .with_context(|| format!("failed to parse first trace"))?;
-        let snd_trace = parse_trace(&self.data().snd_trace_path)
+        let snd_trace = parse_trace(&self.runner().snd_trace_path)
             .with_context(|| format!("failed to parse second trace"))?;
 
         if self.detect_errors(&input, &input_path, &fst_trace, &snd_trace)? {
@@ -156,21 +156,21 @@ impl Fuzzer for GreyBoxFuzzer {
             return Ok(());
         }
 
-        self.teardown_all()?;
+        self.runner().teardown_all()?;
 
         debug!("getting feedback");
         let fst_kcov_is_interesting =
             self.fst_kcov_feedback.is_interesting().with_context(|| {
                 format!(
                     "failed to get first kcov feedback for '{}'",
-                    self.data.fst_fs_name
+                    self.runner.fst_fs_name
                 )
             })?;
         let snd_kcov_is_interesting =
             self.snd_kcov_feedback.is_interesting().with_context(|| {
                 format!(
                     "failed to get second kcov feedback for '{}'",
-                    self.data.snd_fs_name
+                    self.runner.snd_fs_name
                 )
             })?;
         if fst_kcov_is_interesting || snd_kcov_is_interesting {
@@ -187,22 +187,22 @@ impl Fuzzer for GreyBoxFuzzer {
     }
 
     fn show_stats(&mut self) {
-        self.data.stats.last_time_showed = Instant::now();
-        let since_start = Instant::now().duration_since(self.data.stats.start);
+        self.runner.stats.last_time_showed = Instant::now();
+        let since_start = Instant::now().duration_since(self.runner.stats.start);
         let secs = since_start.as_secs();
         info!(
             "corpus: {}, crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
             self.corpus.len(),
-            self.data.stats.crashes,
-            self.data.stats.executions,
-            (self.data.stats.executions as f64) / (secs as f64),
+            self.runner.stats.crashes,
+            self.runner.stats.executions,
+            (self.runner.stats.executions as f64) / (secs as f64),
             secs / (60 * 60),
             (secs / (60)) % 60,
             secs % 60,
         );
     }
 
-    fn data(&mut self) -> &mut FuzzData {
-        &mut self.data
+    fn runner(&mut self) -> &mut Runner {
+        &mut self.runner
     }
 }
