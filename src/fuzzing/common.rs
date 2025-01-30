@@ -268,17 +268,11 @@ impl Runner {
             .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
 
         self.fst_harness
-            .run(&input_path)
+            .run(&input_path, false)
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
         self.snd_harness
-            .run(&input_path)
+            .run(&input_path, false)
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
-        Ok(())
-    }
-
-    pub fn teardown_all(&mut self) -> anyhow::Result<()> {
-        self.fst_harness.teardown()?;
-        self.snd_harness.teardown()?;
         Ok(())
     }
 

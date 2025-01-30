@@ -66,13 +66,9 @@ pub fn run(
 
     info!("running harness");
     harness
-        .run(&input_path)
+        .run(&input_path, keep_fs)
         .with_context(|| format!("failed to run harness"))
         .unwrap();
-
-    if !keep_fs {
-        harness.teardown().unwrap();
-    }
 
     info!("saving results");
     save_testcase(save_to_dir, &input_path, &input)

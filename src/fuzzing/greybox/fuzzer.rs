@@ -156,8 +156,6 @@ impl Fuzzer for GreyBoxFuzzer {
             return Ok(());
         }
 
-        self.runner().teardown_all()?;
-
         debug!("getting feedback");
         let fst_kcov_is_interesting =
             self.fst_kcov_feedback.is_interesting().with_context(|| {

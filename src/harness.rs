@@ -30,7 +30,7 @@ impl Harness {
             stderr,
         }
     }
-    pub fn run(&self, input_path: &Path) -> anyhow::Result<bool> {
+    pub fn run(&self, input_path: &Path, keep_fs: bool) -> anyhow::Result<bool> {
         let test_exec_copy = self.exec_dir.join("test.out");
         std::fs::copy(input_path, &test_exec_copy).with_context(|| {
             format!(
@@ -54,6 +54,10 @@ impl Harness {
         let output = exec
             .output()
             .with_context(|| format!("failed to run executable '{:?}'", exec))?;
+
+        if !keep_fs {
+            self.teardown()?;
+        }
 
         self.stdout.replace(
             String::from_utf8(output.stdout)

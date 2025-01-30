@@ -4,10 +4,7 @@ use anyhow::{Context, Ok};
 use log::{info, warn};
 
 use crate::{
-    abstract_fs::{
-        mutator::remove,
-        workload::Workload,
-    },
+    abstract_fs::{mutator::remove, workload::Workload},
     config::Config,
     fuzzing::common::parse_trace,
     hasher::hasher::FileDiff,
@@ -65,11 +62,9 @@ impl Reducer {
             todo!()
         } else if hash_diff_interesting {
             let old_diff = self.runner.hash_objective.get_diff();
-            self.runner.teardown_all()?;
             self.reduce_by_hash(input, old_diff, save_to_dir)?;
         } else {
             warn!("crash not detected");
-            self.runner.teardown_all()?;
         }
 
         Ok(())
@@ -106,7 +101,6 @@ impl Reducer {
                         )?;
                     }
                 }
-                self.runner.teardown_all()?;
             }
             if index == 0 {
                 break;
