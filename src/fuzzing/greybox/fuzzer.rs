@@ -139,9 +139,9 @@ impl Fuzzer for GreyBoxFuzzer {
         debug!("mutating input");
         let input = self.mutator.mutate(input);
 
-        let input_path = self.compile_test(&input)?;
+        let input_path = self.runner().compile_test(&input)?;
 
-        self.run_harness(&input_path)?;
+        self.runner().run_harness(&input_path)?;
 
         let fst_trace = parse_trace(&self.runner().fst_trace_path)
             .with_context(|| format!("failed to parse first trace"))?;
@@ -156,7 +156,7 @@ impl Fuzzer for GreyBoxFuzzer {
             return Ok(());
         }
 
-        self.teardown_all()?;
+        self.runner().teardown_all()?;
 
         debug!("getting feedback");
         let fst_kcov_is_interesting =

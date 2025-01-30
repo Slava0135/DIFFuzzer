@@ -6,7 +6,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
 use crate::config::Config;
-use crate::fuzzing::common::{parse_trace, Runner, Fuzzer};
+use crate::fuzzing::common::{parse_trace, Fuzzer, Runner};
 
 use crate::mount::mount::FileSystemMount;
 
@@ -42,9 +42,9 @@ impl Fuzzer for BlackBoxFuzzer {
             &self.runner.config.operation_weights,
         );
 
-        let input_path = self.compile_test(&input)?;
+        let input_path = self.runner().compile_test(&input)?;
 
-        self.run_harness(&input_path)?;
+        self.runner().run_harness(&input_path)?;
 
         let fst_trace = parse_trace(&self.runner().fst_trace_path)
             .with_context(|| format!("failed to parse first trace"))?;
@@ -57,7 +57,7 @@ impl Fuzzer for BlackBoxFuzzer {
 
         self.do_objective(&input, &input_path, &fst_trace, &snd_trace)?;
 
-        self.teardown_all()?;
+        self.runner().teardown_all()?;
 
         Ok(())
     }

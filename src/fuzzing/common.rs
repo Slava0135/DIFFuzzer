@@ -93,31 +93,6 @@ pub trait Fuzzer {
 
     fn fuzz_one(&mut self) -> anyhow::Result<()>;
 
-    fn compile_test(&mut self, input: &Workload) -> anyhow::Result<Box<Path>> {
-        debug!("compiling test at '{}'", self.runner().test_dir.display());
-        let input_path = input
-            .compile(&self.runner().test_dir)
-            .with_context(|| format!("failed to compile test"))?;
-        Ok(input_path)
-    }
-
-    fn run_harness(&mut self, input_path: &Path) -> anyhow::Result<()> {
-        debug!("running harness at '{}'", input_path.display());
-
-        setup_dir(self.runner().fst_exec_dir.as_ref())
-            .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
-        setup_dir(self.runner().snd_exec_dir.as_ref())
-            .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
-
-        self.runner().fst_harness.run(&input_path).with_context(|| {
-            format!("failed to run first harness '{}'", self.runner().fst_fs_name)
-        })?;
-        self.runner().snd_harness.run(&input_path).with_context(|| {
-            format!("failed to run second harness '{}'", self.runner().snd_fs_name)
-        })?;
-        Ok(())
-    }
-
     fn do_objective(
         &mut self,
         input: &Workload,
@@ -195,12 +170,6 @@ pub trait Fuzzer {
         } else {
             Ok(false)
         }
-    }
-
-    fn teardown_all(&mut self) -> anyhow::Result<()> {
-        self.runner().fst_harness.teardown()?;
-        self.runner().snd_harness.teardown()?;
-        Ok(())
     }
 
     fn show_stats(&mut self);
@@ -303,6 +272,37 @@ impl Runner {
             stats: Stats::new(),
             hasher_options: Default::default(),
         }
+    }
+
+    pub fn compile_test(&mut self, input: &Workload) -> anyhow::Result<Box<Path>> {
+        debug!("compiling test at '{}'", self.test_dir.display());
+        let input_path = input
+            .compile(&self.test_dir)
+            .with_context(|| format!("failed to compile test"))?;
+        Ok(input_path)
+    }
+
+    pub fn run_harness(&mut self, input_path: &Path) -> anyhow::Result<()> {
+        debug!("running harness at '{}'", input_path.display());
+
+        setup_dir(self.fst_exec_dir.as_ref())
+            .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
+        setup_dir(self.snd_exec_dir.as_ref())
+            .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
+
+        self.fst_harness
+            .run(&input_path)
+            .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
+        self.snd_harness
+            .run(&input_path)
+            .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
+        Ok(())
+    }
+
+    pub fn teardown_all(&mut self) -> anyhow::Result<()> {
+        self.fst_harness.teardown()?;
+        self.snd_harness.teardown()?;
+        Ok(())
     }
 
     pub fn report_crash(
