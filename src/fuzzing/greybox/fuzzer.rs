@@ -54,16 +54,16 @@ impl GreyBoxFuzzer {
             None
         };
 
-        let fuzz_data = Runner::new(fst_mount, snd_mount, config);
+        let runner = Runner::new(fst_mount, snd_mount, config);
 
-        let fst_kcov_path = fuzz_data.fst_exec_dir.join(KCOV_FILENAME);
-        let snd_kcov_path = fuzz_data.snd_exec_dir.join(KCOV_FILENAME);
+        let fst_kcov_path = runner.fst_exec_dir.join(KCOV_FILENAME);
+        let snd_kcov_path = runner.snd_exec_dir.join(KCOV_FILENAME);
 
         let fst_kcov_feedback = KCovFeedback::new(fst_kcov_path.clone().into_boxed_path());
         let snd_kcov_feedback = KCovFeedback::new(snd_kcov_path.clone().into_boxed_path());
 
         Self {
-            runner: fuzz_data,
+            runner,
             corpus: vec![Workload::new()],
             next_seed: 0,
 
