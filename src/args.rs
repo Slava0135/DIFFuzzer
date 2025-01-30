@@ -38,6 +38,9 @@ pub enum Mode {
         /// Path to testcase in JSON format
         #[arg(short, long)]
         path_to_test: String,
+        /// Keep FS after test
+        #[arg(short, long, default_value_t = false)]
+        keep_fs: bool,
         /// Filesystem to test
         #[arg(short, long)]
         #[clap(value_parser = PossibleValuesParser::new(filesystems_available()))]

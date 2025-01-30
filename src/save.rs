@@ -9,8 +9,8 @@ use crate::abstract_fs::{
     trace::TRACE_FILENAME,
     workload::Workload,
 };
-use crate::hasher::hasher::{DIFF_HASH_FILENAME, FileDiff};
 use crate::hasher::hasher::FileDiff::{DifferentHash, OneExists};
+use crate::hasher::hasher::{FileDiff, DIFF_HASH_FILENAME};
 
 pub fn save_testcase(dir: &Path, input_path: &Path, input: &Workload) -> anyhow::Result<()> {
     let source_path = dir.join(TEST_SOURCE_FILENAME);
