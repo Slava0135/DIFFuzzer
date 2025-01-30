@@ -20,17 +20,16 @@ fn test_hash_eq() {
 
     let ext4_dirs = Ext4::new().get_internal_dirs();
     let hash_options = Default::default();
-    let hash_fst = calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options);
-    let hash_snd = calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options);
-    assert_eq!(hash_fst, hash_snd);
-
+    let (hash_fst, fst_content) = calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options);
+    let (hash_snd, snd_content) = calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options);
     let diff = get_diff(
-        cmp_dirs[0].as_path(),
-        cmp_dirs[1].as_path(),
+        &fst_content,
+        &snd_content,
         &ext4_dirs,
         &ext4_dirs,
         &hash_options,
     );
+    assert_eq!(hash_fst, hash_snd);
     assert_eq!(diff.len(), 0);
 }
 
@@ -50,13 +49,13 @@ fn test_hash_not_eq() {
 
     let ext4_dirs = Ext4::new().get_internal_dirs();
     let hash_options = Default::default();
-    let hash_fst = calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options);
-    let hash_snd = calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options);
+    let (hash_fst, fst_content) = calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options);
+    let (hash_snd, snd_content) = calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options);
     assert_ne!(hash_fst, hash_snd);
 
     let diff = get_diff(
-        cmp_dirs[0].as_path(),
-        cmp_dirs[1].as_path(),
+        &fst_content,
+        &snd_content,
         &ext4_dirs,
         &ext4_dirs,
         &hash_options,

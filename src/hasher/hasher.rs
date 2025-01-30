@@ -53,8 +53,13 @@ impl Display for FileInfo {
     }
 }
 
-pub fn calc_dir_hash(path: &Path, skip: &RegexSet, hasher_options: &HasherOptions) -> u64 {
+pub fn calc_dir_hash(
+    path: &Path,
+    skip: &RegexSet,
+    hasher_options: &HasherOptions,
+) -> (u64, Vec<FileInfo>) {
     let mut hasher = XxHash64::default();
+    let mut res: Vec<FileInfo> = Vec::new();
 
     for entry in WalkDir::new(path).sort_by(|a, b| a.file_name().cmp(b.file_name())) {
         let entry = entry.unwrap();
@@ -77,20 +82,27 @@ pub fn calc_dir_hash(path: &Path, skip: &RegexSet, hasher_options: &HasherOption
         if hasher_options.mode {
             hasher.write_u32(metadata.mode());
         }
+        res.push(FileInfo {
+            abs_path: entry.path().to_str().unwrap().to_owned(),
+            rel_path: rel_path.to_owned(),
+            gid: metadata.gid(),
+            uid: metadata.uid(),
+            size: metadata.size(),
+            nlink: metadata.nlink(),
+            mode: metadata.mode(),
+        })
     }
 
-    return hasher.finish();
+    return (hasher.finish(), res);
 }
 
 pub fn get_diff(
-    path_fst: &Path,
-    path_snd: &Path,
+    vec_fst: &Vec<FileInfo>,
+    vec_snd: &Vec<FileInfo>,
     fst_skip: &RegexSet,
     snd_skip: &RegexSet,
     hasher_options: &HasherOptions,
 ) -> Vec<FileDiff> {
-    let vec_fst = get_dir_content(path_fst);
-    let vec_snd = get_dir_content(path_snd);
     let mut i_fst = vec_fst.len() - 1;
     let mut i_snd = vec_snd.len() - 1;
     let mut res: Vec<FileDiff> = Vec::new();
@@ -115,9 +127,9 @@ pub fn get_diff(
         let cmp_res = vec_fst[i_fst].rel_path.cmp(&vec_snd[i_snd].rel_path);
         match cmp_res {
             Ordering::Equal => {
-                let hash_fst =
+                let (hash_fst, _) =
                     calc_dir_hash(vec_fst[i_fst].abs_path.as_ref(), fst_skip, &hasher_options);
-                let hash_snd =
+                let (hash_snd, _) =
                     calc_dir_hash(vec_snd[i_snd].abs_path.as_ref(), snd_skip, &hasher_options);
                 if hash_fst != hash_snd {
                     res.push(DifferentHash {
@@ -154,7 +166,7 @@ pub fn get_diff(
     res
 }
 
-fn handle_last_diff(mut i: usize, vec_data: Vec<FileInfo>, res: &mut Vec<FileDiff>) {
+fn handle_last_diff(mut i: usize, vec_data: &Vec<FileInfo>, res: &mut Vec<FileDiff>) {
     if i > 0 {
         loop {
             res.push(OneExists(vec_data[i].clone()));
@@ -164,31 +176,4 @@ fn handle_last_diff(mut i: usize, vec_data: Vec<FileInfo>, res: &mut Vec<FileDif
             i -= 1;
         }
     }
-}
-
-fn get_dir_content(path: &Path) -> Vec<FileInfo> {
-    let mut v = Vec::new();
-    for entry in WalkDir::new(path).sort_by(|a, b| a.file_name().cmp(b.file_name())) {
-        let entry = entry.unwrap();
-        let rel_path = entry
-            .path()
-            .strip_prefix(path)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_owned();
-
-        let metadata = entry.metadata().unwrap();
-
-        v.push(FileInfo {
-            abs_path: entry.path().to_str().unwrap().to_owned(),
-            rel_path,
-            gid: metadata.gid(),
-            uid: metadata.uid(),
-            size: metadata.size(),
-            nlink: metadata.nlink(),
-            mode: metadata.mode(),
-        });
-    }
-    return v;
 }
