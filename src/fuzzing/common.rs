@@ -381,7 +381,7 @@ pub fn parse_trace(path: &Path) -> anyhow::Result<Trace> {
     anyhow::Ok(Trace::try_parse(trace).with_context(|| format!("failed to parse trace"))?)
 }
 
-fn setup_dir(path: &Path) -> io::Result<()> {
+pub fn setup_dir(path: &Path) -> io::Result<()> {
     fs::remove_dir_all(path).unwrap_or(());
     fs::create_dir(path)
 }

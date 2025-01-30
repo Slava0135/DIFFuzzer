@@ -6,6 +6,7 @@ use args::Args;
 use clap::Parser;
 use config::Config;
 use fuzzing::common::Fuzzer;
+use fuzzing::reducer::Reducer;
 use log::info;
 
 mod abstract_fs;
@@ -66,5 +67,19 @@ fn main() {
             filesystem.try_into().unwrap(),
             config.fs_name,
         ),
+        args::Mode::Reduce {
+            save_to_dir,
+            path_to_test,
+            first_filesystem,
+            second_filesystem,
+        } => {
+            Reducer::new(
+                config,
+                first_filesystem.try_into().unwrap(),
+                second_filesystem.try_into().unwrap(),
+            )
+            .run(Path::new(&path_to_test), Path::new(&save_to_dir))
+            .unwrap();
+        }
     }
 }
