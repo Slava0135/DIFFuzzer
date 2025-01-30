@@ -120,7 +120,7 @@ pub trait Fuzzer {
                 diff = runner.hash_objective.get_diff();
             }
             runner
-                .report_crash(input.clone(), input_path, runner.crashes_path.clone(), diff)
+                .report_crash(&input, input_path, runner.crashes_path.clone(), diff)
                 .with_context(|| format!("failed to report crash"))?;
             self.runner().stats.crashes += 1;
             self.show_stats();
@@ -142,7 +142,7 @@ pub trait Fuzzer {
             warn!("both traces contain errors, potential bug in model");
             let accidents_path = self.runner().accidents_path.clone();
             self.runner()
-                .report_crash(input.clone(), &input_path, accidents_path, vec![])
+                .report_crash(&input, &input_path, accidents_path, vec![])
                 .with_context(|| format!("failed to report accident"))?;
             Ok(true)
         } else {
@@ -284,7 +284,7 @@ impl Runner {
 
     pub fn report_crash(
         &mut self,
-        input: Workload,
+        input: &Workload,
         input_path: &Path,
         crash_dir: Box<Path>,
         hash_diff: Vec<FileDiff>,

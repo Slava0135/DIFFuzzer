@@ -25,6 +25,7 @@ pub struct FileInfo {
     mode: u32,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FileDiff {
     DifferentHash { fst: FileInfo, snd: FileInfo },
     OneExists(FileInfo),
