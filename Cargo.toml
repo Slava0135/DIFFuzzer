@@ -2,5 +2,5 @@
 
 members = [
     "dif-fuzzer",
-    "bin-hasher"
+    "hasher"
 ]

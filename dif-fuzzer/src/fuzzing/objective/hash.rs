@@ -1,10 +1,11 @@
+use std::path::Path;
+
 use log::debug;
 use regex::RegexSet;
 
-use crate::{
-    hasher::hasher::{calc_dir_hash, get_diff, FileDiff, FileInfo, HasherOptions},
-    path::RemotePath,
-};
+use crate::path::RemotePath;
+
+use hasher::{calc_dir_hash, get_diff, FileDiff, FileInfo, HasherOptions};
 
 pub struct HashHolder {
     fs_dir: RemotePath,

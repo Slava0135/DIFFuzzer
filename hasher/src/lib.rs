@@ -7,9 +7,8 @@ use std::path::Path;
 use regex::RegexSet;
 use twox_hash::XxHash64;
 use walkdir::WalkDir;
+use FileDiff::{DifferentHash, OneExists};
 
-use crate::hasher::hasher::FileDiff::DifferentHash;
-use crate::hasher::hasher::FileDiff::OneExists;
 
 pub const DIFF_HASH_FILENAME: &str = "diff_hash.txt";
 
