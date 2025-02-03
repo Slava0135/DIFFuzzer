@@ -25,6 +25,23 @@ pub struct FileInfo {
     mode: u32,
 }
 
+impl FileInfo {
+    fn add_to_hasher(&self, hasher: &mut dyn Hasher, hasher_options: &HasherOptions) {
+        hasher.write(self.rel_path.as_bytes());
+        hasher.write_u32(self.gid);
+        hasher.write_u32(self.uid);
+        if hasher_options.size {
+            hasher.write_u64(self.size);
+        }
+        if hasher_options.nlink {
+            hasher.write_u64(self.nlink);
+        }
+        if hasher_options.mode {
+            hasher.write_u32(self.mode);
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FileDiff {
     DifferentHash { fst: FileInfo, snd: FileInfo },
@@ -70,19 +87,7 @@ pub fn calc_dir_hash(
         }
 
         let metadata = entry.metadata().unwrap();
-        hasher.write(rel_path.as_bytes());
-        hasher.write_u32(metadata.gid());
-        hasher.write_u32(metadata.uid());
-        if hasher_options.size {
-            hasher.write_u64(metadata.size());
-        }
-        if hasher_options.nlink {
-            hasher.write_u64(metadata.nlink());
-        }
-        if hasher_options.mode {
-            hasher.write_u32(metadata.mode());
-        }
-        res.push(FileInfo {
+        let file_info = FileInfo {
             abs_path: entry.path().to_str().unwrap().to_owned(),
             rel_path: rel_path.to_owned(),
             gid: metadata.gid(),
@@ -90,10 +95,26 @@ pub fn calc_dir_hash(
             size: metadata.size(),
             nlink: metadata.nlink(),
             mode: metadata.mode(),
-        })
+        };
+        file_info.add_to_hasher(&mut hasher, hasher_options);
+        res.push(file_info);
     }
 
     return (hasher.finish(), res);
+}
+
+pub fn calc_fileinfo_hash(
+    vec: &Vec<FileInfo>,
+    rel_path: &String,
+    hasher_options: &HasherOptions,
+) -> u64 {
+    let mut hasher = XxHash64::default();
+    for file_info in vec {
+        if file_info.rel_path.starts_with(rel_path.as_str()) {
+            file_info.add_to_hasher(&mut hasher, hasher_options);
+        }
+    }
+    return hasher.finish();
 }
 
 pub fn get_diff(
@@ -127,10 +148,10 @@ pub fn get_diff(
         let cmp_res = vec_fst[i_fst].rel_path.cmp(&vec_snd[i_snd].rel_path);
         match cmp_res {
             Ordering::Equal => {
-                let (hash_fst, _) =
-                    calc_dir_hash(vec_fst[i_fst].abs_path.as_ref(), fst_skip, &hasher_options);
-                let (hash_snd, _) =
-                    calc_dir_hash(vec_snd[i_snd].abs_path.as_ref(), snd_skip, &hasher_options);
+                let hash_fst =
+                    calc_fileinfo_hash(vec_fst, &vec_fst[i_fst].rel_path, hasher_options);
+                let hash_snd =
+                    calc_fileinfo_hash(vec_snd, &vec_snd[i_snd].rel_path, hasher_options);
                 if hash_fst != hash_snd {
                     res.push(DifferentHash {
                         fst: vec_fst[i_fst].clone(),

@@ -63,6 +63,35 @@ fn test_hash_not_eq() {
     assert_ne!(diff.len(), 0);
 }
 
+#[ignore]
+#[test]
+fn test_hash_eq_skip() {
+    let dirs = vec!["A/B", "A/C", "AA/D/E", "AAA/D/F/G", "Q"];
+    let files = vec!["test1.out", "test2.txt", "test3.txt"];
+    let data = vec!["", "dsfsdfsdfsdfpsd", "11213213\nddfdsf    \n     "];
+
+    let cmp_dirs = create_data_for_test(dirs, files, data);
+
+    let err_dir = cmp_dirs[0].as_path().join("lost+found");
+    fs::create_dir(err_dir.clone())
+        .with_context(|| format!("failed create folder '{}'", err_dir.display()))
+        .unwrap();
+
+    let ext4_dirs = Ext4::new().get_internal_dirs();
+    let hash_options = Default::default();
+    let (hash_fst, fst_content) = calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options);
+    let (hash_snd, snd_content) = calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options);
+    let diff = get_diff(
+        &fst_content,
+        &snd_content,
+        &ext4_dirs,
+        &ext4_dirs,
+        &hash_options,
+    );
+    assert_eq!(hash_fst, hash_snd);
+    assert_eq!(diff.len(), 0);
+}
+
 fn create_data_for_test(dirs: Vec<&str>, files: Vec<&str>, data: Vec<&str>) -> Vec<PathBuf> {
     let temp_dir = env::temp_dir().join("DIFFuzzer-hash-test");
     fs::remove_dir_all(temp_dir.as_path()).unwrap_or(());
