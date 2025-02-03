@@ -5,9 +5,9 @@ use log::{debug, error, info, warn};
 
 use crate::{
     abstract_fs::{trace::Trace, workload::Workload},
-    hasher::hasher::FileDiff,
     path::RemotePath,
 };
+use hasher::FileDiff;
 
 use super::{outcome::Outcome, runner::Runner};
 
