@@ -3,7 +3,7 @@ use std::path::Path;
 use log::debug;
 use regex::RegexSet;
 
-use crate::hasher::hasher::{calc_dir_hash, get_diff, FileDiff, FileInfo, HasherOptions};
+use hasher::{calc_dir_hash, get_diff, FileDiff, FileInfo, HasherOptions};
 
 pub struct HashHolder {
     fs_dir: Box<Path>,
