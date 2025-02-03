@@ -5,6 +5,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 use regex::RegexSet;
+use serde::{Deserialize, Serialize};
 use twox_hash::XxHash64;
 use walkdir::WalkDir;
 use FileDiff::{DifferentHash, OneExists};
@@ -12,7 +13,7 @@ use FileDiff::{DifferentHash, OneExists};
 
 pub const DIFF_HASH_FILENAME: &str = "diff_hash.txt";
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileInfo {
     abs_path: String,
     rel_path: String,
@@ -48,9 +49,9 @@ pub enum FileDiff {
 }
 
 pub struct HasherOptions {
-    size: bool,
-    nlink: bool,
-    mode: bool,
+    pub size: bool,
+    pub nlink: bool,
+    pub mode: bool
 }
 
 impl Default for HasherOptions {
@@ -58,7 +59,7 @@ impl Default for HasherOptions {
         Self {
             size: false,
             nlink: false,
-            mode: false,
+            mode: false
         }
     }
 }
