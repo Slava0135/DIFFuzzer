@@ -2,7 +2,6 @@ use crate::abstract_fs::trace::{Trace, TRACE_FILENAME};
 
 use crate::abstract_fs::workload::Workload;
 use crate::config::Config;
-use crate::fuzzing::objective::console::ConsoleObjective;
 use crate::fuzzing::objective::trace::TraceObjective;
 use crate::harness::{ConsolePipe, Harness};
 use crate::hasher::hasher::FileDiff;
@@ -38,7 +37,6 @@ pub struct Runner {
     pub accidents_path: Box<Path>,
 
     pub trace_objective: TraceObjective,
-    pub console_objective: ConsoleObjective,
     pub hash_objective: HashObjective,
 
     pub fst_fs_name: String,
@@ -102,18 +100,14 @@ pub trait Fuzzer {
             .hash_objective
             .is_interesting()
             .with_context(|| format!("failed to do hash objective"))?;
-        let console_is_interesting = runner
-            .console_objective
-            .is_interesting()
-            .with_context(|| format!("failed to do console objective"))?;
         let trace_is_interesting = runner
             .trace_objective
             .is_interesting(fst_trace, snd_trace)
             .with_context(|| format!("failed to do trace objective"))?;
-        if console_is_interesting || trace_is_interesting || hash_diff_interesting {
+        if trace_is_interesting || hash_diff_interesting {
             debug!(
-                "Error detected by: console?: {}, trace?: {}, hash?: {}",
-                console_is_interesting, trace_is_interesting, hash_diff_interesting
+                "Error detected by: trace?: {}, hash?: {}",
+                trace_is_interesting, hash_diff_interesting
             );
             let mut diff: Vec<FileDiff> = vec![];
             if hash_diff_interesting {
@@ -204,7 +198,6 @@ impl Runner {
             config.hashing_enabled,
         );
         let trace_objective = TraceObjective::new();
-        let console_objective = ConsoleObjective::new(fst_stdout.clone(), snd_stdout.clone());
 
         let fst_harness = Harness::new(
             fst_mount,
@@ -240,7 +233,6 @@ impl Runner {
 
             hash_objective,
             trace_objective,
-            console_objective,
 
             fst_fs_name,
             snd_fs_name,

@@ -7,7 +7,6 @@ pub mod generator;
 pub mod mutator;
 pub mod node;
 pub mod operation;
-pub mod output;
 pub mod pathname;
 pub mod trace;
 pub mod workload;
