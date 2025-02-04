@@ -10,7 +10,6 @@ use twox_hash::XxHash64;
 use walkdir::WalkDir;
 use FileDiff::{DifferentHash, OneExists};
 
-
 pub const DIFF_HASH_FILENAME: &str = "diff_hash.txt";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -51,7 +50,7 @@ pub enum FileDiff {
 pub struct HasherOptions {
     pub size: bool,
     pub nlink: bool,
-    pub mode: bool
+    pub mode: bool,
 }
 
 impl Default for HasherOptions {
@@ -59,7 +58,7 @@ impl Default for HasherOptions {
         Self {
             size: false,
             nlink: false,
-            mode: false
+            mode: false,
         }
     }
 }

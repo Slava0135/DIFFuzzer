@@ -1,16 +1,31 @@
-mod lib;
-mod args;
+use std::fs;
+use std::path::Path;
 
+use anyhow::Context;
+use clap::Parser;
 use regex::RegexSet;
+use serde_json::to_string;
+
 use args::Args;
 use hasher::{calc_dir_hash, HasherOptions};
+
+mod args;
+mod lib;
 
 fn main() {
     let args = Args::parse();
 
-    let hasher_options = HasherOptions { size: args.size, nlink: args.nlink, mode: args.mode };
+    let hasher_options = HasherOptions {
+        size: args.size,
+        nlink: args.nlink,
+        mode: args.mode,
+    };
 
     let r_set = RegexSet::new::<_, &str>([]).unwrap();
-    let hash = calc_dir_hash(args.fs_path, &r_set, &hasher_options);
-    println!("{}", hash)
+    let (hash, files) = calc_dir_hash(Path::new(&args.fs_path), &r_set, &hasher_options);
+    println!("{}", hash);
+    let serialized_file = to_string(&files).unwrap();
+    fs::write(Path::new(&args.target_path), serialized_file)
+        .with_context(|| format!("failed write diff to file"))
+        .unwrap();
 }
