@@ -5,7 +5,7 @@ max_workload_length = 100
 timeout = 10 # in seconds
 
 [qemu_config]
-ssh_private_key_path = "./ssh_key"
+ssh_private_key_path = "./ssh.key"
 
 [qemu_config.launch_options]
 cmd = "qemu-system-x86_64"
