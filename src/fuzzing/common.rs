@@ -260,10 +260,10 @@ impl Runner {
             .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
 
         self.fst_harness
-            .run(&input_path, false)
+            .run(&input_path, false, Some(&mut self.hash_objective.fst_fs))
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
         self.snd_harness
-            .run(&input_path, false)
+            .run(&input_path, false, Some(&mut self.hash_objective.snd_fs))
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
         Ok(())
     }
@@ -302,7 +302,7 @@ impl Runner {
             self.fst_stdout.borrow().clone(),
             self.fst_stderr.borrow().clone(),
         )
-        .with_context(|| format!("failed to save output for first harness"))?;
+            .with_context(|| format!("failed to save output for first harness"))?;
         save_output(
             &crash_dir,
             &self.snd_trace_path,
@@ -310,7 +310,7 @@ impl Runner {
             self.snd_stdout.borrow().clone(),
             self.snd_stderr.borrow().clone(),
         )
-        .with_context(|| format!("failed to save output for first harness"))?;
+            .with_context(|| format!("failed to save output for first harness"))?;
 
         save_diff(&crash_dir, hash_diff)
             .with_context(|| format!("failed to save hash differences"))?;

@@ -2,6 +2,7 @@ use std::{cell::RefCell, path::Path, process::Command, rc::Rc};
 
 use anyhow::Context;
 
+use crate::fuzzing::objective::hash::HashHolder;
 use crate::mount::mount::FileSystemMount;
 
 pub type ConsolePipe = Rc<RefCell<String>>;
@@ -30,7 +31,12 @@ impl Harness {
             stderr,
         }
     }
-    pub fn run(&self, input_path: &Path, keep_fs: bool) -> anyhow::Result<bool> {
+    pub fn run(
+        &self,
+        input_path: &Path,
+        keep_fs: bool,
+        hash_holder: Option<&mut HashHolder>,
+    ) -> anyhow::Result<bool> {
         let test_exec_copy = self.exec_dir.join("test.out");
         std::fs::copy(input_path, &test_exec_copy).with_context(|| {
             format!(
@@ -54,6 +60,11 @@ impl Harness {
         let output = exec
             .output()
             .with_context(|| format!("failed to run executable '{:?}'", exec))?;
+
+        match hash_holder {
+            Some(holder) => { holder.calc_and_save_hash() }
+            _ => {}
+        }
 
         if !keep_fs {
             self.teardown()?;

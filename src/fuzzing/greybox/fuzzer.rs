@@ -6,7 +6,7 @@ use anyhow::{Context, Ok};
 use log::{debug, info};
 use rand::{rngs::StdRng, SeedableRng};
 
-use crate::fuzzing::common::{parse_trace, Runner, Fuzzer};
+use crate::fuzzing::common::{parse_trace, Fuzzer, Runner};
 use crate::fuzzing::greybox::feedback::kcov::KCOV_FILENAME;
 use crate::save::{save_output, save_testcase};
 use crate::{abstract_fs::workload::Workload, config::Config, mount::mount::FileSystemMount};
