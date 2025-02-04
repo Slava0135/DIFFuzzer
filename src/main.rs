@@ -17,6 +17,7 @@ mod fuzzing;
 mod harness;
 mod hasher;
 mod mount;
+mod qemu;
 mod save;
 mod single;
 mod temp_dir;
@@ -81,5 +82,6 @@ fn main() {
             .run(Path::new(&path_to_test), Path::new(&output_dir))
             .unwrap();
         }
+        args::Mode::VM {} => qemu::run(config.qemu_config),
     }
 }

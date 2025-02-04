@@ -81,4 +81,6 @@ pub enum Mode {
         #[clap(value_parser = PossibleValuesParser::new(filesystems_available()))]
         second_filesystem: String,
     },
+    /// Run virtual machine
+    VM {},
 }
