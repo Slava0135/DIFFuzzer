@@ -4,6 +4,24 @@ heartbeat_interval = 30 # in seconds
 max_workload_length = 100 
 timeout = 10 # in seconds
 
+[qemu_config]
+ssh_private_key_path = "./ssh_key"
+
+[qemu_config.launch_options]
+cmd = "qemu-system-x86_64"
+cpu = "host"
+drive = {if = "virtio", format = "qcow2", file = "./disk.img"}
+extra = [
+  "-nographic",
+  "-enable-kvm",
+  "-snapshot",
+]
+machine = {accel = "kvm", type = "q35"}
+memory = "2G"
+monitor_port = "55555"
+netdev_ssh_forward_port = "2222"
+smp = {cores = "2"}
+
 [greybox]
 max_mutations = 10
 save_corpus = false
