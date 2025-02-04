@@ -64,7 +64,7 @@ pub enum Mode {
     Reduce {
         /// Place where results will be saved
         #[arg(short, long)]
-        save_to_dir: String,
+        output_dir: String,
         /// Path to testcase in JSON format
         #[arg(short, long)]
         path_to_test: String,
