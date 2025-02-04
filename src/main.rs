@@ -3,7 +3,7 @@ use std::{fs, path::Path};
 use args::Args;
 use clap::Parser;
 use config::Config;
-use fuzzing::native::{blackbox::fuzzer::BlackBoxFuzzer, common::Fuzzer, greybox::fuzzer::GreyBoxFuzzer, reducer::Reducer};
+use fuzzing::native::{blackbox::fuzzer::BlackBoxFuzzer, common::Fuzzer, greybox::fuzzer::GreyBoxFuzzer, reducer::Reducer, single};
 use log::info;
 
 mod abstract_fs;
@@ -11,12 +11,10 @@ mod args;
 mod config;
 mod filesystems;
 mod fuzzing;
-mod harness;
 mod hasher;
 mod mount;
 mod qemu;
 mod save;
-mod single;
 mod temp_dir;
 
 fn main() {

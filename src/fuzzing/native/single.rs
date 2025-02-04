@@ -9,11 +9,7 @@ use anyhow::Context;
 use log::info;
 
 use crate::{
-    abstract_fs::{trace::TRACE_FILENAME, workload::Workload},
-    harness::Harness,
-    mount::mount::FileSystemMount,
-    save::{save_output, save_testcase},
-    temp_dir::setup_temp_dir,
+    abstract_fs::{trace::TRACE_FILENAME, workload::Workload}, fuzzing::native::harness::Harness, mount::mount::FileSystemMount, save::{save_output, save_testcase}, temp_dir::setup_temp_dir
 };
 
 pub fn run(

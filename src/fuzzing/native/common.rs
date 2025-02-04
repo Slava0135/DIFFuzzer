@@ -3,7 +3,6 @@ use crate::abstract_fs::trace::{Trace, TRACE_FILENAME};
 use crate::abstract_fs::workload::Workload;
 use crate::config::Config;
 use crate::fuzzing::native::objective::trace::TraceObjective;
-use crate::harness::{ConsolePipe, Harness};
 use crate::hasher::hasher::FileDiff;
 use crate::mount::mount::FileSystemMount;
 use crate::save::{save_diff, save_output, save_testcase};
@@ -17,6 +16,7 @@ use std::rc::Rc;
 use std::time::Instant;
 use std::{fs, io};
 
+use super::harness::{ConsolePipe, Harness};
 use super::objective::hash::HashObjective;
 
 pub struct Runner {
