@@ -1,6 +1,7 @@
 pub mod blackbox;
 pub mod fuzzer;
 pub mod greybox;
+mod hasher_tests;
 pub mod objective;
 pub mod harness;
 pub mod reducer;

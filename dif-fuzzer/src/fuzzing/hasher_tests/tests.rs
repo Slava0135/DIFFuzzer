@@ -10,6 +10,7 @@ use crate::mount::ext4::Ext4;
 use crate::mount::mount::FileSystemMount;
 use crate::path::LocalPath;
 
+use hasher::{calc_dir_hash, get_diff};
 
 #[ignore]
 #[test]
