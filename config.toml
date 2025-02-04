@@ -20,7 +20,6 @@ machine = {accel = "kvm", type = "q35"}
 memory = "2G"
 monitor = {tcp_port = "55555", extra = ["server", "nowait"]}
 netdev = {driver = "virtio-net-pci", id = "net0", ssh_host_forward_port = "2222"}
-netdev_ssh_forward_port = "2222"
 smp = {cores = "2"}
 
 [greybox]
