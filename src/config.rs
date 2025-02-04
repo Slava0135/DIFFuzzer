@@ -44,12 +44,30 @@ pub struct QemuLaunchOptions {
     pub smp: HashMap<String, String>,
     /// Memory available for instance: `-m ...`
     pub memory: String,
-    /// QMP monitor host TCP port: `-monitor ...tcp::######`
-    pub monitor_port: String,
-    /// Host TCP port used for SSH connection: `-netdev ...hostfwd=tcp::#####-:22`
-    pub netdev_ssh_forward_port: String,
+    /// QMP monitor: `-monitor ...`
+    pub monitor: MonitorOptions,
+    /// Network device for SSH: `-device ...` + `-netdev user,...`
+    pub netdev: NetDeviceOptions,
     /// Drive with OS image
     pub drive: HashMap<String, String>,
     /// Extra options
     pub extra: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MonitorOptions {
+    /// Host TCP port for monitor connection
+    pub tcp_port: String,
+    /// Extra options
+    pub extra: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct NetDeviceOptions {
+    /// Device driver
+    pub driver: String,
+    /// Unique device identifier
+    pub id: String,
+    /// Host TCP port for SSH connection to VM
+    pub ssh_host_forward_port: String,
 }
