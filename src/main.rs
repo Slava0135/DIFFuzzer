@@ -37,6 +37,9 @@ fn main() {
             second_filesystem,
             test_count,
         } => {
+            if args.qemu {
+                todo!("QEMU not supported")
+            }
             GreyBoxFuzzer::new(
                 config,
                 first_filesystem.try_into().unwrap(),
@@ -49,6 +52,9 @@ fn main() {
             second_filesystem,
             test_count,
         } => {
+            if args.qemu {
+                todo!("QEMU not supported")
+            }
             BlackBoxFuzzer::new(
                 config,
                 first_filesystem.try_into().unwrap(),
@@ -61,19 +67,27 @@ fn main() {
             path_to_test,
             keep_fs,
             filesystem,
-        } => single::run(
-            Path::new(&path_to_test),
-            Path::new(&save_to_dir),
-            keep_fs,
-            filesystem.try_into().unwrap(),
-            config.fs_name,
-        ),
+        } => {
+            if args.qemu {
+                todo!("QEMU not supported")
+            }
+            single::run(
+                Path::new(&path_to_test),
+                Path::new(&save_to_dir),
+                keep_fs,
+                filesystem.try_into().unwrap(),
+                config.fs_name,
+            )
+        }
         args::Mode::Reduce {
             output_dir,
             path_to_test,
             first_filesystem,
             second_filesystem,
         } => {
+            if args.qemu {
+                todo!("QEMU not supported")
+            }
             Reducer::new(
                 config,
                 first_filesystem.try_into().unwrap(),
