@@ -1,12 +1,9 @@
 use std::{fs, path::Path};
 
-use crate::fuzzing::blackbox::fuzzer::BlackBoxFuzzer;
-use crate::fuzzing::greybox::fuzzer::GreyBoxFuzzer;
 use args::Args;
 use clap::Parser;
 use config::Config;
-use fuzzing::common::Fuzzer;
-use fuzzing::reducer::Reducer;
+use fuzzing::native::{blackbox::fuzzer::BlackBoxFuzzer, common::Fuzzer, greybox::fuzzer::GreyBoxFuzzer, reducer::Reducer};
 use log::info;
 
 mod abstract_fs;

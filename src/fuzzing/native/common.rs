@@ -2,7 +2,7 @@ use crate::abstract_fs::trace::{Trace, TRACE_FILENAME};
 
 use crate::abstract_fs::workload::Workload;
 use crate::config::Config;
-use crate::fuzzing::objective::trace::TraceObjective;
+use crate::fuzzing::native::objective::trace::TraceObjective;
 use crate::harness::{ConsolePipe, Harness};
 use crate::hasher::hasher::FileDiff;
 use crate::mount::mount::FileSystemMount;

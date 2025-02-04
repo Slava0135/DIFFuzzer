@@ -6,11 +6,11 @@ use anyhow::{Context, Ok};
 use log::{debug, info};
 use rand::{rngs::StdRng, SeedableRng};
 
-use crate::fuzzing::common::{parse_trace, Fuzzer, Runner};
-use crate::fuzzing::greybox::feedback::kcov::KCOV_FILENAME;
+use crate::fuzzing::native::common::{parse_trace, Fuzzer, Runner};
 use crate::save::{save_output, save_testcase};
 use crate::{abstract_fs::workload::Workload, config::Config, mount::mount::FileSystemMount};
 
+use super::feedback::kcov::KCOV_FILENAME;
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 
 pub struct GreyBoxFuzzer {
