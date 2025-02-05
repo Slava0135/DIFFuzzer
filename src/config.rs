@@ -14,7 +14,7 @@ pub struct Config {
     pub hashing_enabled: bool,
     pub heartbeat_interval: u16,
     pub timeout: u8,
-    pub qemu_config: QemuConfig,
+    pub qemu: QemuConfig,
 }
 
 #[derive(Serialize, Deserialize)]

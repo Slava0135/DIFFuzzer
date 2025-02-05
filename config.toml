@@ -4,7 +4,7 @@ heartbeat_interval = 30 # in seconds
 max_workload_length = 100 
 timeout = 10 # in seconds
 
-[qemu_config]
+[qemu]
 launch_script = "./tools/launch-snapshot.sh"
 monitor_port = 55555
 os_image = "./disk.img"
