@@ -66,7 +66,7 @@ pub fn run(
 
     info!("running harness");
     harness
-        .run(&input_path, keep_fs)
+        .run(&input_path, keep_fs, None)
         .with_context(|| format!("failed to run harness"))
         .unwrap();
 
