@@ -1,0 +1,9 @@
+#cloud-config
+disable_root: false
+users:
+  - name: root
+    groups: sudo
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    ssh_authorized_keys:
+      - <PUBLIC KEY HERE>

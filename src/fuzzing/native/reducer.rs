@@ -4,11 +4,7 @@ use anyhow::{Context, Ok};
 use log::{info, warn};
 
 use crate::{
-    abstract_fs::{mutator::remove, workload::Workload},
-    config::Config,
-    fuzzing::common::parse_trace,
-    hasher::hasher::FileDiff,
-    mount::mount::FileSystemMount,
+    abstract_fs::{mutator::remove, workload::Workload}, config::Config, fuzzing::native::common::parse_trace, hasher::hasher::FileDiff, mount::mount::FileSystemMount
 };
 
 use super::common::Runner;
