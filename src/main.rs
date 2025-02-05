@@ -13,7 +13,6 @@ mod filesystems;
 mod fuzzing;
 mod hasher;
 mod mount;
-mod qemu;
 mod save;
 mod temp_dir;
 mod command;
@@ -92,6 +91,5 @@ fn main() {
             .run(Path::new(&path_to_test), Path::new(&output_dir))
             .unwrap();
         }
-        args::Mode::VM {} => qemu::run(config.qemu_config),
     }
 }

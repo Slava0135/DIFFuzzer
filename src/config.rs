@@ -25,10 +25,16 @@ pub struct GreyboxConfig {
 
 #[derive(Serialize, Deserialize)]
 pub struct QemuConfig {
-    /// Options used to launch QEMU
-    pub launch_options: QemuLaunchOptions,
+    /// Path to VM launch script
+    pub launch_script: String,
     /// Private key used to connect to VM instance using SSH
     pub ssh_private_key_path: String,
+    /// Port for monitor connection
+    pub monitor_port: u16,
+    /// Port for SSH connection
+    pub ssh_port: u16,
+    /// Path to OS image
+    pub os_image: String,
 }
 
 /// [QEMU documentation](https://www.qemu.org/docs/master/system/invocation.html)
