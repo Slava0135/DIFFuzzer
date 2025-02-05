@@ -23,6 +23,7 @@ pub struct GreyboxConfig {
     pub save_corpus: bool,
 }
 
+/// [QEMU documentation](https://www.qemu.org/docs/master/system/invocation.html)
 #[derive(Serialize, Deserialize)]
 pub struct QemuConfig {
     /// Path to VM launch script
@@ -35,45 +36,4 @@ pub struct QemuConfig {
     pub ssh_port: u16,
     /// Path to OS image
     pub os_image: String,
-}
-
-/// [QEMU documentation](https://www.qemu.org/docs/master/system/invocation.html)
-#[derive(Serialize, Deserialize)]
-pub struct QemuLaunchOptions {
-    /// QEMU command to run
-    pub cmd: String,
-    /// Select the emulated machine by name: `-machine ...`
-    pub machine: HashMap<String, String>,
-    /// CPU model: `-cpu ...`
-    pub cpu: String,
-    /// CPU topology hierarchy: `-smp ...`
-    pub smp: HashMap<String, String>,
-    /// Memory available for instance: `-m ...`
-    pub memory: String,
-    /// QMP monitor: `-monitor ...`
-    pub monitor: MonitorOptions,
-    /// Network device for SSH: `-device ...` + `-netdev user,...`
-    pub netdev: NetDeviceOptions,
-    /// Drive with OS image
-    pub drive: HashMap<String, String>,
-    /// Extra options
-    pub extra: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct MonitorOptions {
-    /// Host TCP port for monitor connection
-    pub tcp_port: String,
-    /// Extra options
-    pub extra: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct NetDeviceOptions {
-    /// Device driver
-    pub driver: String,
-    /// Unique device identifier
-    pub id: String,
-    /// Host TCP port for SSH connection to VM
-    pub ssh_host_forward_port: String,
 }
