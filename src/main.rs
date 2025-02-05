@@ -68,7 +68,7 @@ fn main() {
             config.fs_name,
         ),
         args::Mode::Reduce {
-            save_to_dir,
+            output_dir,
             path_to_test,
             first_filesystem,
             second_filesystem,
@@ -78,7 +78,7 @@ fn main() {
                 first_filesystem.try_into().unwrap(),
                 second_filesystem.try_into().unwrap(),
             )
-            .run(Path::new(&path_to_test), Path::new(&save_to_dir))
+            .run(Path::new(&path_to_test), Path::new(&output_dir))
             .unwrap();
         }
     }

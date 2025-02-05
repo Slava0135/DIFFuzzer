@@ -58,9 +58,7 @@ impl Reducer {
             .is_interesting(&fst_trace, &snd_trace)
             .with_context(|| format!("failed to do trace objective"))?;
 
-        if trace_is_interesting {
-            todo!()
-        } else if hash_diff_interesting {
+        if hash_diff_interesting {
             let old_diff = self.runner.hash_objective.get_diff();
             self.reduce_by_hash(input, old_diff, save_to_dir)?;
         } else {
