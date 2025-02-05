@@ -140,6 +140,7 @@ impl CommandInterface for RemoteCommandInterface {
         ssh.arg("root@localhost");
         ssh.arg("-t").arg(format!("{:?}", cmd.internal));
         ssh.exec_local()
+            .with_context(|| format!("failed to execute remote command: {:?}", cmd.internal))
     }
 }
 
