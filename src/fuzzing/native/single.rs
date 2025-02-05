@@ -9,7 +9,12 @@ use anyhow::Context;
 use log::info;
 
 use crate::{
-    abstract_fs::{trace::TRACE_FILENAME, workload::Workload}, fuzzing::native::harness::Harness, mount::mount::FileSystemMount, save::{save_output, save_testcase}, temp_dir::setup_temp_dir
+    abstract_fs::{trace::TRACE_FILENAME, workload::Workload},
+    command::LocalCommandInterface,
+    fuzzing::native::harness::Harness,
+    mount::mount::FileSystemMount,
+    save::{save_output, save_testcase},
+    temp_dir::setup_temp_dir,
 };
 
 pub fn run(
@@ -60,9 +65,11 @@ pub fn run(
         stderr.clone(),
     );
 
+    let cmdi = LocalCommandInterface::new();
+
     info!("running harness");
     harness
-        .run(&input_path, keep_fs, None)
+        .run(&cmdi, &input_path, keep_fs, None)
         .with_context(|| format!("failed to run harness"))
         .unwrap();
 

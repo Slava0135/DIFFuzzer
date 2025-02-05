@@ -1,6 +1,7 @@
 use crate::abstract_fs::trace::{Trace, TRACE_FILENAME};
 
 use crate::abstract_fs::workload::Workload;
+use crate::command::{CommandInterface, LocalCommandInterface};
 use crate::config::Config;
 use crate::fuzzing::native::objective::trace::TraceObjective;
 use crate::hasher::hasher::FileDiff;
@@ -21,6 +22,8 @@ use super::objective::hash::HashObjective;
 
 pub struct Runner {
     pub config: Config,
+
+    pub cmdi: Box<dyn CommandInterface>,
 
     pub fst_exec_dir: Box<Path>,
     pub snd_exec_dir: Box<Path>,
@@ -217,6 +220,8 @@ impl Runner {
         Self {
             config,
 
+            cmdi: Box::new(LocalCommandInterface::new()),
+
             fst_exec_dir: fst_exec_dir.into_boxed_path(),
             snd_exec_dir: snd_exec_dir.into_boxed_path(),
             fst_trace_path: fst_trace_path.into_boxed_path(),
@@ -260,10 +265,20 @@ impl Runner {
             .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
 
         self.fst_harness
-            .run(&input_path, false, Some(&mut self.hash_objective.fst_fs))
+            .run(
+                self.cmdi.as_ref(),
+                &input_path,
+                false,
+                Some(&mut self.hash_objective.fst_fs),
+            )
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
         self.snd_harness
-            .run(&input_path, false, Some(&mut self.hash_objective.snd_fs))
+            .run(
+                self.cmdi.as_ref(),
+                &input_path,
+                false,
+                Some(&mut self.hash_objective.snd_fs),
+            )
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
         Ok(())
     }
@@ -302,7 +317,7 @@ impl Runner {
             self.fst_stdout.borrow().clone(),
             self.fst_stderr.borrow().clone(),
         )
-            .with_context(|| format!("failed to save output for first harness"))?;
+        .with_context(|| format!("failed to save output for first harness"))?;
         save_output(
             &crash_dir,
             &self.snd_trace_path,
@@ -310,7 +325,7 @@ impl Runner {
             self.snd_stdout.borrow().clone(),
             self.snd_stderr.borrow().clone(),
         )
-            .with_context(|| format!("failed to save output for first harness"))?;
+        .with_context(|| format!("failed to save output for first harness"))?;
 
         save_diff(&crash_dir, hash_diff)
             .with_context(|| format!("failed to save hash differences"))?;

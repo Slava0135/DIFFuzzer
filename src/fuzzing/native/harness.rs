@@ -2,7 +2,8 @@ use std::{cell::RefCell, path::Path, process::Command, rc::Rc};
 
 use anyhow::Context;
 
-use crate::fuzzing::objective::hash::HashHolder;
+use crate::command::CommandInterface;
+use crate::fuzzing::native::objective::hash::HashHolder;
 use crate::mount::mount::FileSystemMount;
 
 pub type ConsolePipe = Rc<RefCell<String>>;
@@ -33,6 +34,7 @@ impl Harness {
     }
     pub fn run(
         &self,
+        cmdi: &dyn CommandInterface,
         input_path: &Path,
         keep_fs: bool,
         hash_holder: Option<&mut HashHolder>,
@@ -46,7 +48,7 @@ impl Harness {
             )
         })?;
 
-        self.fs_mount.setup(&self.fs_dir).with_context(|| {
+        self.fs_mount.setup(cmdi, &self.fs_dir).with_context(|| {
             format!(
                 "failed to setup fs '{}' at '{}'",
                 self.fs_mount,
@@ -62,12 +64,12 @@ impl Harness {
             .with_context(|| format!("failed to run executable '{:?}'", exec))?;
 
         match hash_holder {
-            Some(holder) => { holder.calc_and_save_hash() }
+            Some(holder) => holder.calc_and_save_hash(),
             _ => {}
         }
 
         if !keep_fs {
-            self.teardown()?;
+            self.teardown(cmdi)?;
         }
 
         self.stdout.replace(
@@ -82,14 +84,16 @@ impl Harness {
         Ok(output.status.success())
     }
 
-    pub fn teardown(&self) -> anyhow::Result<()> {
-        self.fs_mount.teardown(&self.fs_dir).with_context(|| {
-            format!(
-                "failed to teardown fs '{}' at '{}'",
-                self.fs_mount,
-                self.fs_dir.display()
-            )
-        })?;
+    pub fn teardown(&self, cmdi: &dyn CommandInterface) -> anyhow::Result<()> {
+        self.fs_mount
+            .teardown(cmdi, &self.fs_dir)
+            .with_context(|| {
+                format!(
+                    "failed to teardown fs '{}' at '{}'",
+                    self.fs_mount,
+                    self.fs_dir.display()
+                )
+            })?;
         Ok(())
     }
 }
