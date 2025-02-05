@@ -1,100 +1,66 @@
-use std::{fmt::Display, fs, path::Path, process::Command};
+use std::{fmt::Display, path::Path};
 
-use anyhow::{bail, Context};
+use anyhow::Context;
 use log::debug;
 use regex::RegexSet;
+
+use crate::command::{CommandInterface, CommandWrapper};
 
 const RAM_DISK_SIZE: usize = 1_000_000;
 const DEVICE: &str = "/dev/ram0";
 
 pub trait FileSystemMount: Display {
-    fn setup(&self, path: &Path) -> anyhow::Result<()> {
+    fn setup(&self, cmdi: &dyn CommandInterface, path: &Path) -> anyhow::Result<()> {
         debug!("setting up '{}' filesystem at '{}'", self, path.display());
 
-        fs::create_dir_all(path)
-            .with_context(|| format!("failed to create mountpoint at '{}'", path.display()))?;
+        cmdi.create_dir_all(path)
+            .with_context(|| "failed to create mountpoint")?;
 
-        let mut modprobe = Command::new("modprobe");
+        let mut modprobe = CommandWrapper::new("modprobe");
         modprobe
             .arg("brd")
             .arg("rd_nr=1")
             .arg(format!("rd_size={RAM_DISK_SIZE}"));
-        let output = modprobe
-            .output()
-            .with_context(|| format!("failed to load block ram device module: {:?}", modprobe))?;
-        if !output.status.success() {
-            bail!(
-                "failed to load block ram device module: {:?}\n{}",
-                modprobe,
-                String::from_utf8(output.stderr)
-                    .with_context(|| format!("failed to read stderr (brd)"))?,
-            );
-        }
+        cmdi.exec(modprobe)
+            .with_context(|| "failed to load module 'brd'")?;
 
-        let mut mkfs = Command::new(self.mkfs_cmd());
+        let mut mkfs = CommandWrapper::new(self.mkfs_cmd());
         if let Some(opts) = self.mkfs_opts() {
             mkfs.arg("-O");
             mkfs.arg(opts);
         }
         mkfs.arg(DEVICE);
-        let output = mkfs.output()?;
-        if !output.status.success() {
-            bail!(
-                "failed to create fs: {:?}\n{}",
-                mkfs,
-                String::from_utf8(output.stderr)
-                    .with_context(|| format!("failed to read stderr (mkfs)"))?,
-            );
-        }
+        cmdi.exec(mkfs)
+            .with_context(|| "failed to make filesystem")?;
 
-        let mut mount = Command::new("mount");
+        let mut mount = CommandWrapper::new("mount");
         mount.arg("-t").arg(self.mount_t());
         if let Some(opts) = self.mount_opts() {
             mount.arg("-o");
             mount.arg(opts);
         }
         mount.arg(DEVICE).arg(path);
-        let output = mount.output()?;
-        if !output.status.success() {
-            bail!(
-                "failed to mount fs: {:?}\n{}",
-                mount,
-                String::from_utf8(output.stderr)
-                    .with_context(|| format!("failed to read stderr (mount)"))?,
-            );
-        }
+        cmdi.exec(mount)
+            .with_context(|| format!("failed to mount filesystem at '{}'", path.display()))?;
+
         Ok(())
     }
 
-    fn teardown(&self, path: &Path) -> anyhow::Result<()> {
+    fn teardown(&self, cmdi: &dyn CommandInterface, path: &Path) -> anyhow::Result<()> {
         debug!("tearing down '{}' filesystem at '{}'", self, path.display());
 
-        let mut umount = Command::new("umount");
+        let mut umount = CommandWrapper::new("umount");
         umount.arg("-fl").arg(path);
-        let output = umount.output()?;
-        if !output.status.success() {
-            bail!(
-                "failed to unmount fs: {:?}\n{}",
-                umount,
-                String::from_utf8(output.stderr)
-                    .with_context(|| format!("failed to read stderr (umount)"))?,
-            );
-        }
+        cmdi.exec(umount)
+            .with_context(|| format!("failed to unmount filesystem at '{}'", path.display()))?;
 
-        let mut rmmod = Command::new("rmmod");
+        let mut rmmod = CommandWrapper::new("rmmod");
         rmmod.arg("brd");
-        let output = rmmod.output()?;
-        if !output.status.success() {
-            bail!(
-                "failed to remove block ram device module fs: {:?}\n{}",
-                rmmod,
-                String::from_utf8(output.stderr)
-                    .with_context(|| format!("failed to read stderr (umount)"))?,
-            );
-        }
+        cmdi.exec(rmmod)
+            .with_context(|| "failed to remove module 'brd'")?;
 
-        fs::remove_dir_all(path)
-            .with_context(|| format!("failed to remove mountpoint at '{}'", path.display()))?;
+        cmdi.remove_dir_all(path)
+            .with_context(|| format!("failed to remove mountpoint"))?;
 
         Ok(())
     }

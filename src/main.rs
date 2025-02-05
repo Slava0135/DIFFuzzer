@@ -16,6 +16,7 @@ mod mount;
 mod qemu;
 mod save;
 mod temp_dir;
+mod command;
 
 fn main() {
     let args = Args::parse();
