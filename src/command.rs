@@ -121,14 +121,26 @@ impl CommandInterface for RemoteCommandInterface {
         let mut scp = self.copy_common();
         scp.arg(host_path);
         scp.arg(format!("root@localhost:{}", guest_path.display()));
-        scp.exec_local()?;
+        scp.exec_local().with_context(|| {
+            format!(
+                "failed to copy local file from '{}' (host) to '{}' (guest)",
+                host_path.display(),
+                guest_path.display(),
+            )
+        })?;
         Ok(())
     }
     fn copy_to_host(&self, guest_path: &Path, host_path: &Path) -> anyhow::Result<()> {
         let mut scp = self.copy_common();
         scp.arg(format!("root@localhost:{}", guest_path.display()));
         scp.arg(host_path);
-        scp.exec_local()?;
+        scp.exec_local().with_context(|| {
+            format!(
+                "failed to copy local file from '{}' (guest) to '{}' (host)",
+                guest_path.display(),
+                host_path.display(),
+            )
+        })?;
         Ok(())
     }
     fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output> {
