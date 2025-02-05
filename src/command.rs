@@ -5,11 +5,14 @@ use std::{
     process::{Command, Output},
 };
 
-use anyhow::{bail, Context};
+use anyhow::{bail, Context, Ok};
 
 pub trait CommandInterface {
     fn create_dir_all(&self, path: &Path) -> anyhow::Result<()>;
     fn remove_dir_all(&self, path: &Path) -> anyhow::Result<()>;
+    fn copy_to_guest(&self, host_path: &Path, guest_path: &Path) -> anyhow::Result<()>;
+    fn copy_to_host(&self, guest_path: &Path, host_path: &Path) -> anyhow::Result<()>;
+
     fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output>;
 }
 
@@ -46,14 +49,34 @@ impl CommandInterface for LocalCommandInterface {
         fs::remove_dir_all(path)
             .with_context(|| format!("failed to remove local dir at '{}'", path.display()))
     }
+    fn copy_to_guest(&self, host_path: &Path, guest_path: &Path) -> anyhow::Result<()> {
+        fs::copy(host_path, guest_path).with_context(|| {
+            format!(
+                "failed to copy local file from '{}' to '{}'",
+                host_path.display(),
+                guest_path.display(),
+            )
+        })?;
+        Ok(())
+    }
+    fn copy_to_host(&self, guest_path: &Path, host_path: &Path) -> anyhow::Result<()> {
+        fs::copy(guest_path, host_path).with_context(|| {
+            format!(
+                "failed to copy local file from '{}' to '{}'",
+                guest_path.display(),
+                host_path.display(),
+            )
+        })?;
+        Ok(())
+    }
     fn exec(&self, mut cmd: CommandWrapper) -> anyhow::Result<Output> {
         let output = cmd
             .internal
             .output()
-            .with_context(|| format!("failed to run command: {:?}", cmd.internal))?;
+            .with_context(|| format!("failed to run local command: {:?}", cmd.internal))?;
         if !output.status.success() {
             bail!(
-                "command {:?} execution ended with error:\n{}",
+                "local command {:?} execution ended with error:\n{}",
                 cmd.internal,
                 String::from_utf8(output.stderr).unwrap_or("<invalid UTF-8 string>".into())
             );
@@ -75,6 +98,12 @@ impl CommandInterface for RemoteCommandInterface {
         todo!()
     }
     fn remove_dir_all(&self, path: &Path) -> anyhow::Result<()> {
+        todo!()
+    }
+    fn copy_to_guest(&self, host_path: &Path, guest_path: &Path) -> anyhow::Result<()> {
+        todo!()
+    }
+    fn copy_to_host(&self, guest_path: &Path, host_path: &Path) -> anyhow::Result<()> {
         todo!()
     }
     fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output> {
