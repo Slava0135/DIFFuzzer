@@ -123,7 +123,7 @@ impl CommandInterface for RemoteCommandInterface {
         scp.arg(format!("root@localhost:{}", guest_path.display()));
         scp.exec_local().with_context(|| {
             format!(
-                "failed to copy local file from '{}' (host) to '{}' (guest)",
+                "failed to copy file from '{}' (host) to '{}' (guest)",
                 host_path.display(),
                 guest_path.display(),
             )
@@ -136,7 +136,7 @@ impl CommandInterface for RemoteCommandInterface {
         scp.arg(host_path);
         scp.exec_local().with_context(|| {
             format!(
-                "failed to copy local file from '{}' (guest) to '{}' (host)",
+                "failed to copy file from '{}' (guest) to '{}' (host)",
                 guest_path.display(),
                 host_path.display(),
             )
