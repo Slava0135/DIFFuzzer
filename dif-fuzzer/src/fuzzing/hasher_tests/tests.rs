@@ -5,9 +5,9 @@ use std::{env, fs};
 
 use anyhow::Context;
 
-use crate::hasher::hasher::{calc_dir_hash, get_diff};
 use crate::mount::ext4::Ext4;
 use crate::mount::mount::FileSystemMount;
+use hasher::{calc_dir_hash, get_diff};
 
 #[ignore]
 #[test]

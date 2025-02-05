@@ -15,7 +15,6 @@ mod config;
 mod filesystems;
 mod fuzzing;
 mod harness;
-mod hasher;
 mod mount;
 mod save;
 mod single;
