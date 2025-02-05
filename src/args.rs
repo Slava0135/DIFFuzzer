@@ -12,9 +12,9 @@ pub struct Args {
     #[clap(subcommand)]
     pub mode: Mode,
 
-    /// Run tests in QEMU (Recommended)
-    #[arg(short, long, default_value_t = true)]
-    pub qemu: bool,
+    /// Run tests on host instead of QEMU (not recommended)
+    #[arg(short, long, default_value_t = false)]
+    pub no_qemu: bool,
 }
 
 #[derive(Debug, PartialEq, Clone, Subcommand)]
