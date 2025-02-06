@@ -160,7 +160,11 @@ impl Runner {
     ) -> Self {
         info!("new fuzzer");
 
-        let temp_dir = setup_temp_dir();
+        let cmdi = Box::new(LocalCommandInterface::new());
+
+        let temp_dir = setup_temp_dir(cmdi.as_ref())
+            .with_context(|| "failed to setup temp dir")
+            .unwrap();
 
         info!("setting up fuzzing components");
         let test_dir = temp_dir.clone();
@@ -220,7 +224,7 @@ impl Runner {
         Self {
             config,
 
-            cmdi: Box::new(LocalCommandInterface::new()),
+            cmdi,
 
             fst_exec_dir: fst_exec_dir.into_boxed_path(),
             snd_exec_dir: snd_exec_dir.into_boxed_path(),

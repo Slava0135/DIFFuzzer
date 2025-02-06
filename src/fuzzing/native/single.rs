@@ -34,7 +34,11 @@ pub fn run(
         .with_context(|| format!("failed to parse json"))
         .unwrap();
 
-    let temp_dir = setup_temp_dir();
+    let cmdi = LocalCommandInterface::new();
+
+    let temp_dir = setup_temp_dir(&cmdi)
+        .with_context(|| "failed to setup temp dir")
+        .unwrap();
     let test_dir = temp_dir.clone();
 
     let exec_dir = temp_dir.join("exec");
@@ -64,8 +68,6 @@ pub fn run(
         stdout.clone(),
         stderr.clone(),
     );
-
-    let cmdi = LocalCommandInterface::new();
 
     info!("running harness");
     harness

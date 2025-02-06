@@ -1,34 +1,51 @@
 use anyhow::Context;
 use log::info;
 use std::path::{Path, PathBuf};
-use std::{env, fs};
 
-pub fn setup_temp_dir() -> PathBuf {
-    info!("setting up temporary directory");
-    let temp_dir = env::temp_dir().join("DIFFuzzer");
-    fs::remove_dir_all(temp_dir.as_path()).unwrap_or(());
-    fs::create_dir(temp_dir.as_path())
-        .with_context(|| {
-            format!(
-                "failed to create temporary directory at '{}'",
-                temp_dir.display()
-            )
-        })
-        .unwrap();
+use crate::command::{CommandInterface, CommandWrapper};
+
+const EXECUTOR_SOURCE_DIR: &str = "./executor";
+const MAKEFILE_NAME: &str = "makefile";
+const EXECUTOR_H_NAME: &str = "executor.h";
+const EXECUTOR_CPP_NAME: &str = "executor.cpp";
+const TEST_NAME: &str = "test.c";
+
+pub fn setup_temp_dir(cmdi: &dyn CommandInterface) -> anyhow::Result<PathBuf> {
+    let temp_dir = Path::new("/tmp").join("DIFFuzzer");
+
+    info!("setting up temporary directory at '{}'", temp_dir.display());
+    cmdi.remove_dir_all(&temp_dir).unwrap_or(());
+    cmdi.create_dir_all(&temp_dir).with_context(|| {
+        format!(
+            "failed to create temporary directory at '{}'",
+            temp_dir.display()
+        )
+    })?;
 
     info!("copying executor to '{}'", temp_dir.display());
-    let executor_dir = Path::new("executor");
-    let makefile = "makefile";
-    let executor_h = "executor.h";
-    let executor_cpp = "executor.cpp";
-    fs::copy(executor_dir.join(makefile), temp_dir.join(makefile))
-        .with_context(|| format!("failed to copy '{}'", makefile))
-        .unwrap();
-    fs::copy(executor_dir.join(executor_h), temp_dir.join(executor_h))
-        .with_context(|| format!("failed to copy '{}'", executor_h))
-        .unwrap();
-    fs::copy(executor_dir.join(executor_cpp), temp_dir.join(executor_cpp))
-        .with_context(|| format!("failed to copy '{}'", executor_cpp))
-        .unwrap();
-    temp_dir
+    let executor_dir = Path::new(EXECUTOR_SOURCE_DIR);
+    cmdi.copy_to_guest(
+        &executor_dir.join(MAKEFILE_NAME),
+        &temp_dir.join(MAKEFILE_NAME),
+    )?;
+    cmdi.copy_to_guest(
+        &executor_dir.join(EXECUTOR_H_NAME),
+        &temp_dir.join(EXECUTOR_H_NAME),
+    )?;
+    cmdi.copy_to_guest(
+        &executor_dir.join(EXECUTOR_CPP_NAME),
+        &temp_dir.join(EXECUTOR_CPP_NAME),
+    )?;
+    cmdi.copy_to_guest(
+        &executor_dir.join(EXECUTOR_CPP_NAME),
+        &temp_dir.join(EXECUTOR_CPP_NAME),
+    )?;
+    cmdi.copy_to_guest(&executor_dir.join(TEST_NAME), &temp_dir.join(TEST_NAME))?;
+
+    let mut make = CommandWrapper::new("make");
+    make.arg("C").arg(executor_dir);
+    cmdi.exec(make)
+        .with_context(|| "failed to make test binary")?;
+
+    Ok(temp_dir)
 }
