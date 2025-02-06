@@ -1,8 +1,8 @@
-use std::{cell::RefCell, process::Command, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use anyhow::Context;
 
-use crate::command::CommandInterface;
+use crate::command::{CommandInterface, CommandWrapper};
 use crate::fuzzing::native::objective::hash::HashHolder;
 use crate::mount::mount::FileSystemMount;
 use crate::path::RemotePath;
@@ -40,17 +40,6 @@ impl Harness {
         keep_fs: bool,
         hash_holder: Option<&mut HashHolder>,
     ) -> anyhow::Result<bool> {
-        let binary_copy_path = self.exec_dir.join("test.out");
-        todo!("use cmdi");
-        std::fs::copy(binary_path.base.as_ref(), binary_copy_path.base.as_ref()).with_context(
-            || {
-                format!(
-                    "failed to copy executable from '{}' to '{}'",
-                    binary_path, binary_copy_path
-                )
-            },
-        )?;
-
         self.fs_mount.setup(cmdi, &self.fs_dir).with_context(|| {
             format!(
                 "failed to setup fs '{}' at '{}'",
@@ -58,12 +47,11 @@ impl Harness {
             )
         })?;
 
-        let mut exec = Command::new(binary_copy_path.base.as_ref());
+        let mut exec = CommandWrapper::new(binary_path.base.as_ref());
         exec.arg(self.fs_dir.base.as_ref());
-        exec.current_dir(&self.exec_dir.base.as_ref());
-        let output = exec
-            .output()
-            .with_context(|| format!("failed to run executable '{:?}'", exec))?;
+        let output = cmdi
+            .exec_in_dir(exec, &self.exec_dir)
+            .with_context(|| "failed to run test binary")?;
 
         match hash_holder {
             Some(holder) => holder.calc_and_save_hash(),

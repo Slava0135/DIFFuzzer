@@ -28,6 +28,7 @@ pub trait CommandInterface {
     fn read_to_string(&self, path: &RemotePath) -> anyhow::Result<String>;
 
     fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output>;
+    fn exec_in_dir(&self, cmd: CommandWrapper, dir: &RemotePath) -> anyhow::Result<Output>;
 }
 
 pub struct CommandWrapper {
@@ -115,6 +116,11 @@ impl CommandInterface for LocalCommandInterface {
     fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output> {
         cmd.exec_local()
     }
+    fn exec_in_dir(&self, cmd: CommandWrapper, dir: &RemotePath) -> anyhow::Result<Output> {
+        let mut cmd = cmd;
+        cmd.internal.current_dir(dir.base.as_ref());
+        cmd.exec_local()
+    }
 }
 
 pub struct RemoteCommandInterface {
@@ -184,15 +190,24 @@ impl CommandInterface for RemoteCommandInterface {
     }
 
     fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output> {
-        let mut ssh = CommandWrapper::new("ssh");
-        ssh.arg("-q");
-        ssh.arg("-i").arg(self.config.ssh_private_key_path.clone());
-        ssh.arg("-o").arg("StrictHostKeyChecking no");
-        ssh.arg("-p").arg(self.config.ssh_port.to_string());
-        ssh.arg("root@localhost");
+        let mut ssh = self.exec_common();
         ssh.arg("-t").arg(format!("{:?}", cmd.internal));
         ssh.exec_local()
             .with_context(|| format!("failed to execute remote command: {:?}", cmd.internal))
+    }
+    fn exec_in_dir(&self, cmd: CommandWrapper, dir: &RemotePath) -> anyhow::Result<Output> {
+        let mut ssh = self.exec_common();
+        ssh.arg("-t")
+            .arg("cd")
+            .arg(dir.base.as_ref())
+            .arg("&&")
+            .arg(format!("{:?}", cmd.internal));
+        ssh.exec_local().with_context(|| {
+            format!(
+                "failed to execute remote command in directory '{}': {:?}",
+                dir, cmd.internal
+            )
+        })
     }
 }
 
@@ -205,5 +220,14 @@ impl RemoteCommandInterface {
         // not a typo
         scp.arg("-P").arg(self.config.ssh_port.to_string());
         scp
+    }
+    fn exec_common(&self) -> CommandWrapper {
+        let mut ssh = CommandWrapper::new("ssh");
+        ssh.arg("-q");
+        ssh.arg("-i").arg(self.config.ssh_private_key_path.clone());
+        ssh.arg("-o").arg("StrictHostKeyChecking no");
+        ssh.arg("-p").arg(self.config.ssh_port.to_string());
+        ssh.arg("root@localhost");
+        ssh
     }
 }
