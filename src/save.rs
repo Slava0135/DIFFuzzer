@@ -4,19 +4,18 @@ use std::io::Write;
 
 use anyhow::Context;
 
+use crate::command::CommandInterface;
 use crate::compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME};
 use crate::hasher::hasher::FileDiff::{DifferentHash, OneExists};
 use crate::hasher::hasher::{FileDiff, DIFF_HASH_FILENAME};
 use crate::path::LocalPath;
 use crate::{
-    abstract_fs::{
-        trace::TRACE_FILENAME,
-        workload::Workload,
-    },
+    abstract_fs::{trace::TRACE_FILENAME, workload::Workload},
     path::RemotePath,
 };
 
 pub fn save_testcase(
+    cmdi: &dyn CommandInterface,
     dir: &LocalPath,
     binary_path: &RemotePath,
     input: &Workload,
@@ -26,13 +25,13 @@ pub fn save_testcase(
         .with_context(|| format!("failed to save source file to '{}'", source_path))?;
 
     let binary_copy_path = dir.join(TEST_EXE_FILENAME);
-    todo!("use cmdi");
-    fs::copy(&binary_path.base, &binary_copy_path).with_context(|| {
-        format!(
-            "failed to copy executable from '{}' to '{}'",
-            binary_path, binary_copy_path
-        )
-    })?;
+    cmdi.copy_from_remote(binary_path, &binary_copy_path)
+        .with_context(|| {
+            format!(
+                "failed to copy binary test executable from '{}' to '{}'",
+                binary_path, binary_copy_path
+            )
+        })?;
 
     let json_path = dir.join("test").with_extension("json");
     let json = serde_json::to_string_pretty(&input)
@@ -42,20 +41,21 @@ pub fn save_testcase(
 }
 
 pub fn save_output(
+    cmdi: &dyn CommandInterface,
     dir: &LocalPath,
     trace_path: &RemotePath,
     fs_name: &str,
     stdout: String,
     stderr: String,
 ) -> anyhow::Result<()> {
-    let copy_trace_path = dir.join(format!("{}.{}", fs_name, TRACE_FILENAME));
-    todo!("use cmdi");
-    fs::copy(trace_path.base.as_ref(), &copy_trace_path).with_context(|| {
-        format!(
-            "failed to copy trace from '{}' to '{}'",
-            trace_path, copy_trace_path
-        )
-    })?;
+    let trace_copy_path = dir.join(format!("{}.{}", fs_name, TRACE_FILENAME));
+    cmdi.copy_from_remote(trace_path, &trace_copy_path)
+        .with_context(|| {
+            format!(
+                "failed to copy trace from '{}' to '{}'",
+                trace_path, trace_copy_path
+            )
+        })?;
 
     let stdout_path = dir.join(format!("{}.stdout.txt", fs_name));
     fs::write(&stdout_path, stdout)

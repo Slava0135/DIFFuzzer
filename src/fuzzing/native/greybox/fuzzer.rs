@@ -107,8 +107,9 @@ impl GreyBoxFuzzer {
         fs::create_dir(&corpus_dir)
             .with_context(|| format!("failed to create corpus directory at '{}'", corpus_dir))?;
 
-        save_testcase(&corpus_dir, binary_path, &input)?;
+        save_testcase(self.runner.cmdi.as_ref(), &corpus_dir, binary_path, &input)?;
         save_output(
+            self.runner.cmdi.as_ref(),
             &corpus_dir,
             &self.runner.fst_trace_path,
             &self.runner.fst_fs_name,
@@ -117,6 +118,7 @@ impl GreyBoxFuzzer {
         )
         .with_context(|| format!("failed to save output for first harness"))?;
         save_output(
+            self.runner.cmdi.as_ref(),
             &corpus_dir,
             &self.runner.snd_trace_path,
             &self.runner.snd_fs_name,

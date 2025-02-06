@@ -316,8 +316,9 @@ impl Runner {
         fs::create_dir(&crash_dir)
             .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
 
-        save_testcase(&crash_dir, binary_path, &input)?;
+        save_testcase(self.cmdi.as_ref(), &crash_dir, binary_path, &input)?;
         save_output(
+            self.cmdi.as_ref(),
             &crash_dir,
             &self.fst_trace_path,
             &self.fst_fs_name,
@@ -326,6 +327,7 @@ impl Runner {
         )
         .with_context(|| format!("failed to save output for first harness"))?;
         save_output(
+            self.cmdi.as_ref(),
             &crash_dir,
             &self.snd_trace_path,
             &self.snd_fs_name,
