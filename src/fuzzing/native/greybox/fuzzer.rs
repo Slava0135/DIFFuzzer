@@ -162,15 +162,19 @@ impl Fuzzer for GreyBoxFuzzer {
         }
 
         debug!("getting feedback");
-        let fst_kcov_is_interesting =
-            self.fst_kcov_feedback.is_interesting().with_context(|| {
+        let fst_kcov_is_interesting = self
+            .fst_kcov_feedback
+            .is_interesting(self.runner.cmdi.as_ref())
+            .with_context(|| {
                 format!(
                     "failed to get first kcov feedback for '{}'",
                     self.runner.fst_fs_name
                 )
             })?;
-        let snd_kcov_is_interesting =
-            self.snd_kcov_feedback.is_interesting().with_context(|| {
+        let snd_kcov_is_interesting = self
+            .snd_kcov_feedback
+            .is_interesting(self.runner.cmdi.as_ref())
+            .with_context(|| {
                 format!(
                     "failed to get second kcov feedback for '{}'",
                     self.runner.snd_fs_name

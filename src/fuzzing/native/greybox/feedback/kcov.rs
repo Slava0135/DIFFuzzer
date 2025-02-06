@@ -7,7 +7,7 @@ use std::{
 use anyhow::Context;
 use log::debug;
 
-use crate::path::RemotePath;
+use crate::{command::CommandInterface, path::RemotePath};
 
 pub const KCOV_FILENAME: &str = "kcov.dat";
 
@@ -23,17 +23,15 @@ impl KCovFeedback {
             kcov_path,
         }
     }
-    pub fn is_interesting(&mut self) -> anyhow::Result<bool> {
-        todo!("use cmdi");
+    pub fn is_interesting(&mut self, cmdi: &dyn CommandInterface) -> anyhow::Result<bool> {
         debug!("do kcov feedback");
-        let kcov = File::open(&self.kcov_path.base)
-            .with_context(|| format!("failed to open kcov file at '{}'", self.kcov_path))?;
-        let reader = BufReader::new(kcov);
+        let kcov = cmdi
+            .read_to_string(&self.kcov_path)
+            .with_context(|| "failed to read kcov file")?;
         let mut new_coverage = HashSet::new();
-        for line in reader.lines() {
-            let addr = line.with_context(|| format!("failed to read lines from kcov file"))?;
-            let addr = parse_addr(&addr)
-                .with_context(|| format!("failed to parse addr from kcov line '{}'", addr))?;
+        for line in kcov.lines() {
+            let addr = parse_addr(&line)
+                .with_context(|| format!("failed to parse addr from kcov line '{}'", line))?;
             new_coverage.insert(addr);
         }
         let c = self.all_coverage.clone();
