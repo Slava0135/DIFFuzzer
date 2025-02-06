@@ -4,12 +4,12 @@ use std::io::Write;
 
 use anyhow::Context;
 
+use crate::compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME};
 use crate::hasher::hasher::FileDiff::{DifferentHash, OneExists};
 use crate::hasher::hasher::{FileDiff, DIFF_HASH_FILENAME};
 use crate::path::LocalPath;
 use crate::{
     abstract_fs::{
-        compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME},
         trace::TRACE_FILENAME,
         workload::Workload,
     },

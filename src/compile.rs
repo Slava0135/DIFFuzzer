@@ -2,14 +2,11 @@ use std::{fs, process::Command};
 
 use anyhow::{bail, Context};
 
-use crate::path::RemotePath;
-
-use super::workload::Workload;
+use crate::{abstract_fs::workload::Workload, path::RemotePath};
 
 pub const TEST_SOURCE_FILENAME: &str = "test.c";
 pub const TEST_EXE_FILENAME: &str = "test.out";
 
-// TODO: move to fuzzer
 impl Workload {
     pub fn compile(&self, dir: &RemotePath) -> anyhow::Result<RemotePath> {
         todo!("use cmdi");

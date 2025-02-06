@@ -1,4 +1,3 @@
-pub mod compile;
 pub mod content;
 pub mod encode;
 pub mod flags;

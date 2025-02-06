@@ -21,6 +21,7 @@ mod mount;
 mod path;
 mod save;
 mod temp_dir;
+mod compile;
 
 fn main() {
     let args = Args::parse();
