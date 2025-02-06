@@ -12,11 +12,10 @@ use crate::temp_dir::setup_temp_dir;
 use anyhow::{Context, Ok};
 use log::{debug, error, info, warn};
 use std::cell::RefCell;
-use std::fs::read_to_string;
+use std::fs;
 use std::path::Path;
 use std::rc::Rc;
 use std::time::Instant;
-use std::{fs, io};
 
 use super::harness::{ConsolePipe, Harness};
 use super::objective::hash::HashObjective;
@@ -262,13 +261,13 @@ impl Runner {
     pub fn run_harness(&mut self, binary_path: &RemotePath) -> anyhow::Result<()> {
         debug!("running harness at '{}'", binary_path);
 
-        setup_dir(&self.fst_exec_dir).with_context(|| {
+        setup_dir(self.cmdi.as_ref(), &self.fst_exec_dir).with_context(|| {
             format!(
                 "failed to setup remote exec dir at '{}'",
                 &self.fst_exec_dir
             )
         })?;
-        setup_dir(&self.snd_exec_dir).with_context(|| {
+        setup_dir(self.cmdi.as_ref(), &self.snd_exec_dir).with_context(|| {
             format!(
                 "failed to setup remote exec dir at '{}'",
                 &self.snd_exec_dir
@@ -362,15 +361,12 @@ impl Stats {
     }
 }
 
-pub fn parse_trace(path: &RemotePath) -> anyhow::Result<Trace> {
-    todo!("use cmdi");
-    let trace = read_to_string(&path.base)
-        .with_context(|| format!("failed to read trace at '{}'", path))?;
+pub fn parse_trace(cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<Trace> {
+    let trace = cmdi.read_to_string(path)?;
     anyhow::Ok(Trace::try_parse(trace).with_context(|| format!("failed to parse trace"))?)
 }
 
-pub fn setup_dir(path: &RemotePath) -> io::Result<()> {
-    todo!("use cmdi");
-    fs::remove_dir_all(path.base.as_ref()).unwrap_or(());
-    fs::create_dir(path.base.as_ref())
+pub fn setup_dir(cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<()> {
+    cmdi.remove_dir_all(path).unwrap_or(());
+    cmdi.create_dir_all(path)
 }

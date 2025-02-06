@@ -1,6 +1,6 @@
 use std::{
     ffi::OsStr,
-    fs::{self, write},
+    fs,
     process::{Command, Output},
 };
 
@@ -25,6 +25,7 @@ pub trait CommandInterface {
         local_path: &LocalPath,
     ) -> anyhow::Result<()>;
     fn write(&self, path: &RemotePath, contents: &[u8]) -> anyhow::Result<()>;
+    fn read_to_string(&self, path: &RemotePath) -> anyhow::Result<String>;
 
     fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output>;
 }
@@ -103,8 +104,12 @@ impl CommandInterface for LocalCommandInterface {
         Ok(())
     }
     fn write(&self, path: &RemotePath, contents: &[u8]) -> anyhow::Result<()> {
-        write(path.base.as_ref(), contents)
+        fs::write(path.base.as_ref(), contents)
             .with_context(|| format!("failed to write local file '{}'", path))
+    }
+    fn read_to_string(&self, path: &RemotePath) -> anyhow::Result<String> {
+        fs::read_to_string(path.base.as_ref())
+            .with_context(|| format!("failed to read local file '{}'", path))
     }
 
     fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output> {
@@ -172,6 +177,9 @@ impl CommandInterface for RemoteCommandInterface {
         Ok(())
     }
     fn write(&self, path: &RemotePath, contents: &[u8]) -> anyhow::Result<()> {
+        todo!()
+    }
+    fn read_to_string(&self, path: &RemotePath) -> anyhow::Result<String> {
         todo!()
     }
 
