@@ -12,8 +12,8 @@ use crate::config::QemuConfig;
 pub trait CommandInterface {
     fn create_dir_all(&self, path: &Path) -> anyhow::Result<()>;
     fn remove_dir_all(&self, path: &Path) -> anyhow::Result<()>;
-    fn copy_to_guest(&self, host_path: &Path, guest_path: &Path) -> anyhow::Result<()>;
-    fn copy_to_host(&self, guest_path: &Path, host_path: &Path) -> anyhow::Result<()>;
+    fn copy_to_remote(&self, local_path: &Path, remote_path: &Path) -> anyhow::Result<()>;
+    fn copy_from_remote(&self, remote_path: &Path, local_path: &Path) -> anyhow::Result<()>;
 
     fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output>;
 }
@@ -65,22 +65,22 @@ impl CommandInterface for LocalCommandInterface {
         fs::remove_dir_all(path)
             .with_context(|| format!("failed to remove local dir at '{}'", path.display()))
     }
-    fn copy_to_guest(&self, host_path: &Path, guest_path: &Path) -> anyhow::Result<()> {
-        fs::copy(host_path, guest_path).with_context(|| {
+    fn copy_to_remote(&self, local_path: &Path, remote_path: &Path) -> anyhow::Result<()> {
+        fs::copy(local_path, remote_path).with_context(|| {
             format!(
                 "failed to copy local file from '{}' to '{}'",
-                host_path.display(),
-                guest_path.display(),
+                local_path.display(),
+                remote_path.display(),
             )
         })?;
         Ok(())
     }
-    fn copy_to_host(&self, guest_path: &Path, host_path: &Path) -> anyhow::Result<()> {
-        fs::copy(guest_path, host_path).with_context(|| {
+    fn copy_from_remote(&self, remote_path: &Path, local_path: &Path) -> anyhow::Result<()> {
+        fs::copy(remote_path, local_path).with_context(|| {
             format!(
                 "failed to copy local file from '{}' to '{}'",
-                guest_path.display(),
-                host_path.display(),
+                remote_path.display(),
+                local_path.display(),
             )
         })?;
         Ok(())
@@ -117,28 +117,28 @@ impl CommandInterface for RemoteCommandInterface {
             .with_context(|| format!("failed to remove remote dir at '{}'", path.display()))?;
         Ok(())
     }
-    fn copy_to_guest(&self, host_path: &Path, guest_path: &Path) -> anyhow::Result<()> {
+    fn copy_to_remote(&self, local_path: &Path, remote_path: &Path) -> anyhow::Result<()> {
         let mut scp = self.copy_common();
-        scp.arg(host_path);
-        scp.arg(format!("root@localhost:{}", guest_path.display()));
+        scp.arg(local_path);
+        scp.arg(format!("root@localhost:{}", remote_path.display()));
         scp.exec_local().with_context(|| {
             format!(
-                "failed to copy file from '{}' (host) to '{}' (guest)",
-                host_path.display(),
-                guest_path.display(),
+                "failed to copy file from '{}' (local) to '{}' (remote)",
+                local_path.display(),
+                remote_path.display(),
             )
         })?;
         Ok(())
     }
-    fn copy_to_host(&self, guest_path: &Path, host_path: &Path) -> anyhow::Result<()> {
+    fn copy_from_remote(&self, remote_path: &Path, local_path: &Path) -> anyhow::Result<()> {
         let mut scp = self.copy_common();
-        scp.arg(format!("root@localhost:{}", guest_path.display()));
-        scp.arg(host_path);
+        scp.arg(format!("root@localhost:{}", remote_path.display()));
+        scp.arg(local_path);
         scp.exec_local().with_context(|| {
             format!(
-                "failed to copy file from '{}' (guest) to '{}' (host)",
-                guest_path.display(),
-                host_path.display(),
+                "failed to copy file from '{}' (local) to '{}' (remote)",
+                remote_path.display(),
+                local_path.display(),
             )
         })?;
         Ok(())

@@ -24,23 +24,23 @@ pub fn setup_temp_dir(cmdi: &dyn CommandInterface) -> anyhow::Result<PathBuf> {
 
     info!("copying executor to '{}'", temp_dir.display());
     let executor_dir = Path::new(EXECUTOR_SOURCE_DIR);
-    cmdi.copy_to_guest(
+    cmdi.copy_to_remote(
         &executor_dir.join(MAKEFILE_NAME),
         &temp_dir.join(MAKEFILE_NAME),
     )?;
-    cmdi.copy_to_guest(
+    cmdi.copy_to_remote(
         &executor_dir.join(EXECUTOR_H_NAME),
         &temp_dir.join(EXECUTOR_H_NAME),
     )?;
-    cmdi.copy_to_guest(
+    cmdi.copy_to_remote(
         &executor_dir.join(EXECUTOR_CPP_NAME),
         &temp_dir.join(EXECUTOR_CPP_NAME),
     )?;
-    cmdi.copy_to_guest(
+    cmdi.copy_to_remote(
         &executor_dir.join(EXECUTOR_CPP_NAME),
         &temp_dir.join(EXECUTOR_CPP_NAME),
     )?;
-    cmdi.copy_to_guest(&executor_dir.join(TEST_NAME), &temp_dir.join(TEST_NAME))?;
+    cmdi.copy_to_remote(&executor_dir.join(TEST_NAME), &temp_dir.join(TEST_NAME))?;
 
     let mut make = CommandWrapper::new("make");
     make.arg("-C").arg(executor_dir);
