@@ -1,17 +1,18 @@
-use std::{cell::RefCell, path::Path, process::Command, rc::Rc};
+use std::{cell::RefCell, process::Command, rc::Rc};
 
 use anyhow::Context;
 
 use crate::command::CommandInterface;
 use crate::fuzzing::native::objective::hash::HashHolder;
 use crate::mount::mount::FileSystemMount;
+use crate::path::RemotePath;
 
 pub type ConsolePipe = Rc<RefCell<String>>;
 
 pub struct Harness {
     fs_mount: &'static dyn FileSystemMount,
-    fs_dir: Box<Path>,
-    exec_dir: Box<Path>,
+    fs_dir: RemotePath,
+    exec_dir: RemotePath,
     stdout: ConsolePipe,
     stderr: ConsolePipe,
 }
@@ -19,8 +20,8 @@ pub struct Harness {
 impl Harness {
     pub fn new(
         fs_mount: &'static dyn FileSystemMount,
-        fs_dir: Box<Path>,
-        exec_dir: Box<Path>,
+        fs_dir: RemotePath,
+        exec_dir: RemotePath,
         stdout: ConsolePipe,
         stderr: ConsolePipe,
     ) -> Self {
@@ -35,30 +36,31 @@ impl Harness {
     pub fn run(
         &self,
         cmdi: &dyn CommandInterface,
-        input_path: &Path,
+        input_path: &RemotePath,
         keep_fs: bool,
         hash_holder: Option<&mut HashHolder>,
     ) -> anyhow::Result<bool> {
         let test_exec_copy = self.exec_dir.join("test.out");
-        std::fs::copy(input_path, &test_exec_copy).with_context(|| {
-            format!(
-                "failed to copy executable from '{}' to '{}'",
-                input_path.display(),
-                test_exec_copy.display()
-            )
-        })?;
+        todo!("use cmdi");
+        std::fs::copy(input_path.base.as_ref(), test_exec_copy.base.as_ref()).with_context(
+            || {
+                format!(
+                    "failed to copy executable from '{}' to '{}'",
+                    input_path, test_exec_copy
+                )
+            },
+        )?;
 
         self.fs_mount.setup(cmdi, &self.fs_dir).with_context(|| {
             format!(
                 "failed to setup fs '{}' at '{}'",
-                self.fs_mount,
-                self.fs_dir.display()
+                self.fs_mount, self.fs_dir
             )
         })?;
 
-        let mut exec = Command::new(test_exec_copy);
-        exec.arg(self.fs_dir.as_os_str());
-        exec.current_dir(&self.exec_dir);
+        let mut exec = Command::new(test_exec_copy.base.as_ref());
+        exec.arg(self.fs_dir.base.as_ref());
+        exec.current_dir(&self.exec_dir.base.as_ref());
         let output = exec
             .output()
             .with_context(|| format!("failed to run executable '{:?}'", exec))?;
@@ -90,8 +92,7 @@ impl Harness {
             .with_context(|| {
                 format!(
                     "failed to teardown fs '{}' at '{}'",
-                    self.fs_mount,
-                    self.fs_dir.display()
+                    self.fs_mount, self.fs_dir
                 )
             })?;
         Ok(())

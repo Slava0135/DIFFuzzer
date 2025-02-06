@@ -1,17 +1,20 @@
-use std::{fmt::Display, path::Path};
+use std::fmt::Display;
 
 use anyhow::Context;
 use log::debug;
 use regex::RegexSet;
 
-use crate::command::{CommandInterface, CommandWrapper};
+use crate::{
+    command::{CommandInterface, CommandWrapper},
+    path::RemotePath,
+};
 
 const RAM_DISK_SIZE: usize = 1_000_000;
 const DEVICE: &str = "/dev/ram0";
 
 pub trait FileSystemMount: Display {
-    fn setup(&self, cmdi: &dyn CommandInterface, path: &Path) -> anyhow::Result<()> {
-        debug!("setting up '{}' filesystem at '{}'", self, path.display());
+    fn setup(&self, cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<()> {
+        debug!("setting up '{}' filesystem at '{}'", self, path);
 
         cmdi.create_dir_all(path)
             .with_context(|| "failed to create mountpoint")?;
@@ -39,20 +42,20 @@ pub trait FileSystemMount: Display {
             mount.arg("-o");
             mount.arg(opts);
         }
-        mount.arg(DEVICE).arg(path);
+        mount.arg(DEVICE).arg(path.base.as_ref());
         cmdi.exec(mount)
-            .with_context(|| format!("failed to mount filesystem at '{}'", path.display()))?;
+            .with_context(|| format!("failed to mount filesystem at '{}'", path))?;
 
         Ok(())
     }
 
-    fn teardown(&self, cmdi: &dyn CommandInterface, path: &Path) -> anyhow::Result<()> {
-        debug!("tearing down '{}' filesystem at '{}'", self, path.display());
+    fn teardown(&self, cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<()> {
+        debug!("tearing down '{}' filesystem at '{}'", self, path);
 
         let mut umount = CommandWrapper::new("umount");
-        umount.arg("-fl").arg(path);
+        umount.arg("-fl").arg(path.base.as_ref());
         cmdi.exec(umount)
-            .with_context(|| format!("failed to unmount filesystem at '{}'", path.display()))?;
+            .with_context(|| format!("failed to unmount filesystem at '{}'", path))?;
 
         let mut rmmod = CommandWrapper::new("rmmod");
         rmmod.arg("brd");

@@ -7,6 +7,7 @@ use log::{debug, info};
 use rand::{rngs::StdRng, SeedableRng};
 
 use crate::fuzzing::native::common::{parse_trace, Fuzzer, Runner};
+use crate::path::{LocalPath, RemotePath};
 use crate::save::{save_output, save_testcase};
 use crate::{abstract_fs::workload::Workload, config::Config, mount::mount::FileSystemMount};
 
@@ -24,7 +25,7 @@ pub struct GreyBoxFuzzer {
 
     mutator: Mutator,
 
-    corpus_path: Option<Box<Path>>,
+    corpus_path: Option<LocalPath>,
 }
 
 impl GreyBoxFuzzer {
@@ -49,7 +50,7 @@ impl GreyBoxFuzzer {
         let corpus_path = if config.greybox.save_corpus {
             let path = Path::new("./corpus");
             fs::create_dir(path).unwrap_or(());
-            Some(path.to_path_buf().into_boxed_path())
+            Some(LocalPath::new(path))
         } else {
             None
         };
@@ -59,8 +60,8 @@ impl GreyBoxFuzzer {
         let fst_kcov_path = runner.fst_exec_dir.join(KCOV_FILENAME);
         let snd_kcov_path = runner.snd_exec_dir.join(KCOV_FILENAME);
 
-        let fst_kcov_feedback = KCovFeedback::new(fst_kcov_path.clone().into_boxed_path());
-        let snd_kcov_feedback = KCovFeedback::new(snd_kcov_path.clone().into_boxed_path());
+        let fst_kcov_feedback = KCovFeedback::new(fst_kcov_path);
+        let snd_kcov_feedback = KCovFeedback::new(snd_kcov_path);
 
         Self {
             runner,
@@ -90,25 +91,21 @@ impl GreyBoxFuzzer {
         self.corpus.push(input);
     }
 
-    fn save_input(&mut self, input: Workload, input_path: &Path) -> anyhow::Result<()> {
+    fn save_input(&mut self, input: Workload, input_path: &RemotePath) -> anyhow::Result<()> {
         let name = input.generate_name();
         debug!("save corpus input '{}'", name);
 
         let corpus_dir = self.corpus_path.clone().unwrap().join(name);
-        if fs::exists(corpus_dir.as_path()).with_context(|| {
+        if fs::exists(&corpus_dir).with_context(|| {
             format!(
                 "failed to determine existence of corpus directory at '{}'",
-                corpus_dir.display()
+                corpus_dir
             )
         })? {
             return anyhow::Ok(());
         }
-        fs::create_dir(corpus_dir.as_path()).with_context(|| {
-            format!(
-                "failed to create corpus directory at '{}'",
-                corpus_dir.display()
-            )
-        })?;
+        fs::create_dir(&corpus_dir)
+            .with_context(|| format!("failed to create corpus directory at '{}'", corpus_dir))?;
 
         save_testcase(&corpus_dir, input_path, &input)?;
         save_output(

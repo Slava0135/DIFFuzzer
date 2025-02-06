@@ -1,10 +1,15 @@
-use std::{fs::read_to_string, path::Path};
+use std::fs::read_to_string;
 
 use anyhow::{Context, Ok};
 use log::{info, warn};
 
 use crate::{
-    abstract_fs::{mutator::remove, workload::Workload}, config::Config, fuzzing::native::common::parse_trace, hasher::hasher::FileDiff, mount::mount::FileSystemMount
+    abstract_fs::{mutator::remove, workload::Workload},
+    config::Config,
+    fuzzing::native::common::parse_trace,
+    hasher::hasher::FileDiff,
+    mount::mount::FileSystemMount,
+    path::LocalPath,
 };
 
 use super::common::Runner;
@@ -24,9 +29,9 @@ impl Reducer {
         }
     }
 
-    pub fn run(&mut self, test_path: &Path, save_to_dir: &Path) -> anyhow::Result<()> {
+    pub fn run(&mut self, test_path: &LocalPath, save_to_dir: &LocalPath) -> anyhow::Result<()> {
         info!("running reducer");
-        info!("reading testcase at '{}'", test_path.display());
+        info!("reading testcase at '{}'", test_path);
         let input = read_to_string(test_path)
             .with_context(|| format!("failed to read testcase"))
             .unwrap();
@@ -68,7 +73,7 @@ impl Reducer {
         &mut self,
         input: Workload,
         old_diff: Vec<FileDiff>,
-        save_to_dir: &Path,
+        save_to_dir: &LocalPath,
     ) -> anyhow::Result<()> {
         info!("reducing using hash difference");
         let mut index = input.ops.len() - 1;
@@ -90,7 +95,7 @@ impl Reducer {
                         self.runner.report_crash(
                             &workload,
                             &input_path,
-                            save_to_dir.to_path_buf().into_boxed_path(),
+                            save_to_dir.clone(),
                             new_diff,
                         )?;
                     }

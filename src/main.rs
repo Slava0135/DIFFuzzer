@@ -8,6 +8,7 @@ use fuzzing::native::{
     reducer::Reducer, single,
 };
 use log::info;
+use path::LocalPath;
 
 mod abstract_fs;
 mod args;
@@ -17,6 +18,7 @@ mod filesystems;
 mod fuzzing;
 mod hasher;
 mod mount;
+mod path;
 mod save;
 mod temp_dir;
 
@@ -70,8 +72,8 @@ fn main() {
         } => {
             if args.no_qemu {
                 single::run(
-                    Path::new(&path_to_test),
-                    Path::new(&save_to_dir),
+                    &LocalPath::new(Path::new(&path_to_test)),
+                    &LocalPath::new(Path::new(&save_to_dir)),
                     keep_fs,
                     filesystem.try_into().unwrap(),
                     config.fs_name,
@@ -92,7 +94,10 @@ fn main() {
                     first_filesystem.try_into().unwrap(),
                     second_filesystem.try_into().unwrap(),
                 )
-                .run(Path::new(&path_to_test), Path::new(&output_dir))
+                .run(
+                    &LocalPath::new(Path::new(&path_to_test)),
+                    &LocalPath::new(Path::new(&output_dir)),
+                )
                 .unwrap();
             } else {
                 todo!("QEMU not supported");

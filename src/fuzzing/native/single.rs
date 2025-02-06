@@ -1,32 +1,28 @@
-use std::{
-    cell::RefCell,
-    fs::{self, read_to_string},
-    path::Path,
-    rc::Rc,
-};
+use std::{cell::RefCell, fs::read_to_string, path::Path, rc::Rc};
 
 use anyhow::Context;
 use log::info;
 
 use crate::{
     abstract_fs::{trace::TRACE_FILENAME, workload::Workload},
-    command::LocalCommandInterface,
+    command::{CommandInterface, LocalCommandInterface},
     fuzzing::native::harness::Harness,
     mount::mount::FileSystemMount,
+    path::{LocalPath, RemotePath},
     save::{save_output, save_testcase},
     temp_dir::setup_temp_dir,
 };
 
 pub fn run(
-    test_path: &Path,
-    save_to_dir: &Path,
+    test_path: &LocalPath,
+    save_to_dir: &LocalPath,
     keep_fs: bool,
     mount: &'static dyn FileSystemMount,
     fs_name: String,
 ) {
     info!("running single test");
 
-    info!("reading testcase at '{}'", test_path.display());
+    info!("reading testcase at '{}'", test_path);
     let input = read_to_string(test_path)
         .with_context(|| format!("failed to read testcase"))
         .unwrap();
@@ -42,15 +38,16 @@ pub fn run(
     let test_dir = temp_dir.clone();
 
     let exec_dir = temp_dir.join("exec");
-    fs::remove_dir_all(&exec_dir).unwrap_or(());
-    fs::create_dir(&exec_dir)
+    cmdi.remove_dir_all(&exec_dir).unwrap_or(());
+    cmdi.create_dir_all(&exec_dir)
         .with_context(|| format!("failed to create executable directory"))
         .unwrap();
+
     let trace_path = exec_dir.join(TRACE_FILENAME);
 
-    info!("compiling test at '{}'", test_dir.display());
+    info!("compiling test at '{}'", test_dir);
     let input_path = input
-        .compile(test_dir.as_path())
+        .compile(&test_dir)
         .with_context(|| format!("failed to compile test"))
         .unwrap();
 
@@ -58,16 +55,10 @@ pub fn run(
     let stderr = Rc::new(RefCell::new("".to_owned()));
 
     let fs_str = mount.to_string();
-    let harness = Harness::new(
-        mount,
-        Path::new("/mnt")
-            .join(fs_str.to_lowercase())
-            .join(fs_name)
-            .into_boxed_path(),
-        exec_dir.to_owned().into_boxed_path(),
-        stdout.clone(),
-        stderr.clone(),
-    );
+    let fs_dir = RemotePath::new(Path::new("/mnt"))
+        .join(fs_str.to_lowercase())
+        .join(fs_name);
+    let harness = Harness::new(mount, fs_dir, exec_dir, stdout.clone(), stderr.clone());
 
     info!("running harness");
     harness

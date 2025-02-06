@@ -6,6 +6,7 @@ use crate::config::Config;
 use crate::fuzzing::native::objective::trace::TraceObjective;
 use crate::hasher::hasher::FileDiff;
 use crate::mount::mount::FileSystemMount;
+use crate::path::{LocalPath, RemotePath};
 use crate::save::{save_diff, save_output, save_testcase};
 use crate::temp_dir::setup_temp_dir;
 use anyhow::{Context, Ok};
@@ -25,19 +26,19 @@ pub struct Runner {
 
     pub cmdi: Box<dyn CommandInterface>,
 
-    pub fst_exec_dir: Box<Path>,
-    pub snd_exec_dir: Box<Path>,
-    pub fst_trace_path: Box<Path>,
-    pub snd_trace_path: Box<Path>,
+    pub test_dir: RemotePath,
+    pub fst_exec_dir: RemotePath,
+    pub snd_exec_dir: RemotePath,
+    pub fst_trace_path: RemotePath,
+    pub snd_trace_path: RemotePath,
 
     pub fst_stdout: ConsolePipe,
     pub snd_stdout: ConsolePipe,
     pub fst_stderr: ConsolePipe,
     pub snd_stderr: ConsolePipe,
 
-    pub test_dir: Box<Path>,
-    pub crashes_path: Box<Path>,
-    pub accidents_path: Box<Path>,
+    pub crashes_path: LocalPath,
+    pub accidents_path: LocalPath,
 
     pub trace_objective: TraceObjective,
     pub hash_objective: HashObjective,
@@ -93,7 +94,7 @@ pub trait Fuzzer {
     fn do_objective(
         &mut self,
         input: &Workload,
-        input_path: &Path,
+        input_path: &RemotePath,
         fst_trace: &Trace,
         snd_trace: &Trace,
     ) -> anyhow::Result<bool> {
@@ -130,7 +131,7 @@ pub trait Fuzzer {
     fn detect_errors(
         &mut self,
         input: &Workload,
-        input_path: &Path,
+        input_path: &RemotePath,
         fst_trace: &Trace,
         snd_trace: &Trace,
     ) -> anyhow::Result<bool> {
@@ -139,7 +140,7 @@ pub trait Fuzzer {
             warn!("both traces contain errors, potential bug in model");
             let accidents_path = self.runner().accidents_path.clone();
             self.runner()
-                .report_crash(&input, &input_path, accidents_path, vec![])
+                .report_crash(&input, input_path, accidents_path, vec![])
                 .with_context(|| format!("failed to report accident"))?;
             Ok(true)
         } else {
@@ -174,11 +175,11 @@ impl Runner {
         let fst_trace_path = fst_exec_dir.join(TRACE_FILENAME);
         let snd_trace_path = snd_exec_dir.join(TRACE_FILENAME);
 
-        let crashes_path = Path::new("./crashes");
-        fs::create_dir(crashes_path).unwrap_or(());
+        let crashes_path = LocalPath::new(Path::new("./crashes"));
+        fs::create_dir(&crashes_path).unwrap_or(());
 
-        let accidents_path = Path::new("./accidents");
-        fs::create_dir(accidents_path).unwrap_or(());
+        let accidents_path = LocalPath::new(Path::new("./accidents"));
+        fs::create_dir(&accidents_path).unwrap_or(());
 
         let fst_stdout = Rc::new(RefCell::new("".to_owned()));
         let fst_stderr = Rc::new(RefCell::new("".to_owned()));
@@ -188,14 +189,12 @@ impl Runner {
         let fst_fs_name = fst_mount.to_string();
         let snd_fs_name = snd_mount.to_string();
 
-        let fst_fs_dir = Path::new("/mnt")
+        let fst_fs_dir = RemotePath::new(Path::new("/mnt"))
             .join(fst_fs_name.to_lowercase())
-            .join(&config.fs_name)
-            .into_boxed_path();
-        let snd_fs_dir = Path::new("/mnt")
+            .join(&config.fs_name);
+        let snd_fs_dir = RemotePath::new(Path::new("/mnt"))
             .join(snd_fs_name.to_lowercase())
-            .join(&config.fs_name)
-            .into_boxed_path();
+            .join(&config.fs_name);
 
         let hash_objective = HashObjective::new(
             fst_fs_dir.clone(),
@@ -209,14 +208,14 @@ impl Runner {
         let fst_harness = Harness::new(
             fst_mount,
             fst_fs_dir.clone(),
-            fst_exec_dir.clone().into_boxed_path(),
+            fst_exec_dir.clone(),
             fst_stdout.clone(),
             fst_stderr.clone(),
         );
         let snd_harness = Harness::new(
             snd_mount,
             snd_fs_dir.clone(),
-            snd_exec_dir.clone().into_boxed_path(),
+            snd_exec_dir.clone(),
             snd_stdout.clone(),
             snd_stderr.clone(),
         );
@@ -226,19 +225,19 @@ impl Runner {
 
             cmdi,
 
-            fst_exec_dir: fst_exec_dir.into_boxed_path(),
-            snd_exec_dir: snd_exec_dir.into_boxed_path(),
-            fst_trace_path: fst_trace_path.into_boxed_path(),
-            snd_trace_path: snd_trace_path.into_boxed_path(),
+            fst_exec_dir: fst_exec_dir,
+            snd_exec_dir: snd_exec_dir,
+            fst_trace_path: fst_trace_path,
+            snd_trace_path: snd_trace_path,
 
             fst_stdout,
             snd_stdout,
             fst_stderr,
             snd_stderr,
 
-            test_dir: test_dir.into_boxed_path(),
-            crashes_path: crashes_path.to_path_buf().into_boxed_path(),
-            accidents_path: accidents_path.to_path_buf().into_boxed_path(),
+            test_dir: test_dir,
+            crashes_path: crashes_path,
+            accidents_path: accidents_path,
 
             hash_objective,
             trace_objective,
@@ -252,21 +251,21 @@ impl Runner {
         }
     }
 
-    pub fn compile_test(&mut self, input: &Workload) -> anyhow::Result<Box<Path>> {
-        debug!("compiling test at '{}'", self.test_dir.display());
+    pub fn compile_test(&mut self, input: &Workload) -> anyhow::Result<RemotePath> {
+        debug!("compiling test at '{}'", self.test_dir);
         let input_path = input
             .compile(&self.test_dir)
             .with_context(|| format!("failed to compile test"))?;
         Ok(input_path)
     }
 
-    pub fn run_harness(&mut self, input_path: &Path) -> anyhow::Result<()> {
-        debug!("running harness at '{}'", input_path.display());
+    pub fn run_harness(&mut self, input_path: &RemotePath) -> anyhow::Result<()> {
+        debug!("running harness at '{}'", input_path);
 
-        setup_dir(self.fst_exec_dir.as_ref())
-            .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
-        setup_dir(self.snd_exec_dir.as_ref())
-            .with_context(|| format!("failed to setup dir at '{}'", input_path.display()))?;
+        setup_dir(&self.fst_exec_dir)
+            .with_context(|| format!("failed to setup remote exec dir at '{}'", input_path))?;
+        setup_dir(&self.snd_exec_dir)
+            .with_context(|| format!("failed to setup remote exec dir at '{}'", input_path))?;
 
         self.fst_harness
             .run(
@@ -290,28 +289,24 @@ impl Runner {
     pub fn report_crash(
         &mut self,
         input: &Workload,
-        input_path: &Path,
-        crash_dir: Box<Path>,
+        input_path: &RemotePath,
+        crash_dir: LocalPath,
         hash_diff: Vec<FileDiff>,
     ) -> anyhow::Result<()> {
         let name = input.generate_name();
         debug!("report crash '{}'", name);
 
         let crash_dir = crash_dir.join(name);
-        if fs::exists(crash_dir.as_path()).with_context(|| {
+        if fs::exists(&crash_dir).with_context(|| {
             format!(
                 "failed to determine existence of crash directory at '{}'",
-                crash_dir.display()
+                crash_dir
             )
         })? {
             return anyhow::Ok(());
         }
-        fs::create_dir(crash_dir.as_path()).with_context(|| {
-            format!(
-                "failed to create crash directory at '{}'",
-                crash_dir.display()
-            )
-        })?;
+        fs::create_dir(&crash_dir)
+            .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
 
         save_testcase(&crash_dir, input_path, &input)?;
         save_output(
@@ -333,7 +328,7 @@ impl Runner {
 
         save_diff(&crash_dir, hash_diff)
             .with_context(|| format!("failed to save hash differences"))?;
-        info!("crash saved at '{}'", crash_dir.display());
+        info!("crash saved at '{}'", crash_dir);
 
         anyhow::Ok(())
     }
@@ -357,13 +352,15 @@ impl Stats {
     }
 }
 
-pub fn parse_trace(path: &Path) -> anyhow::Result<Trace> {
-    let trace = read_to_string(&path)
-        .with_context(|| format!("failed to read trace at '{}'", path.display()))?;
+pub fn parse_trace(path: &RemotePath) -> anyhow::Result<Trace> {
+    todo!("use cmdi");
+    let trace = read_to_string(&path.base)
+        .with_context(|| format!("failed to read trace at '{}'", path))?;
     anyhow::Ok(Trace::try_parse(trace).with_context(|| format!("failed to parse trace"))?)
 }
 
-pub fn setup_dir(path: &Path) -> io::Result<()> {
-    fs::remove_dir_all(path).unwrap_or(());
-    fs::create_dir(path)
+pub fn setup_dir(path: &RemotePath) -> io::Result<()> {
+    todo!("use cmdi");
+    fs::remove_dir_all(path.base.as_ref()).unwrap_or(());
+    fs::create_dir(path.base.as_ref())
 }
