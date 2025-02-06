@@ -18,19 +18,19 @@ use crate::{
 
 pub fn save_testcase(
     dir: &LocalPath,
-    input_path: &RemotePath,
+    binary_path: &RemotePath,
     input: &Workload,
 ) -> anyhow::Result<()> {
     let source_path = dir.join(TEST_SOURCE_FILENAME);
     fs::write(&source_path, input.clone().encode_c())
         .with_context(|| format!("failed to save source file to '{}'", source_path))?;
 
-    let exe_path = dir.join(TEST_EXE_FILENAME);
+    let binary_copy_path = dir.join(TEST_EXE_FILENAME);
     todo!("use cmdi");
-    fs::copy(&input_path.base, &exe_path).with_context(|| {
+    fs::copy(&binary_path.base, &binary_copy_path).with_context(|| {
         format!(
             "failed to copy executable from '{}' to '{}'",
-            input_path, exe_path
+            binary_path, binary_copy_path
         )
     })?;
 

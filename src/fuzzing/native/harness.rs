@@ -36,17 +36,17 @@ impl Harness {
     pub fn run(
         &self,
         cmdi: &dyn CommandInterface,
-        input_path: &RemotePath,
+        binary_path: &RemotePath,
         keep_fs: bool,
         hash_holder: Option<&mut HashHolder>,
     ) -> anyhow::Result<bool> {
-        let test_exec_copy = self.exec_dir.join("test.out");
+        let binary_copy_path = self.exec_dir.join("test.out");
         todo!("use cmdi");
-        std::fs::copy(input_path.base.as_ref(), test_exec_copy.base.as_ref()).with_context(
+        std::fs::copy(binary_path.base.as_ref(), binary_copy_path.base.as_ref()).with_context(
             || {
                 format!(
                     "failed to copy executable from '{}' to '{}'",
-                    input_path, test_exec_copy
+                    binary_path, binary_copy_path
                 )
             },
         )?;
@@ -58,7 +58,7 @@ impl Harness {
             )
         })?;
 
-        let mut exec = Command::new(test_exec_copy.base.as_ref());
+        let mut exec = Command::new(binary_copy_path.base.as_ref());
         exec.arg(self.fs_dir.base.as_ref());
         exec.current_dir(&self.exec_dir.base.as_ref());
         let output = exec

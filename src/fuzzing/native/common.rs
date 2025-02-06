@@ -94,7 +94,7 @@ pub trait Fuzzer {
     fn do_objective(
         &mut self,
         input: &Workload,
-        input_path: &RemotePath,
+        binary_path: &RemotePath,
         fst_trace: &Trace,
         snd_trace: &Trace,
     ) -> anyhow::Result<bool> {
@@ -118,7 +118,7 @@ pub trait Fuzzer {
                 diff = runner.hash_objective.get_diff();
             }
             runner
-                .report_crash(&input, input_path, runner.crashes_path.clone(), diff)
+                .report_crash(&input, binary_path, runner.crashes_path.clone(), diff)
                 .with_context(|| format!("failed to report crash"))?;
             self.runner().stats.crashes += 1;
             self.show_stats();
@@ -131,7 +131,7 @@ pub trait Fuzzer {
     fn detect_errors(
         &mut self,
         input: &Workload,
-        input_path: &RemotePath,
+        binary_path: &RemotePath,
         fst_trace: &Trace,
         snd_trace: &Trace,
     ) -> anyhow::Result<bool> {
@@ -140,7 +140,7 @@ pub trait Fuzzer {
             warn!("both traces contain errors, potential bug in model");
             let accidents_path = self.runner().accidents_path.clone();
             self.runner()
-                .report_crash(&input, input_path, accidents_path, vec![])
+                .report_crash(&input, binary_path, accidents_path, vec![])
                 .with_context(|| format!("failed to report accident"))?;
             Ok(true)
         } else {
@@ -253,24 +253,32 @@ impl Runner {
 
     pub fn compile_test(&mut self, input: &Workload) -> anyhow::Result<RemotePath> {
         debug!("compiling test at '{}'", self.test_dir);
-        let input_path = input
+        let binary_path = input
             .compile(&self.test_dir)
             .with_context(|| format!("failed to compile test"))?;
-        Ok(input_path)
+        Ok(binary_path)
     }
 
-    pub fn run_harness(&mut self, input_path: &RemotePath) -> anyhow::Result<()> {
-        debug!("running harness at '{}'", input_path);
+    pub fn run_harness(&mut self, binary_path: &RemotePath) -> anyhow::Result<()> {
+        debug!("running harness at '{}'", binary_path);
 
-        setup_dir(&self.fst_exec_dir)
-            .with_context(|| format!("failed to setup remote exec dir at '{}'", input_path))?;
-        setup_dir(&self.snd_exec_dir)
-            .with_context(|| format!("failed to setup remote exec dir at '{}'", input_path))?;
+        setup_dir(&self.fst_exec_dir).with_context(|| {
+            format!(
+                "failed to setup remote exec dir at '{}'",
+                &self.fst_exec_dir
+            )
+        })?;
+        setup_dir(&self.snd_exec_dir).with_context(|| {
+            format!(
+                "failed to setup remote exec dir at '{}'",
+                &self.snd_exec_dir
+            )
+        })?;
 
         self.fst_harness
             .run(
                 self.cmdi.as_ref(),
-                &input_path,
+                &binary_path,
                 false,
                 Some(&mut self.hash_objective.fst_fs),
             )
@@ -278,7 +286,7 @@ impl Runner {
         self.snd_harness
             .run(
                 self.cmdi.as_ref(),
-                &input_path,
+                &binary_path,
                 false,
                 Some(&mut self.hash_objective.snd_fs),
             )
@@ -289,7 +297,7 @@ impl Runner {
     pub fn report_crash(
         &mut self,
         input: &Workload,
-        input_path: &RemotePath,
+        binary_path: &RemotePath,
         crash_dir: LocalPath,
         hash_diff: Vec<FileDiff>,
     ) -> anyhow::Result<()> {
@@ -308,7 +316,7 @@ impl Runner {
         fs::create_dir(&crash_dir)
             .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
 
-        save_testcase(&crash_dir, input_path, &input)?;
+        save_testcase(&crash_dir, binary_path, &input)?;
         save_output(
             &crash_dir,
             &self.fst_trace_path,

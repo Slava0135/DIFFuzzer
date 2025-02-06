@@ -91,7 +91,7 @@ impl GreyBoxFuzzer {
         self.corpus.push(input);
     }
 
-    fn save_input(&mut self, input: Workload, input_path: &RemotePath) -> anyhow::Result<()> {
+    fn save_input(&mut self, input: Workload, binary_path: &RemotePath) -> anyhow::Result<()> {
         let name = input.generate_name();
         debug!("save corpus input '{}'", name);
 
@@ -107,7 +107,7 @@ impl GreyBoxFuzzer {
         fs::create_dir(&corpus_dir)
             .with_context(|| format!("failed to create corpus directory at '{}'", corpus_dir))?;
 
-        save_testcase(&corpus_dir, input_path, &input)?;
+        save_testcase(&corpus_dir, binary_path, &input)?;
         save_output(
             &corpus_dir,
             &self.runner.fst_trace_path,
@@ -136,20 +136,20 @@ impl Fuzzer for GreyBoxFuzzer {
         debug!("mutating input");
         let input = self.mutator.mutate(input);
 
-        let input_path = self.runner().compile_test(&input)?;
+        let binary_path = self.runner().compile_test(&input)?;
 
-        self.runner().run_harness(&input_path)?;
+        self.runner().run_harness(&binary_path)?;
 
         let fst_trace = parse_trace(&self.runner().fst_trace_path)
             .with_context(|| format!("failed to parse first trace"))?;
         let snd_trace = parse_trace(&self.runner().snd_trace_path)
             .with_context(|| format!("failed to parse second trace"))?;
 
-        if self.detect_errors(&input, &input_path, &fst_trace, &snd_trace)? {
+        if self.detect_errors(&input, &binary_path, &fst_trace, &snd_trace)? {
             return Ok(());
         }
 
-        if self.do_objective(&input, &input_path, &fst_trace, &snd_trace)? {
+        if self.do_objective(&input, &binary_path, &fst_trace, &snd_trace)? {
             return Ok(());
         }
 
@@ -172,7 +172,7 @@ impl Fuzzer for GreyBoxFuzzer {
             self.add_to_corpus(input.clone());
             self.show_stats();
             if self.corpus_path.is_some() {
-                self.save_input(input, &input_path)
+                self.save_input(input, &binary_path)
                     .with_context(|| format!("failed to save input"))?;
             }
             return Ok(());

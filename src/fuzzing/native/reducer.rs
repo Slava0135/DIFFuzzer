@@ -39,9 +39,9 @@ impl Reducer {
             .with_context(|| format!("failed to parse json"))
             .unwrap();
 
-        let input_path = self.runner.compile_test(&input)?;
+        let binary_path = self.runner.compile_test(&input)?;
 
-        self.runner.run_harness(&input_path)?;
+        self.runner.run_harness(&binary_path)?;
 
         let fst_trace = parse_trace(&self.runner.fst_trace_path)
             .with_context(|| format!("failed to parse first trace"))?;
@@ -80,8 +80,8 @@ impl Reducer {
         let mut workload = input;
         loop {
             if let Some(reduced) = remove(&workload, index) {
-                let input_path = self.runner.compile_test(&workload)?;
-                self.runner.run_harness(&input_path)?;
+                let binary_path = self.runner.compile_test(&workload)?;
+                self.runner.run_harness(&binary_path)?;
                 let hash_diff_interesting = self
                     .runner
                     .hash_objective
@@ -94,7 +94,7 @@ impl Reducer {
                         info!("reduced workload (length = {})", workload.ops.len());
                         self.runner.report_crash(
                             &workload,
-                            &input_path,
+                            &binary_path,
                             save_to_dir.clone(),
                             new_diff,
                         )?;

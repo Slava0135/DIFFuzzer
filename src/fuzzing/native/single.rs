@@ -46,7 +46,7 @@ pub fn run(
     let trace_path = exec_dir.join(TRACE_FILENAME);
 
     info!("compiling test at '{}'", test_dir);
-    let input_path = input
+    let binary_path = input
         .compile(&test_dir)
         .with_context(|| format!("failed to compile test"))
         .unwrap();
@@ -62,12 +62,12 @@ pub fn run(
 
     info!("running harness");
     harness
-        .run(&cmdi, &input_path, keep_fs, None)
+        .run(&cmdi, &binary_path, keep_fs, None)
         .with_context(|| format!("failed to run harness"))
         .unwrap();
 
     info!("saving results");
-    save_testcase(save_to_dir, &input_path, &input)
+    save_testcase(save_to_dir, &binary_path, &input)
         .with_context(|| format!("failed to save testcase"))
         .unwrap();
     save_output(
