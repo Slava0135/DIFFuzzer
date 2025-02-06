@@ -46,9 +46,9 @@ impl Fuzzer for BlackBoxFuzzer {
 
         self.runner().run_harness(&binary_path)?;
 
-        let fst_trace = parse_trace(&self.runner().fst_trace_path)
+        let fst_trace = parse_trace(self.runner.cmdi.as_ref(), &self.runner.fst_trace_path)
             .with_context(|| format!("failed to parse first trace"))?;
-        let snd_trace = parse_trace(&self.runner().snd_trace_path)
+        let snd_trace = parse_trace(self.runner.cmdi.as_ref(), &self.runner.snd_trace_path)
             .with_context(|| format!("failed to parse second trace"))?;
 
         if self.detect_errors(&input, &binary_path, &fst_trace, &snd_trace)? {
