@@ -1,6 +1,8 @@
 use std::{
+    env,
     ffi::OsStr,
     fs,
+    path::Path,
     process::{Command, Output},
 };
 
@@ -125,11 +127,15 @@ impl CommandInterface for LocalCommandInterface {
 
 pub struct RemoteCommandInterface {
     config: QemuConfig,
+    tmp_file: LocalPath,
 }
 
 impl RemoteCommandInterface {
     pub fn new(config: QemuConfig) -> Self {
-        RemoteCommandInterface { config }
+        RemoteCommandInterface {
+            config,
+            tmp_file: LocalPath::new(Path::new("/tmp/diffuzzer-ssh-tmp")),
+        }
     }
 }
 
@@ -183,10 +189,19 @@ impl CommandInterface for RemoteCommandInterface {
         Ok(())
     }
     fn write(&self, path: &RemotePath, contents: &[u8]) -> anyhow::Result<()> {
-        todo!()
+        fs::write(self.tmp_file.as_ref(), contents)
+            .with_context(|| format!("failed to write to temporary file at '{}'", self.tmp_file))?;
+        self.copy_to_remote(&self.tmp_file, path)?;
+        fs::remove_file(self.tmp_file.as_ref())
+            .with_context(|| format!("failed to remove temporary file at '{}'", self.tmp_file))
     }
     fn read_to_string(&self, path: &RemotePath) -> anyhow::Result<String> {
-        todo!()
+        self.copy_from_remote(path, &self.tmp_file)?;
+        let s = fs::read_to_string(&self.tmp_file)
+            .with_context(|| format!("failed to read from temprary file at '{}'", self.tmp_file))?;
+        fs::remove_file(self.tmp_file.as_ref())
+            .with_context(|| format!("failed to remove temporary file at '{}'", self.tmp_file))?;
+        Ok(s)
     }
 
     fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output> {
