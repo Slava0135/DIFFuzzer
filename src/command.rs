@@ -1,6 +1,6 @@
 use std::{
     ffi::OsStr,
-    fs,
+    fs::{self, write},
     process::{Command, Output},
 };
 
@@ -24,6 +24,7 @@ pub trait CommandInterface {
         remote_path: &RemotePath,
         local_path: &LocalPath,
     ) -> anyhow::Result<()>;
+    fn write(&self, path: &RemotePath, contents: &[u8]) -> anyhow::Result<()>;
 
     fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output>;
 }
@@ -83,8 +84,7 @@ impl CommandInterface for LocalCommandInterface {
         fs::copy(local_path, remote_path.base.as_ref()).with_context(|| {
             format!(
                 "failed to copy local file from '{}' to '{}'",
-                local_path,
-                remote_path,
+                local_path, remote_path,
             )
         })?;
         Ok(())
@@ -97,12 +97,16 @@ impl CommandInterface for LocalCommandInterface {
         fs::copy(remote_path.base.as_ref(), local_path).with_context(|| {
             format!(
                 "failed to copy local file from '{}' to '{}'",
-                remote_path,
-                local_path,
+                remote_path, local_path,
             )
         })?;
         Ok(())
     }
+    fn write(&self, path: &RemotePath, contents: &[u8]) -> anyhow::Result<()> {
+        write(path.base.as_ref(), contents)
+            .with_context(|| format!("failed to write local file '{}'", path))
+    }
+
     fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output> {
         cmd.exec_local()
     }
@@ -146,8 +150,7 @@ impl CommandInterface for RemoteCommandInterface {
         scp.exec_local().with_context(|| {
             format!(
                 "failed to copy file from '{}' (local) to '{}' (remote)",
-                local_path,
-                remote_path,
+                local_path, remote_path,
             )
         })?;
         Ok(())
@@ -163,12 +166,15 @@ impl CommandInterface for RemoteCommandInterface {
         scp.exec_local().with_context(|| {
             format!(
                 "failed to copy file from '{}' (local) to '{}' (remote)",
-                remote_path,
-                local_path,
+                remote_path, local_path,
             )
         })?;
         Ok(())
     }
+    fn write(&self, path: &RemotePath, contents: &[u8]) -> anyhow::Result<()> {
+        todo!()
+    }
+
     fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output> {
         let mut ssh = CommandWrapper::new("ssh");
         ssh.arg("-q");

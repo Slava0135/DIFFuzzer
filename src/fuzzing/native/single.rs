@@ -47,7 +47,7 @@ pub fn run(
 
     info!("compiling test at '{}'", test_dir);
     let binary_path = input
-        .compile(&test_dir)
+        .compile(&cmdi, &test_dir)
         .with_context(|| format!("failed to compile test"))
         .unwrap();
 

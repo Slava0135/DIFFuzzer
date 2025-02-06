@@ -254,7 +254,7 @@ impl Runner {
     pub fn compile_test(&mut self, input: &Workload) -> anyhow::Result<RemotePath> {
         debug!("compiling test at '{}'", self.test_dir);
         let binary_path = input
-            .compile(&self.test_dir)
+            .compile(self.cmdi.as_ref(), &self.test_dir)
             .with_context(|| format!("failed to compile test"))?;
         Ok(binary_path)
     }
