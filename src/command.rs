@@ -1,5 +1,4 @@
 use std::{
-    env,
     ffi::OsStr,
     fs,
     path::Path,
