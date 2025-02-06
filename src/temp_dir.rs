@@ -43,7 +43,7 @@ pub fn setup_temp_dir(cmdi: &dyn CommandInterface) -> anyhow::Result<PathBuf> {
     cmdi.copy_to_guest(&executor_dir.join(TEST_NAME), &temp_dir.join(TEST_NAME))?;
 
     let mut make = CommandWrapper::new("make");
-    make.arg("C").arg(executor_dir);
+    make.arg("-C").arg(executor_dir);
     cmdi.exec(make)
         .with_context(|| "failed to make test binary")?;
 
