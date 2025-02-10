@@ -171,15 +171,7 @@ impl Runner {
         debug!("report crash '{}'", name);
 
         let crash_dir = crash_dir.join(name);
-        if fs::exists(&crash_dir).with_context(|| {
-            format!(
-                "failed to determine existence of crash directory at '{}'",
-                crash_dir
-            )
-        })? {
-            return anyhow::Ok(());
-        }
-        fs::create_dir(&crash_dir)
+        fs::create_dir_all(&crash_dir)
             .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
 
         save_testcase(self.cmdi.as_ref(), &crash_dir, binary_path, &input)?;

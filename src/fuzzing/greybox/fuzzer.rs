@@ -100,15 +100,7 @@ impl GreyBoxFuzzer {
         debug!("save corpus input '{}'", name);
 
         let corpus_dir = self.corpus_path.clone().unwrap().join(name);
-        if fs::exists(&corpus_dir).with_context(|| {
-            format!(
-                "failed to determine existence of corpus directory at '{}'",
-                corpus_dir
-            )
-        })? {
-            return anyhow::Ok(());
-        }
-        fs::create_dir(&corpus_dir)
+        fs::create_dir_all(&corpus_dir)
             .with_context(|| format!("failed to create corpus directory at '{}'", corpus_dir))?;
 
         save_testcase(self.runner.cmdi.as_ref(), &corpus_dir, binary_path, &input)?;
