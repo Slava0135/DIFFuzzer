@@ -39,7 +39,7 @@ pub trait CommandInterface {
     fn exec_in_dir(&self, cmd: CommandWrapper, dir: &RemotePath) -> anyhow::Result<Output>;
 
     fn setup_remote_dir(&self) -> anyhow::Result<RemotePath> {
-        let remote_dir = RemotePath::new(&Path::new("/tmp").join("DIFFuzzer"));
+        let remote_dir = RemotePath::new(&Path::new("/tmp").join("diffuzzer-remote"));
 
         info!(
             "setting up remote directory at '{}'",

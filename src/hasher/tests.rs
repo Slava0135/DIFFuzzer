@@ -93,7 +93,7 @@ fn test_hash_eq_skip() {
 }
 
 fn create_data_for_test(dirs: Vec<&str>, files: Vec<&str>, data: Vec<&str>) -> Vec<PathBuf> {
-    let temp_dir = env::temp_dir().join("DIFFuzzer-hash-test");
+    let temp_dir = env::temp_dir().join("diffuzzer-hash-test");
     fs::remove_dir_all(temp_dir.as_path()).unwrap_or(());
 
     let cmp_dirs = vec![temp_dir.join("fst"), temp_dir.join("snd")];
