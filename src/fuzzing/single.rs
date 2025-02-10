@@ -67,6 +67,7 @@ pub fn run(
         .unwrap();
 
     info!("saving results");
+    fs::create_dir_all(output_dir).unwrap();
     save_testcase(&cmdi, output_dir, &binary_path, &input)
         .with_context(|| format!("failed to save testcase"))
         .unwrap();
