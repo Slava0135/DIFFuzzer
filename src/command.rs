@@ -168,17 +168,16 @@ impl CommandInterface for LocalCommandInterface {
         remote_path: &RemotePath,
         local_path: &LocalPath,
     ) -> anyhow::Result<()> {
-        Command::new("cp")
-            .arg("-r")
+        let mut cp = CommandWrapper::new("cp");
+        cp.arg("-r")
             .arg(remote_path.base.as_ref())
-            .arg(local_path.as_ref())
-            .output()
-            .with_context(|| {
-                format!(
-                    "failed to copy local directory from '{}' to '{}'",
-                    remote_path, local_path
-                )
-            })?;
+            .arg(local_path.as_ref());
+        cp.exec_local().with_context(|| {
+            format!(
+                "failed to copy local directory from '{}' to '{}'",
+                remote_path, local_path
+            )
+        })?;
         Ok(())
     }
     fn write(&self, path: &RemotePath, contents: &[u8]) -> anyhow::Result<()> {
