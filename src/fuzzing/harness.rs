@@ -59,7 +59,14 @@ impl Harness {
         }
 
         if !keep_fs {
-            self.teardown(cmdi)?;
+            self.fs_mount
+                .teardown(cmdi, &self.fs_dir)
+                .with_context(|| {
+                    format!(
+                        "failed to teardown fs '{}' at '{}'",
+                        self.fs_mount, self.fs_dir
+                    )
+                })?;
         }
 
         self.stdout.replace(
@@ -72,17 +79,5 @@ impl Harness {
         );
 
         Ok(output.status.success())
-    }
-
-    pub fn teardown(&self, cmdi: &dyn CommandInterface) -> anyhow::Result<()> {
-        self.fs_mount
-            .teardown(cmdi, &self.fs_dir)
-            .with_context(|| {
-                format!(
-                    "failed to teardown fs '{}' at '{}'",
-                    self.fs_mount, self.fs_dir
-                )
-            })?;
-        Ok(())
     }
 }
