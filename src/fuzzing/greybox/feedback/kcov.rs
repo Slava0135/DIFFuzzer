@@ -1,38 +1,35 @@
-use std::{
-    collections::HashSet,
-    fs::File,
-    io::{BufRead, BufReader},
-    path::Path,
-};
+use std::
+    collections::HashSet
+;
 
 use anyhow::Context;
 use log::debug;
+
+use crate::{command::CommandInterface, path::RemotePath};
 
 pub const KCOV_FILENAME: &str = "kcov.dat";
 
 pub struct KCovFeedback {
     all_coverage: HashSet<u64>,
-    kcov_path: Box<Path>,
+    kcov_path: RemotePath,
 }
 
 impl KCovFeedback {
-    pub fn new(kcov_path: Box<Path>) -> Self {
+    pub fn new(kcov_path: RemotePath) -> Self {
         Self {
             all_coverage: HashSet::new(),
             kcov_path,
         }
     }
-    pub fn is_interesting(&mut self) -> anyhow::Result<bool> {
+    pub fn is_interesting(&mut self, cmdi: &dyn CommandInterface) -> anyhow::Result<bool> {
         debug!("do kcov feedback");
-        let kcov = File::open(&self.kcov_path).with_context(|| {
-            format!("failed to open kcov file at '{}'", self.kcov_path.display())
-        })?;
-        let reader = BufReader::new(kcov);
+        let kcov = cmdi
+            .read_to_string(&self.kcov_path)
+            .with_context(|| "failed to read kcov file")?;
         let mut new_coverage = HashSet::new();
-        for line in reader.lines() {
-            let addr = line.with_context(|| format!("failed to read lines from kcov file"))?;
-            let addr = parse_addr(&addr)
-                .with_context(|| format!("failed to parse addr from kcov line '{}'", addr))?;
+        for line in kcov.lines() {
+            let addr = parse_addr(&line)
+                .with_context(|| format!("failed to parse addr from kcov line '{}'", line))?;
             new_coverage.insert(addr);
         }
         let c = self.all_coverage.clone();

@@ -6,11 +6,15 @@ use clap::{builder::PossibleValuesParser, Parser, Subcommand};
 #[command(propagate_version = true)]
 pub struct Args {
     /// Path to configuration file in TOML format
-    #[arg(long,default_value_t = String::from("./config.toml"))]
+    #[arg(long, default_value_t = String::from("./config.toml"))]
     pub config_path: String,
 
     #[clap(subcommand)]
     pub mode: Mode,
+
+    /// Run tests on host instead of QEMU (not recommended)
+    #[arg(short, long, default_value_t = false)]
+    pub no_qemu: bool,
 }
 
 #[derive(Debug, PartialEq, Clone, Subcommand)]

@@ -6,11 +6,13 @@ use anyhow::{Context, Ok};
 use log::{debug, info};
 use rand::{rngs::StdRng, SeedableRng};
 
-use crate::fuzzing::common::{parse_trace, Fuzzer, Runner};
-use crate::fuzzing::greybox::feedback::kcov::KCOV_FILENAME;
+use crate::fuzzing::fuzzer::Fuzzer;
+use crate::fuzzing::runner::{parse_trace, Runner};
+use crate::path::{LocalPath, RemotePath};
 use crate::save::{save_output, save_testcase};
 use crate::{abstract_fs::workload::Workload, config::Config, mount::mount::FileSystemMount};
 
+use super::feedback::kcov::KCOV_FILENAME;
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 
 pub struct GreyBoxFuzzer {
@@ -24,7 +26,7 @@ pub struct GreyBoxFuzzer {
 
     mutator: Mutator,
 
-    corpus_path: Option<Box<Path>>,
+    corpus_path: Option<LocalPath>,
 }
 
 impl GreyBoxFuzzer {
@@ -49,7 +51,7 @@ impl GreyBoxFuzzer {
         let corpus_path = if config.greybox.save_corpus {
             let path = Path::new("./corpus");
             fs::create_dir(path).unwrap_or(());
-            Some(path.to_path_buf().into_boxed_path())
+            Some(LocalPath::new(path))
         } else {
             None
         };
@@ -59,8 +61,8 @@ impl GreyBoxFuzzer {
         let fst_kcov_path = runner.fst_exec_dir.join(KCOV_FILENAME);
         let snd_kcov_path = runner.snd_exec_dir.join(KCOV_FILENAME);
 
-        let fst_kcov_feedback = KCovFeedback::new(fst_kcov_path.clone().into_boxed_path());
-        let snd_kcov_feedback = KCovFeedback::new(snd_kcov_path.clone().into_boxed_path());
+        let fst_kcov_feedback = KCovFeedback::new(fst_kcov_path);
+        let snd_kcov_feedback = KCovFeedback::new(snd_kcov_path);
 
         Self {
             runner,
@@ -90,28 +92,25 @@ impl GreyBoxFuzzer {
         self.corpus.push(input);
     }
 
-    fn save_input(&mut self, input: Workload, input_path: &Path) -> anyhow::Result<()> {
+    fn save_input(&mut self, input: Workload, binary_path: &RemotePath) -> anyhow::Result<()> {
         let name = input.generate_name();
         debug!("save corpus input '{}'", name);
 
         let corpus_dir = self.corpus_path.clone().unwrap().join(name);
-        if fs::exists(corpus_dir.as_path()).with_context(|| {
+        if fs::exists(&corpus_dir).with_context(|| {
             format!(
                 "failed to determine existence of corpus directory at '{}'",
-                corpus_dir.display()
+                corpus_dir
             )
         })? {
             return anyhow::Ok(());
         }
-        fs::create_dir(corpus_dir.as_path()).with_context(|| {
-            format!(
-                "failed to create corpus directory at '{}'",
-                corpus_dir.display()
-            )
-        })?;
+        fs::create_dir(&corpus_dir)
+            .with_context(|| format!("failed to create corpus directory at '{}'", corpus_dir))?;
 
-        save_testcase(&corpus_dir, input_path, &input)?;
+        save_testcase(self.runner.cmdi.as_ref(), &corpus_dir, binary_path, &input)?;
         save_output(
+            self.runner.cmdi.as_ref(),
             &corpus_dir,
             &self.runner.fst_trace_path,
             &self.runner.fst_fs_name,
@@ -120,6 +119,7 @@ impl GreyBoxFuzzer {
         )
         .with_context(|| format!("failed to save output for first harness"))?;
         save_output(
+            self.runner.cmdi.as_ref(),
             &corpus_dir,
             &self.runner.snd_trace_path,
             &self.runner.snd_fs_name,
@@ -139,33 +139,43 @@ impl Fuzzer for GreyBoxFuzzer {
         debug!("mutating input");
         let input = self.mutator.mutate(input);
 
-        let input_path = self.runner().compile_test(&input)?;
+        let binary_path = self.runner().compile_test(&input)?;
 
-        self.runner().run_harness(&input_path)?;
+        self.runner().run_harness(&binary_path)?;
 
-        let fst_trace = parse_trace(&self.runner().fst_trace_path)
-            .with_context(|| format!("failed to parse first trace"))?;
-        let snd_trace = parse_trace(&self.runner().snd_trace_path)
-            .with_context(|| format!("failed to parse second trace"))?;
+        let fst_trace = parse_trace(
+            self.runner.cmdi.as_ref(),
+            &self.runner.fst_trace_path.clone(),
+        )
+        .with_context(|| format!("failed to parse first trace"))?;
+        let snd_trace = parse_trace(
+            self.runner.cmdi.as_ref(),
+            &self.runner.snd_trace_path.clone(),
+        )
+        .with_context(|| format!("failed to parse second trace"))?;
 
-        if self.detect_errors(&input, &input_path, &fst_trace, &snd_trace)? {
+        if self.detect_errors(&input, &binary_path, &fst_trace, &snd_trace)? {
             return Ok(());
         }
 
-        if self.do_objective(&input, &input_path, &fst_trace, &snd_trace)? {
+        if self.do_objective(&input, &binary_path, &fst_trace, &snd_trace)? {
             return Ok(());
         }
 
         debug!("getting feedback");
-        let fst_kcov_is_interesting =
-            self.fst_kcov_feedback.is_interesting().with_context(|| {
+        let fst_kcov_is_interesting = self
+            .fst_kcov_feedback
+            .is_interesting(self.runner.cmdi.as_ref())
+            .with_context(|| {
                 format!(
                     "failed to get first kcov feedback for '{}'",
                     self.runner.fst_fs_name
                 )
             })?;
-        let snd_kcov_is_interesting =
-            self.snd_kcov_feedback.is_interesting().with_context(|| {
+        let snd_kcov_is_interesting = self
+            .snd_kcov_feedback
+            .is_interesting(self.runner.cmdi.as_ref())
+            .with_context(|| {
                 format!(
                     "failed to get second kcov feedback for '{}'",
                     self.runner.snd_fs_name
@@ -175,7 +185,7 @@ impl Fuzzer for GreyBoxFuzzer {
             self.add_to_corpus(input.clone());
             self.show_stats();
             if self.corpus_path.is_some() {
-                self.save_input(input, &input_path)
+                self.save_input(input, &binary_path)
                     .with_context(|| format!("failed to save input"))?;
             }
             return Ok(());

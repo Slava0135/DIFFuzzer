@@ -1,25 +1,26 @@
 use std::{fs, path::Path};
 
-use crate::fuzzing::blackbox::fuzzer::BlackBoxFuzzer;
-use crate::fuzzing::greybox::fuzzer::GreyBoxFuzzer;
 use args::Args;
 use clap::Parser;
 use config::Config;
-use fuzzing::common::Fuzzer;
-use fuzzing::reducer::Reducer;
+use fuzzing::{
+    blackbox::fuzzer::BlackBoxFuzzer, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
+    reducer::Reducer, single,
+};
 use log::info;
+use path::LocalPath;
 
 mod abstract_fs;
 mod args;
+mod command;
+mod compile;
 mod config;
 mod filesystems;
 mod fuzzing;
-mod harness;
 mod hasher;
 mod mount;
+mod path;
 mod save;
-mod single;
-mod temp_dir;
 
 fn main() {
     let args = Args::parse();
@@ -36,50 +37,71 @@ fn main() {
             second_filesystem,
             test_count,
         } => {
-            GreyBoxFuzzer::new(
-                config,
-                first_filesystem.try_into().unwrap(),
-                second_filesystem.try_into().unwrap(),
-            )
-            .run(test_count);
+            if args.no_qemu {
+                GreyBoxFuzzer::new(
+                    config,
+                    first_filesystem.try_into().unwrap(),
+                    second_filesystem.try_into().unwrap(),
+                )
+                .run(test_count);
+            } else {
+                todo!("QEMU not supported");
+            }
         }
         args::Mode::Blackbox {
             first_filesystem,
             second_filesystem,
             test_count,
         } => {
-            BlackBoxFuzzer::new(
-                config,
-                first_filesystem.try_into().unwrap(),
-                second_filesystem.try_into().unwrap(),
-            )
-            .run(test_count);
+            if args.no_qemu {
+                BlackBoxFuzzer::new(
+                    config,
+                    first_filesystem.try_into().unwrap(),
+                    second_filesystem.try_into().unwrap(),
+                )
+                .run(test_count);
+            } else {
+                todo!("QEMU not supported");
+            }
         }
         args::Mode::Single {
             save_to_dir,
             path_to_test,
             keep_fs,
             filesystem,
-        } => single::run(
-            Path::new(&path_to_test),
-            Path::new(&save_to_dir),
-            keep_fs,
-            filesystem.try_into().unwrap(),
-            config.fs_name,
-        ),
+        } => {
+            if args.no_qemu {
+                single::run(
+                    &LocalPath::new(Path::new(&path_to_test)),
+                    &LocalPath::new(Path::new(&save_to_dir)),
+                    keep_fs,
+                    filesystem.try_into().unwrap(),
+                    config.fs_name,
+                )
+            } else {
+                todo!("QEMU not supported");
+            }
+        }
         args::Mode::Reduce {
             output_dir,
             path_to_test,
             first_filesystem,
             second_filesystem,
         } => {
-            Reducer::new(
-                config,
-                first_filesystem.try_into().unwrap(),
-                second_filesystem.try_into().unwrap(),
-            )
-            .run(Path::new(&path_to_test), Path::new(&output_dir))
-            .unwrap();
+            if args.no_qemu {
+                Reducer::new(
+                    config,
+                    first_filesystem.try_into().unwrap(),
+                    second_filesystem.try_into().unwrap(),
+                )
+                .run(
+                    &LocalPath::new(Path::new(&path_to_test)),
+                    &LocalPath::new(Path::new(&output_dir)),
+                )
+                .unwrap();
+            } else {
+                todo!("QEMU not supported");
+            }
         }
     }
 }

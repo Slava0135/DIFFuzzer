@@ -1,4 +1,4 @@
-use std::{fs::read_to_string, path::Path};
+use std::fs::read_to_string;
 
 use anyhow::{Context, Ok};
 use log::{info, warn};
@@ -6,12 +6,13 @@ use log::{info, warn};
 use crate::{
     abstract_fs::{mutator::remove, workload::Workload},
     config::Config,
-    fuzzing::common::parse_trace,
+    fuzzing::runner::parse_trace,
     hasher::hasher::FileDiff,
     mount::mount::FileSystemMount,
+    path::LocalPath,
 };
 
-use super::common::Runner;
+use super::runner::Runner;
 
 pub struct Reducer {
     runner: Runner,
@@ -28,9 +29,9 @@ impl Reducer {
         }
     }
 
-    pub fn run(&mut self, test_path: &Path, save_to_dir: &Path) -> anyhow::Result<()> {
+    pub fn run(&mut self, test_path: &LocalPath, save_to_dir: &LocalPath) -> anyhow::Result<()> {
         info!("running reducer");
-        info!("reading testcase at '{}'", test_path.display());
+        info!("reading testcase at '{}'", test_path);
         let input = read_to_string(test_path)
             .with_context(|| format!("failed to read testcase"))
             .unwrap();
@@ -38,13 +39,13 @@ impl Reducer {
             .with_context(|| format!("failed to parse json"))
             .unwrap();
 
-        let input_path = self.runner.compile_test(&input)?;
+        let binary_path = self.runner.compile_test(&input)?;
 
-        self.runner.run_harness(&input_path)?;
+        self.runner.run_harness(&binary_path)?;
 
-        let fst_trace = parse_trace(&self.runner.fst_trace_path)
+        let fst_trace = parse_trace(self.runner.cmdi.as_ref(), &self.runner.fst_trace_path)
             .with_context(|| format!("failed to parse first trace"))?;
-        let snd_trace = parse_trace(&self.runner.snd_trace_path)
+        let snd_trace = parse_trace(self.runner.cmdi.as_ref(), &self.runner.snd_trace_path)
             .with_context(|| format!("failed to parse second trace"))?;
 
         let hash_diff_interesting = self
@@ -72,15 +73,15 @@ impl Reducer {
         &mut self,
         input: Workload,
         old_diff: Vec<FileDiff>,
-        save_to_dir: &Path,
+        save_to_dir: &LocalPath,
     ) -> anyhow::Result<()> {
         info!("reducing using hash difference");
         let mut index = input.ops.len() - 1;
         let mut workload = input;
         loop {
             if let Some(reduced) = remove(&workload, index) {
-                let input_path = self.runner.compile_test(&workload)?;
-                self.runner.run_harness(&input_path)?;
+                let binary_path = self.runner.compile_test(&workload)?;
+                self.runner.run_harness(&binary_path)?;
                 let hash_diff_interesting = self
                     .runner
                     .hash_objective
@@ -93,8 +94,8 @@ impl Reducer {
                         info!("reduced workload (length = {})", workload.ops.len());
                         self.runner.report_crash(
                             &workload,
-                            &input_path,
-                            save_to_dir.to_path_buf().into_boxed_path(),
+                            &binary_path,
+                            save_to_dir.clone(),
                             new_diff,
                         )?;
                     }

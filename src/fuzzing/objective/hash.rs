@@ -1,12 +1,13 @@
-use std::path::Path;
-
 use log::debug;
 use regex::RegexSet;
 
-use crate::hasher::hasher::{calc_dir_hash, get_diff, FileDiff, FileInfo, HasherOptions};
+use crate::{
+    hasher::hasher::{calc_dir_hash, get_diff, FileDiff, FileInfo, HasherOptions},
+    path::RemotePath,
+};
 
 pub struct HashHolder {
-    fs_dir: Box<Path>,
+    fs_dir: RemotePath,
     fs_internal: RegexSet,
     fs_content: Vec<FileInfo>,
     hash: u64,
@@ -16,7 +17,7 @@ pub struct HashHolder {
 impl HashHolder {
     pub fn calc_and_save_hash(&mut self) {
         let (hash, fs_content) =
-            calc_dir_hash(&self.fs_dir, &self.fs_internal, &self.hasher_options);
+            calc_dir_hash(&self.fs_dir.base, &self.fs_internal, &self.hasher_options);
         self.fs_content = fs_content;
         self.hash = hash;
     }
@@ -30,8 +31,8 @@ pub struct HashObjective {
 
 impl HashObjective {
     pub fn new(
-        fst_fs_dir: Box<Path>,
-        snd_fs_dir: Box<Path>,
+        fst_fs_dir: RemotePath,
+        snd_fs_dir: RemotePath,
         fst_fs_internal: RegexSet,
         snd_fs_internal: RegexSet,
         enabled: bool,

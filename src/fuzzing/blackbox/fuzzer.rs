@@ -6,8 +6,9 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
 use crate::config::Config;
-use crate::fuzzing::common::{parse_trace, Fuzzer, Runner};
 
+use crate::fuzzing::fuzzer::Fuzzer;
+use crate::fuzzing::runner::{parse_trace, Runner};
 use crate::mount::mount::FileSystemMount;
 
 pub struct BlackBoxFuzzer {
@@ -42,20 +43,20 @@ impl Fuzzer for BlackBoxFuzzer {
             &self.runner.config.operation_weights,
         );
 
-        let input_path = self.runner().compile_test(&input)?;
+        let binary_path = self.runner().compile_test(&input)?;
 
-        self.runner().run_harness(&input_path)?;
+        self.runner().run_harness(&binary_path)?;
 
-        let fst_trace = parse_trace(&self.runner().fst_trace_path)
+        let fst_trace = parse_trace(self.runner.cmdi.as_ref(), &self.runner.fst_trace_path)
             .with_context(|| format!("failed to parse first trace"))?;
-        let snd_trace = parse_trace(&self.runner().snd_trace_path)
+        let snd_trace = parse_trace(self.runner.cmdi.as_ref(), &self.runner.snd_trace_path)
             .with_context(|| format!("failed to parse second trace"))?;
 
-        if self.detect_errors(&input, &input_path, &fst_trace, &snd_trace)? {
+        if self.detect_errors(&input, &binary_path, &fst_trace, &snd_trace)? {
             return Ok(());
         }
 
-        self.do_objective(&input, &input_path, &fst_trace, &snd_trace)?;
+        self.do_objective(&input, &binary_path, &fst_trace, &snd_trace)?;
 
         Ok(())
     }

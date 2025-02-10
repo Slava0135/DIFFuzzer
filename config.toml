@@ -4,6 +4,13 @@ heartbeat_interval = 30 # in seconds
 max_workload_length = 100 
 timeout = 10 # in seconds
 
+[qemu]
+launch_script = "./tools/launch-snapshot.sh"
+monitor_port = 55555
+os_image = "./disk.img"
+ssh_port = 2222
+ssh_private_key_path = "./ssh.key"
+
 [greybox]
 max_mutations = 10
 save_corpus = false

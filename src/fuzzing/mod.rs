@@ -1,5 +1,8 @@
 pub mod blackbox;
-pub mod common;
+pub mod fuzzer;
 pub mod greybox;
 pub mod objective;
+pub mod harness;
 pub mod reducer;
+pub mod runner;
+pub mod single;
