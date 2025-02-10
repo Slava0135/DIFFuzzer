@@ -6,7 +6,7 @@ use log::info;
 use crate::{
     abstract_fs::{trace::TRACE_FILENAME, workload::Workload},
     command::{CommandInterface, LocalCommandInterface},
-    fuzzing::native::harness::Harness,
+    fuzzing::harness::Harness,
     mount::mount::FileSystemMount,
     path::{LocalPath, RemotePath},
     save::{save_output, save_testcase},
