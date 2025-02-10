@@ -9,7 +9,7 @@ use crate::{
     path::RemotePath,
 };
 
-use super::runner::Runner;
+use super::{outcome::Outcome, runner::Runner};
 
 pub trait Fuzzer {
     fn run(&mut self, test_count: Option<u64>) {
@@ -57,6 +57,8 @@ pub trait Fuzzer {
         binary_path: &RemotePath,
         fst_trace: &Trace,
         snd_trace: &Trace,
+        fst_outcome: &Outcome,
+        snd_outcome: &Outcome,
     ) -> anyhow::Result<bool> {
         let runner = self.runner();
         debug!("doing objectives");
@@ -78,7 +80,14 @@ pub trait Fuzzer {
                 diff = runner.hash_objective.get_diff();
             }
             runner
-                .report_crash(&input, binary_path, runner.crashes_path.clone(), diff)
+                .report_crash(
+                    &input,
+                    binary_path,
+                    runner.crashes_path.clone(),
+                    diff,
+                    fst_outcome,
+                    snd_outcome,
+                )
                 .with_context(|| format!("failed to report crash"))?;
             self.runner().stats.crashes += 1;
             self.show_stats();
@@ -94,13 +103,22 @@ pub trait Fuzzer {
         binary_path: &RemotePath,
         fst_trace: &Trace,
         snd_trace: &Trace,
+        fst_outcome: &Outcome,
+        snd_outcome: &Outcome,
     ) -> anyhow::Result<bool> {
         debug!("detecting errors");
         if fst_trace.has_errors() && snd_trace.has_errors() {
             warn!("both traces contain errors, potential bug in model");
             let accidents_path = self.runner().accidents_path.clone();
             self.runner()
-                .report_crash(&input, binary_path, accidents_path, vec![])
+                .report_crash(
+                    &input,
+                    binary_path,
+                    accidents_path,
+                    vec![],
+                    fst_outcome,
+                    snd_outcome,
+                )
                 .with_context(|| format!("failed to report accident"))?;
             Ok(true)
         } else {

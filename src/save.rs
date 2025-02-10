@@ -6,6 +6,7 @@ use anyhow::Context;
 
 use crate::command::CommandInterface;
 use crate::compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME};
+use crate::fuzzing::outcome::Outcome;
 use crate::hasher::hasher::FileDiff::{DifferentHash, OneExists};
 use crate::hasher::hasher::{FileDiff, DIFF_HASH_FILENAME};
 use crate::path::LocalPath;
@@ -40,29 +41,26 @@ pub fn save_testcase(
     Ok(())
 }
 
-pub fn save_output(
-    cmdi: &dyn CommandInterface,
+pub fn save_outcome(
     output_dir: &LocalPath,
-    trace_path: &RemotePath,
     fs_name: &str,
-    stdout: String,
-    stderr: String,
+    outcome: &Outcome,
 ) -> anyhow::Result<()> {
+    let trace_path = outcome.dir.join(TRACE_FILENAME);
     let trace_copy_path = output_dir.join(format!("{}.{}", fs_name, TRACE_FILENAME));
-    cmdi.copy_from_remote(trace_path, &trace_copy_path)
-        .with_context(|| {
-            format!(
-                "failed to copy trace from '{}' to '{}'",
-                trace_path, trace_copy_path
-            )
-        })?;
+    fs::copy(trace_path.as_ref(), trace_copy_path.as_ref()).with_context(|| {
+        format!(
+            "failed to copy trace from '{}' to '{}'",
+            trace_path, trace_copy_path
+        )
+    })?;
 
     let stdout_path = output_dir.join(format!("{}.stdout.txt", fs_name));
-    fs::write(&stdout_path, stdout)
+    fs::write(&stdout_path, outcome.stdout.clone())
         .with_context(|| format!("failed to save stdout at '{}'", stdout_path))?;
 
     let stderr_path = output_dir.join(format!("{}.stderr.txt", fs_name));
-    fs::write(&stderr_path, stderr)
+    fs::write(&stderr_path, outcome.stderr.clone())
         .with_context(|| format!("failed to save stderr at '{}'", stderr_path))?;
 
     Ok(())

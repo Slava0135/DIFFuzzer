@@ -6,18 +6,17 @@ use crate::config::Config;
 use crate::hasher::hasher::FileDiff;
 use crate::mount::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
-use crate::save::{save_diff, save_output, save_testcase};
+use crate::save::{save_diff, save_outcome, save_testcase};
 use anyhow::{Context, Ok};
 use log::{debug, info};
-use std::cell::RefCell;
 use std::fs;
 use std::path::Path;
-use std::rc::Rc;
 use std::time::Instant;
 
-use super::harness::{ConsolePipe, Harness};
+use super::harness::Harness;
 use super::objective::hash::HashObjective;
 use super::objective::trace::TraceObjective;
+use super::outcome::Outcome;
 
 pub struct Runner {
     pub config: Config,
@@ -25,15 +24,7 @@ pub struct Runner {
     pub cmdi: Box<dyn CommandInterface>,
 
     pub test_dir: RemotePath,
-    pub fst_exec_dir: RemotePath,
-    pub snd_exec_dir: RemotePath,
-    pub fst_trace_path: RemotePath,
-    pub snd_trace_path: RemotePath,
-
-    pub fst_stdout: ConsolePipe,
-    pub snd_stdout: ConsolePipe,
-    pub fst_stderr: ConsolePipe,
-    pub snd_stderr: ConsolePipe,
+    pub exec_dir: RemotePath,
 
     pub crashes_path: LocalPath,
     pub accidents_path: LocalPath,
@@ -43,6 +34,7 @@ pub struct Runner {
 
     pub fst_fs_name: String,
     pub snd_fs_name: String,
+
     pub fst_harness: Harness,
     pub snd_harness: Harness,
 
@@ -66,22 +58,13 @@ impl Runner {
 
         info!("setting up fuzzing components");
         let test_dir = temp_dir.clone();
-        let fst_exec_dir = temp_dir.join("fst_exec");
-        let snd_exec_dir = temp_dir.join("snd_exec");
-
-        let fst_trace_path = fst_exec_dir.join(TRACE_FILENAME);
-        let snd_trace_path = snd_exec_dir.join(TRACE_FILENAME);
+        let exec_dir = temp_dir.join("exec");
 
         let crashes_path = LocalPath::new(Path::new("./crashes"));
         fs::create_dir(&crashes_path).unwrap_or(());
 
         let accidents_path = LocalPath::new(Path::new("./accidents"));
         fs::create_dir(&accidents_path).unwrap_or(());
-
-        let fst_stdout = Rc::new(RefCell::new("".to_owned()));
-        let fst_stderr = Rc::new(RefCell::new("".to_owned()));
-        let snd_stdout = Rc::new(RefCell::new("".to_owned()));
-        let snd_stderr = Rc::new(RefCell::new("".to_owned()));
 
         let fst_fs_name = fst_mount.to_string();
         let snd_fs_name = snd_mount.to_string();
@@ -105,16 +88,14 @@ impl Runner {
         let fst_harness = Harness::new(
             fst_mount,
             fst_fs_dir.clone(),
-            fst_exec_dir.clone(),
-            fst_stdout.clone(),
-            fst_stderr.clone(),
+            exec_dir.clone(),
+            LocalPath::new_tmp("outcome-1"),
         );
         let snd_harness = Harness::new(
             snd_mount,
             snd_fs_dir.clone(),
-            snd_exec_dir.clone(),
-            snd_stdout.clone(),
-            snd_stderr.clone(),
+            exec_dir.clone(),
+            LocalPath::new_tmp("outcome-2"),
         );
 
         Self {
@@ -122,19 +103,11 @@ impl Runner {
 
             cmdi,
 
-            fst_exec_dir: fst_exec_dir,
-            snd_exec_dir: snd_exec_dir,
-            fst_trace_path: fst_trace_path,
-            snd_trace_path: snd_trace_path,
+            exec_dir,
 
-            fst_stdout,
-            snd_stdout,
-            fst_stderr,
-            snd_stderr,
-
-            test_dir: test_dir,
-            crashes_path: crashes_path,
-            accidents_path: accidents_path,
+            test_dir,
+            crashes_path,
+            accidents_path,
 
             hash_objective,
             trace_objective,
@@ -156,23 +129,13 @@ impl Runner {
         Ok(binary_path)
     }
 
-    pub fn run_harness(&mut self, binary_path: &RemotePath) -> anyhow::Result<()> {
+    pub fn run_harness(&mut self, binary_path: &RemotePath) -> anyhow::Result<(Outcome, Outcome)> {
         debug!("running harness at '{}'", binary_path);
 
-        setup_dir(self.cmdi.as_ref(), &self.fst_exec_dir).with_context(|| {
-            format!(
-                "failed to setup remote exec dir at '{}'",
-                &self.fst_exec_dir
-            )
-        })?;
-        setup_dir(self.cmdi.as_ref(), &self.snd_exec_dir).with_context(|| {
-            format!(
-                "failed to setup remote exec dir at '{}'",
-                &self.snd_exec_dir
-            )
-        })?;
-
-        self.fst_harness
+        setup_dir(self.cmdi.as_ref(), &self.exec_dir)
+            .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;
+        let fst_outcome = self
+            .fst_harness
             .run(
                 self.cmdi.as_ref(),
                 &binary_path,
@@ -180,7 +143,11 @@ impl Runner {
                 Some(&mut self.hash_objective.fst_fs),
             )
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
-        self.snd_harness
+
+        setup_dir(self.cmdi.as_ref(), &self.exec_dir)
+            .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;
+        let snd_outcome = self
+            .snd_harness
             .run(
                 self.cmdi.as_ref(),
                 &binary_path,
@@ -188,7 +155,7 @@ impl Runner {
                 Some(&mut self.hash_objective.snd_fs),
             )
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
-        Ok(())
+        Ok((fst_outcome, snd_outcome))
     }
 
     pub fn report_crash(
@@ -197,6 +164,8 @@ impl Runner {
         binary_path: &RemotePath,
         crash_dir: LocalPath,
         hash_diff: Vec<FileDiff>,
+        fst_outcome: &Outcome,
+        snd_outcome: &Outcome,
     ) -> anyhow::Result<()> {
         let name = input.generate_name();
         debug!("report crash '{}'", name);
@@ -214,24 +183,10 @@ impl Runner {
             .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
 
         save_testcase(self.cmdi.as_ref(), &crash_dir, binary_path, &input)?;
-        save_output(
-            self.cmdi.as_ref(),
-            &crash_dir,
-            &self.fst_trace_path,
-            &self.fst_fs_name,
-            self.fst_stdout.borrow().clone(),
-            self.fst_stderr.borrow().clone(),
-        )
-        .with_context(|| format!("failed to save output for first harness"))?;
-        save_output(
-            self.cmdi.as_ref(),
-            &crash_dir,
-            &self.snd_trace_path,
-            &self.snd_fs_name,
-            self.snd_stdout.borrow().clone(),
-            self.snd_stderr.borrow().clone(),
-        )
-        .with_context(|| format!("failed to save output for first harness"))?;
+        save_outcome(&crash_dir, &self.fst_fs_name, &fst_outcome)
+            .with_context(|| format!("failed to save first outcome"))?;
+        save_outcome(&crash_dir, &self.snd_fs_name, &snd_outcome)
+            .with_context(|| format!("failed to save second outcome"))?;
 
         save_diff(&crash_dir, hash_diff)
             .with_context(|| format!("failed to save hash differences"))?;
@@ -259,8 +214,8 @@ impl Stats {
     }
 }
 
-pub fn parse_trace(cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<Trace> {
-    let trace = cmdi.read_to_string(path)?;
+pub fn parse_trace(outcome: &Outcome) -> anyhow::Result<Trace> {
+    let trace = fs::read_to_string(&outcome.dir.join(TRACE_FILENAME))?;
     anyhow::Ok(Trace::try_parse(trace).with_context(|| format!("failed to parse trace"))?)
 }
 
