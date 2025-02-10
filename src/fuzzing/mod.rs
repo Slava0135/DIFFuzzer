@@ -1,3 +1,8 @@
-pub mod native;
-pub mod qemu;
+pub mod blackbox;
+pub mod fuzzer;
+pub mod greybox;
+pub mod objective;
 pub mod harness;
+pub mod reducer;
+pub mod runner;
+pub mod single;

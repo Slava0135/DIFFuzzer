@@ -4,7 +4,12 @@ use anyhow::{Context, Ok};
 use log::{info, warn};
 
 use crate::{
-    abstract_fs::{mutator::remove, workload::Workload}, config::Config, fuzzing::native::runner::parse_trace, hasher::hasher::FileDiff, mount::mount::FileSystemMount, path::LocalPath
+    abstract_fs::{mutator::remove, workload::Workload},
+    config::Config,
+    fuzzing::runner::parse_trace,
+    hasher::hasher::FileDiff,
+    mount::mount::FileSystemMount,
+    path::LocalPath,
 };
 
 use super::runner::Runner;

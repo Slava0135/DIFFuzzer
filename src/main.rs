@@ -3,7 +3,7 @@ use std::{fs, path::Path};
 use args::Args;
 use clap::Parser;
 use config::Config;
-use fuzzing::native::{
+use fuzzing::{
     blackbox::fuzzer::BlackBoxFuzzer, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer, reducer::Reducer, single
 };
 use log::info;

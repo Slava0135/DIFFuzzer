@@ -6,8 +6,8 @@ use anyhow::{Context, Ok};
 use log::{debug, info};
 use rand::{rngs::StdRng, SeedableRng};
 
-use crate::fuzzing::native::fuzzer::Fuzzer;
-use crate::fuzzing::native::runner::{parse_trace, Runner};
+use crate::fuzzing::fuzzer::Fuzzer;
+use crate::fuzzing::runner::{parse_trace, Runner};
 use crate::path::{LocalPath, RemotePath};
 use crate::save::{save_output, save_testcase};
 use crate::{abstract_fs::workload::Workload, config::Config, mount::mount::FileSystemMount};

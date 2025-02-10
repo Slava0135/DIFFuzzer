@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use anyhow::Context;
 
 use crate::command::{CommandInterface, CommandWrapper};
-use crate::fuzzing::native::objective::hash::HashHolder;
+use crate::fuzzing::objective::hash::HashHolder;
 use crate::mount::mount::FileSystemMount;
 use crate::path::RemotePath;
 
