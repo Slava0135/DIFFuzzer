@@ -4,7 +4,8 @@ use args::Args;
 use clap::Parser;
 use config::Config;
 use fuzzing::{
-    blackbox::fuzzer::BlackBoxFuzzer, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer, reducer::Reducer, single
+    blackbox::fuzzer::BlackBoxFuzzer, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
+    reducer::Reducer, single,
 };
 use log::info;
 use path::LocalPath;
@@ -20,7 +21,6 @@ mod hasher;
 mod mount;
 mod path;
 mod save;
-mod temp_dir;
 
 fn main() {
     let args = Args::parse();

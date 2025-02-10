@@ -4,7 +4,12 @@ use anyhow::Context;
 use log::info;
 
 use crate::{
-    abstract_fs::{trace::TRACE_FILENAME, workload::Workload}, command::{CommandInterface, LocalCommandInterface}, fuzzing::harness::Harness, mount::mount::FileSystemMount, path::{LocalPath, RemotePath}, save::{save_output, save_testcase}, temp_dir::setup_temp_dir
+    abstract_fs::{trace::TRACE_FILENAME, workload::Workload},
+    command::{CommandInterface, LocalCommandInterface},
+    fuzzing::harness::Harness,
+    mount::mount::FileSystemMount,
+    path::{LocalPath, RemotePath},
+    save::{save_output, save_testcase},
 };
 
 pub fn run(
@@ -26,7 +31,8 @@ pub fn run(
 
     let cmdi = LocalCommandInterface::new();
 
-    let temp_dir = setup_temp_dir(&cmdi)
+    let temp_dir = cmdi
+        .setup_remote_dir()
         .with_context(|| "failed to setup temp dir")
         .unwrap();
     let test_dir = temp_dir.clone();

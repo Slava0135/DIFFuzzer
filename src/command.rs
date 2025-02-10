@@ -6,11 +6,18 @@ use std::{
 };
 
 use anyhow::{bail, Context, Ok};
+use log::info;
 
 use crate::{
     config::QemuConfig,
     path::{LocalPath, RemotePath},
 };
+
+const EXECUTOR_SOURCE_DIR: &str = "./executor";
+const MAKEFILE_NAME: &str = "makefile";
+const EXECUTOR_H_NAME: &str = "executor.h";
+const EXECUTOR_CPP_NAME: &str = "executor.cpp";
+const TEST_NAME: &str = "test.c";
 
 pub trait CommandInterface {
     fn create_dir_all(&self, path: &RemotePath) -> anyhow::Result<()>;
@@ -30,6 +37,49 @@ pub trait CommandInterface {
 
     fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output>;
     fn exec_in_dir(&self, cmd: CommandWrapper, dir: &RemotePath) -> anyhow::Result<Output>;
+
+    fn setup_remote_dir(&self) -> anyhow::Result<RemotePath> {
+        let temp_dir = RemotePath::new(&Path::new("/tmp").join("DIFFuzzer"));
+
+        info!(
+            "setting up remote directory at '{}'",
+            temp_dir.base.display()
+        );
+        self.remove_dir_all(&temp_dir).unwrap_or(());
+        self.create_dir_all(&temp_dir).with_context(|| {
+            format!(
+                "failed to create remote temporary directory at '{}'",
+                temp_dir.base.display()
+            )
+        })?;
+
+        info!("copying executor to '{}'", temp_dir.base.display());
+        let executor_dir = LocalPath::new(&Path::new(EXECUTOR_SOURCE_DIR));
+        self.copy_to_remote(
+            &executor_dir.join(MAKEFILE_NAME),
+            &temp_dir.join(MAKEFILE_NAME),
+        )?;
+        self.copy_to_remote(
+            &executor_dir.join(EXECUTOR_H_NAME),
+            &temp_dir.join(EXECUTOR_H_NAME),
+        )?;
+        self.copy_to_remote(
+            &executor_dir.join(EXECUTOR_CPP_NAME),
+            &temp_dir.join(EXECUTOR_CPP_NAME),
+        )?;
+        self.copy_to_remote(
+            &executor_dir.join(EXECUTOR_CPP_NAME),
+            &temp_dir.join(EXECUTOR_CPP_NAME),
+        )?;
+        self.copy_to_remote(&executor_dir.join(TEST_NAME), &temp_dir.join(TEST_NAME))?;
+
+        let mut make = CommandWrapper::new("make");
+        make.arg("-C").arg(executor_dir.as_ref());
+        self.exec(make)
+            .with_context(|| "failed to make test binary")?;
+
+        Ok(temp_dir)
+    }
 }
 
 pub struct CommandWrapper {

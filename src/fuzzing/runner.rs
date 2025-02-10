@@ -7,7 +7,6 @@ use crate::hasher::hasher::FileDiff;
 use crate::mount::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
 use crate::save::{save_diff, save_output, save_testcase};
-use crate::temp_dir::setup_temp_dir;
 use anyhow::{Context, Ok};
 use log::{debug, info};
 use std::cell::RefCell;
@@ -60,7 +59,8 @@ impl Runner {
 
         let cmdi = Box::new(LocalCommandInterface::new());
 
-        let temp_dir = setup_temp_dir(cmdi.as_ref())
+        let temp_dir = cmdi
+            .setup_remote_dir()
             .with_context(|| "failed to setup temp dir")
             .unwrap();
 
