@@ -16,15 +16,15 @@ use crate::{
 
 pub fn save_testcase(
     cmdi: &dyn CommandInterface,
-    dir: &LocalPath,
+    output_dir: &LocalPath,
     binary_path: &RemotePath,
     input: &Workload,
 ) -> anyhow::Result<()> {
-    let source_path = dir.join(TEST_SOURCE_FILENAME);
+    let source_path = output_dir.join(TEST_SOURCE_FILENAME);
     fs::write(&source_path, input.clone().encode_c())
         .with_context(|| format!("failed to save source file to '{}'", source_path))?;
 
-    let binary_copy_path = dir.join(TEST_EXE_FILENAME);
+    let binary_copy_path = output_dir.join(TEST_EXE_FILENAME);
     cmdi.copy_from_remote(binary_path, &binary_copy_path)
         .with_context(|| {
             format!(
@@ -33,7 +33,7 @@ pub fn save_testcase(
             )
         })?;
 
-    let json_path = dir.join("test").with_extension("json");
+    let json_path = output_dir.join("test").with_extension("json");
     let json = serde_json::to_string_pretty(&input)
         .with_context(|| format!("failed to copy workload as json at '{}'", json_path))?;
     fs::write(json_path, json)?;
@@ -42,13 +42,13 @@ pub fn save_testcase(
 
 pub fn save_output(
     cmdi: &dyn CommandInterface,
-    dir: &LocalPath,
+    output_dir: &LocalPath,
     trace_path: &RemotePath,
     fs_name: &str,
     stdout: String,
     stderr: String,
 ) -> anyhow::Result<()> {
-    let trace_copy_path = dir.join(format!("{}.{}", fs_name, TRACE_FILENAME));
+    let trace_copy_path = output_dir.join(format!("{}.{}", fs_name, TRACE_FILENAME));
     cmdi.copy_from_remote(trace_path, &trace_copy_path)
         .with_context(|| {
             format!(
@@ -57,19 +57,19 @@ pub fn save_output(
             )
         })?;
 
-    let stdout_path = dir.join(format!("{}.stdout.txt", fs_name));
+    let stdout_path = output_dir.join(format!("{}.stdout.txt", fs_name));
     fs::write(&stdout_path, stdout)
         .with_context(|| format!("failed to save stdout at '{}'", stdout_path))?;
 
-    let stderr_path = dir.join(format!("{}.stderr.txt", fs_name));
+    let stderr_path = output_dir.join(format!("{}.stderr.txt", fs_name));
     fs::write(&stderr_path, stderr)
         .with_context(|| format!("failed to save stderr at '{}'", stderr_path))?;
 
     Ok(())
 }
 
-pub fn save_diff(dir: &LocalPath, diff_hash: Vec<FileDiff>) -> anyhow::Result<()> {
-    let diff_hash_path = dir.join(DIFF_HASH_FILENAME);
+pub fn save_diff(output_dir: &LocalPath, diff_hash: Vec<FileDiff>) -> anyhow::Result<()> {
+    let diff_hash_path = output_dir.join(DIFF_HASH_FILENAME);
     let mut file = OpenOptions::new()
         .append(true)
         .create(true)
