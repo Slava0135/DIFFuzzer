@@ -105,9 +105,9 @@ impl Runner {
 
             exec_dir,
 
-            test_dir: test_dir,
-            crashes_path: crashes_path,
-            accidents_path: accidents_path,
+            test_dir,
+            crashes_path,
+            accidents_path,
 
             hash_objective,
             trace_objective,
