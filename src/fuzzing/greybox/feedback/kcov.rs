@@ -1,30 +1,25 @@
-use std::
-    collections::HashSet
-;
+use std::{collections::HashSet, fs};
 
 use anyhow::Context;
 use log::debug;
 
-use crate::{command::CommandInterface, path::RemotePath};
+use crate::fuzzing::outcome::Outcome;
 
 pub const KCOV_FILENAME: &str = "kcov.dat";
 
 pub struct KCovFeedback {
     all_coverage: HashSet<u64>,
-    kcov_path: RemotePath,
 }
 
 impl KCovFeedback {
-    pub fn new(kcov_path: RemotePath) -> Self {
+    pub fn new() -> Self {
         Self {
             all_coverage: HashSet::new(),
-            kcov_path,
         }
     }
-    pub fn is_interesting(&mut self, cmdi: &dyn CommandInterface) -> anyhow::Result<bool> {
+    pub fn is_interesting(&mut self, outcome: &Outcome) -> anyhow::Result<bool> {
         debug!("do kcov feedback");
-        let kcov = cmdi
-            .read_to_string(&self.kcov_path)
+        let kcov = fs::read_to_string(outcome.dir.join(KCOV_FILENAME))
             .with_context(|| "failed to read kcov file")?;
         let mut new_coverage = HashSet::new();
         for line in kcov.lines() {

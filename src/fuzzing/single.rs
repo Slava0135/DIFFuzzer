@@ -1,15 +1,15 @@
-use std::{cell::RefCell, fs::read_to_string, path::Path, rc::Rc};
+use std::{fs::read_to_string, path::Path};
 
 use anyhow::Context;
 use log::info;
 
 use crate::{
-    abstract_fs::{trace::TRACE_FILENAME, workload::Workload},
+    abstract_fs::workload::Workload,
     command::{CommandInterface, LocalCommandInterface},
-    fuzzing::harness::Harness,
+    fuzzing::{harness::Harness, runner::setup_dir},
     mount::mount::FileSystemMount,
     path::{LocalPath, RemotePath},
-    save::{save_output, save_testcase},
+    save::{save_outcome, save_testcase},
 };
 
 pub fn run(
@@ -31,19 +31,14 @@ pub fn run(
 
     let cmdi = LocalCommandInterface::new();
 
-    let temp_dir = cmdi
+    let remote_dir = cmdi
         .setup_remote_dir()
-        .with_context(|| "failed to setup temp dir")
+        .with_context(|| "failed to setup remote dir")
         .unwrap();
-    let test_dir = temp_dir.clone();
+    let test_dir = remote_dir.clone();
 
-    let exec_dir = temp_dir.join("exec");
-    cmdi.remove_dir_all(&exec_dir).unwrap_or(());
-    cmdi.create_dir_all(&exec_dir)
-        .with_context(|| format!("failed to create executable directory"))
-        .unwrap();
-
-    let trace_path = exec_dir.join(TRACE_FILENAME);
+    let exec_dir = remote_dir.join("exec");
+    setup_dir(&cmdi, &exec_dir).unwrap();
 
     info!("compiling test at '{}'", test_dir);
     let binary_path = input
@@ -51,17 +46,19 @@ pub fn run(
         .with_context(|| format!("failed to compile test"))
         .unwrap();
 
-    let stdout = Rc::new(RefCell::new("".to_owned()));
-    let stderr = Rc::new(RefCell::new("".to_owned()));
-
     let fs_str = mount.to_string();
     let fs_dir = RemotePath::new(Path::new("/mnt"))
         .join(fs_str.to_lowercase())
-        .join(fs_name);
-    let harness = Harness::new(mount, fs_dir, exec_dir, stdout.clone(), stderr.clone());
+        .join(&fs_name);
+    let harness = Harness::new(
+        mount,
+        fs_dir,
+        exec_dir,
+        LocalPath::new(&Path::new("/tmp").join("diffuzzer-outcome-single")),
+    );
 
     info!("running harness");
-    harness
+    let outcome = harness
         .run(&cmdi, &binary_path, keep_fs, None)
         .with_context(|| format!("failed to run harness"))
         .unwrap();
@@ -70,14 +67,7 @@ pub fn run(
     save_testcase(&cmdi, save_to_dir, &binary_path, &input)
         .with_context(|| format!("failed to save testcase"))
         .unwrap();
-    save_output(
-        &cmdi,
-        save_to_dir,
-        &trace_path,
-        &fs_str,
-        stdout.borrow().clone(),
-        stderr.borrow().clone(),
-    )
-    .with_context(|| format!("failed to save output"))
-    .unwrap();
+    save_outcome(save_to_dir, &fs_name, &outcome)
+        .with_context(|| format!("failed to save outcome"))
+        .unwrap();
 }

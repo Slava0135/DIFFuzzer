@@ -1,20 +1,17 @@
-use std::{cell::RefCell, rc::Rc};
-
 use anyhow::Context;
 
 use crate::command::{CommandInterface, CommandWrapper};
 use crate::fuzzing::objective::hash::HashHolder;
 use crate::mount::mount::FileSystemMount;
-use crate::path::RemotePath;
+use crate::path::{LocalPath, RemotePath};
 
-pub type ConsolePipe = Rc<RefCell<String>>;
+use super::outcome::Outcome;
 
 pub struct Harness {
     fs_mount: &'static dyn FileSystemMount,
     fs_dir: RemotePath,
     exec_dir: RemotePath,
-    stdout: ConsolePipe,
-    stderr: ConsolePipe,
+    outcome_dir: LocalPath,
 }
 
 impl Harness {
@@ -22,15 +19,13 @@ impl Harness {
         fs_mount: &'static dyn FileSystemMount,
         fs_dir: RemotePath,
         exec_dir: RemotePath,
-        stdout: ConsolePipe,
-        stderr: ConsolePipe,
+        outcome_dir: LocalPath,
     ) -> Self {
         Self {
             fs_mount,
             fs_dir,
             exec_dir,
-            stdout,
-            stderr,
+            outcome_dir,
         }
     }
     pub fn run(
@@ -39,7 +34,7 @@ impl Harness {
         binary_path: &RemotePath,
         keep_fs: bool,
         hash_holder: Option<&mut HashHolder>,
-    ) -> anyhow::Result<bool> {
+    ) -> anyhow::Result<Outcome> {
         self.fs_mount.setup(cmdi, &self.fs_dir).with_context(|| {
             format!(
                 "failed to setup fs '{}' at '{}'",
@@ -69,15 +64,19 @@ impl Harness {
                 })?;
         }
 
-        self.stdout.replace(
-            String::from_utf8(output.stdout)
-                .with_context(|| format!("failed to convert stdout to string"))?,
-        );
-        self.stderr.replace(
-            String::from_utf8(output.stderr)
-                .with_context(|| format!("failed to convert stderr to string"))?,
-        );
+        let stdout = String::from_utf8(output.stdout)
+            .with_context(|| format!("failed to convert stdout to string"))?;
+        let stderr = String::from_utf8(output.stderr)
+            .with_context(|| format!("failed to convert stderr to string"))?;
 
-        Ok(output.status.success())
+        cmdi.copy_dir_from_remote(&self.exec_dir, &self.outcome_dir)
+            .with_context(|| format!("failed to copy test output files"))?;
+
+        Ok(Outcome {
+            exit_status: output.status,
+            dir: self.outcome_dir.clone(),
+            stdout,
+            stderr,
+        })
     }
 }

@@ -6,3 +6,4 @@ pub mod harness;
 pub mod reducer;
 pub mod runner;
 pub mod single;
+pub mod outcome;

@@ -32,6 +32,11 @@ pub trait CommandInterface {
         remote_path: &RemotePath,
         local_path: &LocalPath,
     ) -> anyhow::Result<()>;
+    fn copy_dir_from_remote(
+        &self,
+        remote_path: &RemotePath,
+        local_path: &LocalPath,
+    ) -> anyhow::Result<()>;
     fn write(&self, path: &RemotePath, contents: &[u8]) -> anyhow::Result<()>;
     fn read_to_string(&self, path: &RemotePath) -> anyhow::Result<String>;
 
@@ -53,7 +58,10 @@ pub trait CommandInterface {
             )
         })?;
 
-        info!("copying executor to remote directory '{}'", remote_dir.base.display());
+        info!(
+            "copying executor to remote directory '{}'",
+            remote_dir.base.display()
+        );
         let executor_dir = LocalPath::new(&Path::new(EXECUTOR_SOURCE_DIR));
         self.copy_to_remote(
             &executor_dir.join(MAKEFILE_NAME),
@@ -155,6 +163,24 @@ impl CommandInterface for LocalCommandInterface {
         })?;
         Ok(())
     }
+    fn copy_dir_from_remote(
+        &self,
+        remote_path: &RemotePath,
+        local_path: &LocalPath,
+    ) -> anyhow::Result<()> {
+        Command::new("cp")
+            .arg("-r")
+            .arg(remote_path.base.as_ref())
+            .arg(local_path.as_ref())
+            .output()
+            .with_context(|| {
+                format!(
+                    "failed to copy local directory from '{}' to '{}'",
+                    remote_path, local_path
+                )
+            })?;
+        Ok(())
+    }
     fn write(&self, path: &RemotePath, contents: &[u8]) -> anyhow::Result<()> {
         fs::write(path.base.as_ref(), contents)
             .with_context(|| format!("failed to write local file '{}'", path))
@@ -227,6 +253,23 @@ impl CommandInterface for RemoteCommandInterface {
         local_path: &LocalPath,
     ) -> anyhow::Result<()> {
         let mut scp = self.copy_common();
+        scp.arg(format!("root@localhost:{}", remote_path));
+        scp.arg(local_path.as_ref());
+        scp.exec_local().with_context(|| {
+            format!(
+                "failed to copy file from '{}' (local) to '{}' (remote)",
+                remote_path, local_path,
+            )
+        })?;
+        Ok(())
+    }
+    fn copy_dir_from_remote(
+        &self,
+        remote_path: &RemotePath,
+        local_path: &LocalPath,
+    ) -> anyhow::Result<()> {
+        let mut scp = self.copy_common();
+        scp.arg("-r");
         scp.arg(format!("root@localhost:{}", remote_path));
         scp.arg(local_path.as_ref());
         scp.exec_local().with_context(|| {

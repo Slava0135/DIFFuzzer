@@ -41,12 +41,12 @@ impl Reducer {
 
         let binary_path = self.runner.compile_test(&input)?;
 
-        self.runner.run_harness(&binary_path)?;
+        let (fst_outcome, snd_outcome) = self.runner.run_harness(&binary_path)?;
 
-        let fst_trace = parse_trace(self.runner.cmdi.as_ref(), &self.runner.fst_trace_path)
-            .with_context(|| format!("failed to parse first trace"))?;
-        let snd_trace = parse_trace(self.runner.cmdi.as_ref(), &self.runner.snd_trace_path)
-            .with_context(|| format!("failed to parse second trace"))?;
+        let fst_trace =
+            parse_trace(&fst_outcome).with_context(|| format!("failed to parse first trace"))?;
+        let snd_trace =
+            parse_trace(&snd_outcome).with_context(|| format!("failed to parse second trace"))?;
 
         let hash_diff_interesting = self
             .runner
@@ -73,7 +73,7 @@ impl Reducer {
         &mut self,
         input: Workload,
         old_diff: Vec<FileDiff>,
-        save_to_dir: &LocalPath,
+        output_dir: &LocalPath,
     ) -> anyhow::Result<()> {
         info!("reducing using hash difference");
         let mut index = input.ops.len() - 1;
@@ -81,7 +81,7 @@ impl Reducer {
         loop {
             if let Some(reduced) = remove(&workload, index) {
                 let binary_path = self.runner.compile_test(&workload)?;
-                self.runner.run_harness(&binary_path)?;
+                let (fst_outcome, snd_outcome) = self.runner.run_harness(&binary_path)?;
                 let hash_diff_interesting = self
                     .runner
                     .hash_objective
@@ -95,8 +95,10 @@ impl Reducer {
                         self.runner.report_crash(
                             &workload,
                             &binary_path,
-                            save_to_dir.clone(),
+                            output_dir.clone(),
                             new_diff,
+                            &fst_outcome,
+                            &snd_outcome,
                         )?;
                     }
                 }
