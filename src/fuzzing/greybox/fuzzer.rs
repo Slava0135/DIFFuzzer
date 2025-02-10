@@ -50,7 +50,7 @@ impl GreyBoxFuzzer {
 
         let corpus_path = if config.greybox.save_corpus {
             let path = Path::new("./corpus");
-            fs::create_dir(path).unwrap_or(());
+            fs::create_dir_all(path).unwrap();
             Some(LocalPath::new(path))
         } else {
             None

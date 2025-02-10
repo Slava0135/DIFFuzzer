@@ -61,10 +61,10 @@ impl Runner {
         let exec_dir = temp_dir.join("exec");
 
         let crashes_path = LocalPath::new(Path::new("./crashes"));
-        fs::create_dir(&crashes_path).unwrap_or(());
+        fs::create_dir_all(&crashes_path).unwrap();
 
         let accidents_path = LocalPath::new(Path::new("./accidents"));
-        fs::create_dir(&accidents_path).unwrap_or(());
+        fs::create_dir_all(&accidents_path).unwrap();
 
         let fst_fs_name = fst_mount.to_string();
         let snd_fs_name = snd_mount.to_string();
