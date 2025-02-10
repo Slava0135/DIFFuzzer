@@ -46,6 +46,7 @@ pub fn save_outcome(
     fs_name: &str,
     outcome: &Outcome,
 ) -> anyhow::Result<()> {
+    let fs_name = fs_name.to_lowercase();
     let trace_path = outcome.dir.join(TRACE_FILENAME);
     let trace_copy_path = output_dir.join(format!("{}.{}", fs_name, TRACE_FILENAME));
     fs::copy(trace_path.as_ref(), trace_copy_path.as_ref()).with_context(|| {
