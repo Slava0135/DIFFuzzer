@@ -4,8 +4,7 @@ use args::Args;
 use clap::Parser;
 use config::Config;
 use fuzzing::native::{
-    blackbox::fuzzer::BlackBoxFuzzer, common::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
-    reducer::Reducer, single,
+    blackbox::fuzzer::BlackBoxFuzzer, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer, reducer::Reducer, single
 };
 use log::info;
 use path::LocalPath;
@@ -13,6 +12,7 @@ use path::LocalPath;
 mod abstract_fs;
 mod args;
 mod command;
+mod compile;
 mod config;
 mod filesystems;
 mod fuzzing;
@@ -21,7 +21,6 @@ mod mount;
 mod path;
 mod save;
 mod temp_dir;
-mod compile;
 
 fn main() {
     let args = Args::parse();

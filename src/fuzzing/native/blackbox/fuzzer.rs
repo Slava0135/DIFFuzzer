@@ -7,7 +7,8 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use crate::abstract_fs::generator::generate_new;
 use crate::config::Config;
 
-use crate::fuzzing::native::common::{parse_trace, Fuzzer, Runner};
+use crate::fuzzing::native::fuzzer::Fuzzer;
+use crate::fuzzing::native::runner::{parse_trace, Runner};
 use crate::mount::mount::FileSystemMount;
 
 pub struct BlackBoxFuzzer {
