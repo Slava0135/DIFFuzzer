@@ -1,4 +1,7 @@
-use std::{fs::read_to_string, path::Path};
+use std::{
+    fs::{self, read_to_string},
+    path::Path,
+};
 
 use anyhow::Context;
 use log::info;
@@ -14,7 +17,7 @@ use crate::{
 
 pub fn run(
     test_path: &LocalPath,
-    save_to_dir: &LocalPath,
+    output_dir: &LocalPath,
     keep_fs: bool,
     mount: &'static dyn FileSystemMount,
     fs_name: String,
@@ -64,10 +67,10 @@ pub fn run(
         .unwrap();
 
     info!("saving results");
-    save_testcase(&cmdi, save_to_dir, &binary_path, &input)
+    save_testcase(&cmdi, output_dir, &binary_path, &input)
         .with_context(|| format!("failed to save testcase"))
         .unwrap();
-    save_outcome(save_to_dir, &fs_str, &outcome)
+    save_outcome(output_dir, &fs_str, &outcome)
         .with_context(|| format!("failed to save outcome"))
         .unwrap();
 }

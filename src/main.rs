@@ -65,7 +65,7 @@ fn main() {
             }
         }
         args::Mode::Single {
-            save_to_dir,
+            output_dir: save_to_dir,
             path_to_test,
             keep_fs,
             filesystem,
