@@ -44,7 +44,7 @@ pub trait CommandInterface {
     fn exec_in_dir(&self, cmd: CommandWrapper, dir: &RemotePath) -> anyhow::Result<Output>;
 
     fn setup_remote_dir(&self) -> anyhow::Result<RemotePath> {
-        let remote_dir = RemotePath::new(&Path::new("/tmp").join("diffuzzer-remote"));
+        let remote_dir = RemotePath::new_tmp("remote");
 
         info!(
             "setting up remote directory at '{}'",
@@ -209,7 +209,7 @@ impl RemoteCommandInterface {
     pub fn new(config: QemuConfig) -> Self {
         RemoteCommandInterface {
             config,
-            tmp_file: LocalPath::new(Path::new("/tmp/diffuzzer-ssh-tmp")),
+            tmp_file: LocalPath::new_tmp("ssh-tmp"),
         }
     }
 }

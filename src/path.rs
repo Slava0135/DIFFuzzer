@@ -1,5 +1,7 @@
 use std::{ffi::OsStr, fmt::Display, path::Path};
 
+const TMP_DIR_PREFIX: &str = "diffuzzer";
+
 #[derive(Clone)]
 pub struct LocalPath {
     pub base: Box<Path>,
@@ -10,6 +12,12 @@ impl LocalPath {
         Self {
             base: path.to_path_buf().into_boxed_path(),
         }
+    }
+    pub fn new_tmp(name: &str) -> Self {
+        let base = Path::new("/tmp")
+            .join(format!("{}-{}", TMP_DIR_PREFIX, name))
+            .into_boxed_path();
+        Self { base }
     }
     pub fn join<P: AsRef<Path>>(&self, path: P) -> Self {
         Self {
@@ -51,6 +59,12 @@ impl RemotePath {
         Self {
             base: path.to_path_buf().into_boxed_path(),
         }
+    }
+    pub fn new_tmp(name: &str) -> Self {
+        let base = Path::new("/tmp")
+            .join(format!("{}-{}", TMP_DIR_PREFIX, name))
+            .into_boxed_path();
+        Self { base }
     }
     pub fn join<P: AsRef<Path>>(&self, path: P) -> Self {
         Self {

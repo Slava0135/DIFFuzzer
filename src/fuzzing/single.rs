@@ -54,7 +54,7 @@ pub fn run(
         mount,
         fs_dir,
         exec_dir,
-        LocalPath::new(&Path::new("/tmp").join("diffuzzer-outcome-single")),
+        LocalPath::new_tmp("outcome-single"),
     );
 
     info!("running harness");

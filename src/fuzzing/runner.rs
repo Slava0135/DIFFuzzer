@@ -89,13 +89,13 @@ impl Runner {
             fst_mount,
             fst_fs_dir.clone(),
             exec_dir.clone(),
-            LocalPath::new(&Path::new("/tmp").join("diffuzzer-outcome-1")),
+            LocalPath::new_tmp("outcome-1"),
         );
         let snd_harness = Harness::new(
             snd_mount,
             snd_fs_dir.clone(),
             exec_dir.clone(),
-            LocalPath::new(&Path::new("/tmp").join("diffuzzer-outcome-2")),
+            LocalPath::new_tmp("outcome-2"),
         );
 
         Self {

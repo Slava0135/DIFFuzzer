@@ -8,6 +8,7 @@ use anyhow::Context;
 use crate::hasher::hasher::{calc_dir_hash, get_diff};
 use crate::mount::ext4::Ext4;
 use crate::mount::mount::FileSystemMount;
+use crate::path::LocalPath;
 
 #[ignore]
 #[test]
@@ -93,8 +94,9 @@ fn test_hash_eq_skip() {
 }
 
 fn create_data_for_test(dirs: Vec<&str>, files: Vec<&str>, data: Vec<&str>) -> Vec<PathBuf> {
-    let temp_dir = env::temp_dir().join("diffuzzer-hash-test");
-    fs::remove_dir_all(temp_dir.as_path()).unwrap_or(());
+    let temp_dir = LocalPath::new_tmp("hash-test");
+    let temp_dir = temp_dir.as_ref();
+    fs::remove_dir_all(temp_dir).unwrap_or(());
 
     let cmp_dirs = vec![temp_dir.join("fst"), temp_dir.join("snd")];
 
