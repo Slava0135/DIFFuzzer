@@ -1,11 +1,12 @@
 use std::{fs, path::Path};
 
+use crate::fuzzing::duo_single::DuoSingleFuzzer;
 use args::Args;
 use clap::Parser;
 use config::Config;
 use fuzzing::{
-    blackbox::fuzzer::BlackBoxFuzzer, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
-    reducer::Reducer, single,
+    blackbox::fuzzer::BlackBoxFuzzer, duo_single, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
+    reducer::Reducer, solo_single,
 };
 use log::info;
 use path::LocalPath;
@@ -41,6 +42,7 @@ fn main() {
                     config,
                     first_filesystem.try_into().unwrap(),
                     second_filesystem.try_into().unwrap(),
+                    LocalPath::new(Path::new("./crashes")),
                 )
                 .run(test_count);
             } else {
@@ -57,26 +59,48 @@ fn main() {
                     config,
                     first_filesystem.try_into().unwrap(),
                     second_filesystem.try_into().unwrap(),
+                    LocalPath::new(Path::new("./crashes")),
                 )
                 .run(test_count);
             } else {
                 todo!("QEMU not supported");
             }
         }
-        args::Mode::Single {
-            output_dir: save_to_dir,
+        args::Mode::SoloSingle {
+            output_dir,
             path_to_test,
             keep_fs,
             filesystem,
         } => {
             if args.no_qemu {
-                single::run(
+                solo_single::run(
                     &LocalPath::new(Path::new(&path_to_test)),
-                    &LocalPath::new(Path::new(&save_to_dir)),
+                    &LocalPath::new(Path::new(&output_dir)),
                     keep_fs,
                     filesystem.try_into().unwrap(),
                     config.fs_name,
                 )
+            } else {
+                todo!("QEMU not supported");
+            }
+        }
+        args::Mode::DuoSingle {
+            first_filesystem,
+            second_filesystem,
+            output_dir,
+            path_to_test,
+            keep_fs,
+        } => {
+            if args.no_qemu {
+                DuoSingleFuzzer::new(
+                    config,
+                    first_filesystem.try_into().unwrap(),
+                    second_filesystem.try_into().unwrap(),
+                    LocalPath::new(Path::new(&output_dir)),
+                    LocalPath::new(Path::new(&path_to_test)),
+                    keep_fs,
+                )
+                .run(Some(1u64));
             } else {
                 todo!("QEMU not supported");
             }
@@ -92,6 +116,7 @@ fn main() {
                     config,
                     first_filesystem.try_into().unwrap(),
                     second_filesystem.try_into().unwrap(),
+                    LocalPath::new(Path::new(&output_dir)),
                 )
                 .run(
                     &LocalPath::new(Path::new(&path_to_test)),

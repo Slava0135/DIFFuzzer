@@ -34,6 +34,7 @@ impl GreyBoxFuzzer {
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
+        crashes_path: LocalPath,
     ) -> Self {
         let mutator = Mutator::new(
             StdRng::seed_from_u64(
@@ -56,7 +57,7 @@ impl GreyBoxFuzzer {
             None
         };
 
-        let runner = Runner::new(fst_mount, snd_mount, config);
+        let runner = Runner::new(fst_mount, snd_mount, crashes_path, config);
 
         let fst_kcov_feedback = KCovFeedback::new();
         let snd_kcov_feedback = KCovFeedback::new();
@@ -122,7 +123,7 @@ impl Fuzzer for GreyBoxFuzzer {
 
         let binary_path = self.runner().compile_test(&input)?;
 
-        let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path)?;
+        let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path, false)?;
 
         let fst_trace =
             parse_trace(&fst_outcome).with_context(|| format!("failed to parse first trace"))?;

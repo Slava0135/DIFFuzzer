@@ -2,9 +2,12 @@ use anyhow::{Context, Ok};
 use log::{debug, info};
 use rand::prelude::StdRng;
 use rand::SeedableRng;
+use std::fs::read_to_string;
+use std::path::Path;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
+use crate::abstract_fs::workload::Workload;
 use crate::config::Config;
 
 use crate::fuzzing::fuzzer::Fuzzer;
@@ -12,17 +15,21 @@ use crate::fuzzing::runner::{parse_trace, Runner};
 use crate::mount::mount::FileSystemMount;
 use crate::path::LocalPath;
 
-pub struct BlackBoxFuzzer {
+pub struct DuoSingleFuzzer {
     runner: Runner,
     rng: StdRng,
+    test_path: LocalPath,
+    keep_fs: bool,
 }
 
-impl BlackBoxFuzzer {
+impl DuoSingleFuzzer {
     pub fn new(
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
+        test_path: LocalPath,
+        keep_fs: bool,
     ) -> Self {
         Self {
             runner: Runner::new(fst_mount, snd_mount, crashes_path, config),
@@ -32,22 +39,28 @@ impl BlackBoxFuzzer {
                     .unwrap()
                     .as_millis() as u64,
             ),
+            test_path,
+            keep_fs,
         }
     }
 }
 
-impl Fuzzer for BlackBoxFuzzer {
+impl Fuzzer for DuoSingleFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
-        debug!("generating input");
-        let input = generate_new(
-            &mut self.rng,
-            self.runner.config.max_workload_length.into(),
-            &self.runner.config.operation_weights,
-        );
+        info!("running duo single test");
+
+        info!("reading testcase at '{}'", self.test_path);
+        let input = read_to_string(&self.test_path)
+            .with_context(|| format!("failed to read testcase"))
+            .unwrap();
+        let input: Workload = serde_json::from_str(&input)
+            .with_context(|| format!("failed to parse json"))
+            .unwrap();
 
         let binary_path = self.runner().compile_test(&input)?;
 
-        let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path, false)?;
+        let keep_fs = self.keep_fs.to_owned();
+        let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path, keep_fs)?;
 
         let fst_trace =
             parse_trace(&fst_outcome).with_context(|| format!("failed to parse first trace"))?;
@@ -77,20 +90,7 @@ impl Fuzzer for BlackBoxFuzzer {
         Ok(())
     }
 
-    fn show_stats(&mut self) {
-        self.runner.stats.last_time_showed = Instant::now();
-        let since_start = Instant::now().duration_since(self.runner.stats.start);
-        let secs = since_start.as_secs();
-        info!(
-            "crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
-            self.runner.stats.crashes,
-            self.runner.stats.executions,
-            (self.runner.stats.executions as f64) / (secs as f64),
-            secs / (60 * 60),
-            (secs / (60)) % 60,
-            secs % 60,
-        );
-    }
+    fn show_stats(&mut self) {}
 
     fn runner(&mut self) -> &mut Runner {
         &mut self.runner
