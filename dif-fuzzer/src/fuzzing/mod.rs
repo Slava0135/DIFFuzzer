@@ -1,10 +1,10 @@
 pub mod blackbox;
 pub mod fuzzer;
 pub mod greybox;
+pub mod harness;
 mod hasher_tests;
 pub mod objective;
-pub mod harness;
+pub mod outcome;
 pub mod reducer;
 pub mod runner;
 pub mod single;
-pub mod outcome;
