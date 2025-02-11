@@ -1,6 +1,6 @@
 [workspace]
 
 members = [
-    "dif-fuzzer",
+    "diffuzzer",
     "hasher"
 ]

@@ -7,7 +7,7 @@ appenders:
       pattern: "{d(%Y-%m-%d %H:%M:%S)} [{l}] {m}{n}"
   file:
     kind: file
-    path: "dif-fuzzer.log"
+    path: "diffuzzer.log"
     encoder:
       pattern: "{d(%Y-%m-%d %H:%M:%S)} [{l}] {m}{n}"
 
