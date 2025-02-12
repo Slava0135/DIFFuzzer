@@ -1,15 +1,12 @@
 use std::fs;
-use std::fs::File;
+use std::fs::{remove_dir_all, File};
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Context;
+use regex::RegexSet;
 
 use hasher::{calc_dir_hash, get_diff};
-
-use crate::mount::ext4::Ext4;
-use crate::mount::mount::FileSystemMount;
-use crate::path::LocalPath;
 
 #[ignore]
 #[test]
@@ -20,7 +17,7 @@ fn test_hash_eq() {
 
     let cmp_dirs = create_data_for_test(dirs, files, data);
 
-    let ext4_dirs = Ext4::new().get_internal_dirs();
+    let ext4_dirs = RegexSet::new([r"^/?lost\+found($|/)"]).unwrap();
     let hash_options = Default::default();
     let (hash_fst, fst_content) = calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options);
     let (hash_snd, snd_content) = calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options);
@@ -31,6 +28,7 @@ fn test_hash_eq() {
         &ext4_dirs,
         &hash_options,
     );
+    println!("{:?}", diff);
     assert_eq!(hash_fst, hash_snd);
     assert_eq!(diff.len(), 0);
 }
@@ -49,7 +47,7 @@ fn test_hash_not_eq() {
         .with_context(|| format!("failed create folder '{}'", err_dir.display()))
         .unwrap();
 
-    let ext4_dirs = Ext4::new().get_internal_dirs();
+    let ext4_dirs = RegexSet::new([r"^/?lost\+found($|/)"]).unwrap();
     let hash_options = Default::default();
     let (hash_fst, fst_content) = calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options);
     let (hash_snd, snd_content) = calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options);
@@ -79,7 +77,7 @@ fn test_hash_eq_skip() {
         .with_context(|| format!("failed create folder '{}'", err_dir.display()))
         .unwrap();
 
-    let ext4_dirs = Ext4::new().get_internal_dirs();
+    let ext4_dirs = RegexSet::new([r"^/?lost\+found($|/)"]).unwrap();
     let hash_options = Default::default();
     let (hash_fst, fst_content) = calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options);
     let (hash_snd, snd_content) = calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options);
@@ -90,14 +88,19 @@ fn test_hash_eq_skip() {
         &ext4_dirs,
         &hash_options,
     );
+    println!("{:?}", diff);
     assert_eq!(hash_fst, hash_snd);
     assert_eq!(diff.len(), 0);
 }
 
 fn create_data_for_test(dirs: Vec<&str>, files: Vec<&str>, data: Vec<&str>) -> Vec<PathBuf> {
-    let temp_dir = LocalPath::new_tmp("hash-test");
+    let temp_dir = Path::new("/tmp")
+        .join(format!("{}-{}", "diffuzzer", "hash-test"))
+        .into_boxed_path();
     let temp_dir = temp_dir.as_ref();
-    fs::remove_dir_all(temp_dir).unwrap_or(());
+    if temp_dir.exists() {
+        remove_dir_all(temp_dir).unwrap();
+    }
 
     let cmp_dirs = vec![temp_dir.join("fst"), temp_dir.join("snd")];
 

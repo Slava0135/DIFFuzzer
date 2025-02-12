@@ -11,6 +11,7 @@ use hasher::{calc_dir_hash, HasherOptions};
 
 mod args;
 mod lib;
+mod test;
 
 fn main() {
     let args = Args::parse();
