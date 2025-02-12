@@ -64,7 +64,7 @@ pub enum Mode {
         #[clap(value_parser = PossibleValuesParser::new(filesystems_available()))]
         filesystem: String,
     },
-    ///Run single test for 2 fs
+    /// Run single test for 2 filesystems
     DuoSingle {
         /// First filesystem to test
         #[arg(short, long)]
