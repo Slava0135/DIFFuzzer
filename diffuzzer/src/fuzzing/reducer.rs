@@ -1,13 +1,13 @@
-use std::fs::read_to_string;
+use std::{fs::read_to_string, path::Path};
 
 use anyhow::{Context, Ok};
+use hasher::FileDiff;
 use log::{info, warn};
 
 use crate::{
     abstract_fs::{mutator::remove, workload::Workload},
     config::Config,
     fuzzing::runner::parse_trace,
-    hasher::hasher::FileDiff,
     mount::mount::FileSystemMount,
     path::LocalPath,
 };

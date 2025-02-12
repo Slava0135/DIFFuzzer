@@ -17,7 +17,6 @@ mod compile;
 mod config;
 mod filesystems;
 mod fuzzing;
-mod hasher;
 mod mount;
 mod path;
 mod save;
