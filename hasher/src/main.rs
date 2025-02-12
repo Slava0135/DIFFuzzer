@@ -10,7 +10,7 @@ use args::Args;
 use hasher::{calc_dir_hash, HasherOptions};
 
 mod args;
-mod lib;
+#[cfg(test)]
 mod test;
 
 fn main() {
@@ -22,10 +22,7 @@ fn main() {
         mode: args.mode,
     };
 
-    let skip = match args.exclude {
-        None => RegexSet::new::<_, &str>([]).unwrap(),
-        Some(v) => RegexSet::new(v).unwrap(),
-    };
+    let skip = RegexSet::new(args.exclude.unwrap_or(vec![])).unwrap();
     let (hash, files) = calc_dir_hash(Path::new(&args.target_path), &skip, &hasher_options);
     println!("{}", hash);
     let serialized_file = to_string(&files).unwrap();

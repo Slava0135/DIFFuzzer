@@ -8,7 +8,7 @@ twox-hash = "2.1.0"
 regex = "1.11.1"
 walkdir = "2.5.0"
 anyhow = "1.0.95"
-serde = "1.0.215"
+serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
 clap = { version = "4.5.23", features = ["derive", "string"] }
 
