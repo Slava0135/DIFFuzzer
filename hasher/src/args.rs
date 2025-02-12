@@ -1,4 +1,3 @@
-use crate::filesystems::filesystems_available;
 use clap::{builder::PossibleValuesParser, Parser};
 
 #[derive(Parser, Debug)]
@@ -19,8 +18,7 @@ pub struct Args {
     pub nlink: bool,
     #[arg(short, long, default_value_t = false)]
     pub mode: bool,
-    /// Filesystem to test
+    /// Regex pattern for skip dirs and files
     #[arg(short, long)]
-    #[clap(value_parser = PossibleValuesParser::new(filesystems_available()))]
-    pub filesystem: String,
+    pub exclude: Option<Vec<String>>,
 }
