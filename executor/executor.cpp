@@ -57,8 +57,8 @@
     printf("\n");        \
   } while (0)
 
-#define BUFFER_SIZE 1024 * 1024
-#define RANDOM_SEED 123
+const size_t BUFFER_SIZE = 1024 * 1024;
+const size_t RANDOM_SEED = 123;
 
 const char *MKDIR = "MKDIR";
 const char *RMDIR = "RMDIR";
@@ -439,7 +439,7 @@ int do_write(int fd, size_t src_offset, size_t size) {
   idx++;
   if (src_offset + size > BUFFER_SIZE) {
     DPRINTF(
-        "[ERROR] offset %ld + %ld is too big to write from (buffer size is %d)",
+        "[ERROR] offset %ld + %ld is too big to write from (buffer size is %ld)",
         src_offset, size, BUFFER_SIZE);
     exit(ERROR);
   }
@@ -456,7 +456,7 @@ int do_write(int fd, size_t src_offset, size_t size) {
 int do_read(int fd, size_t size) {
   idx++;
   if (size > BUFFER_SIZE) {
-    DPRINTF("[ERROR] size %ld is too big to read to (buffer size is %d)", size,
+    DPRINTF("[ERROR] size %ld is too big to read to (buffer size is %ld)", size,
             BUFFER_SIZE);
     exit(ERROR);
   }
