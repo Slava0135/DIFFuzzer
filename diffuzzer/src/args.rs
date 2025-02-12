@@ -49,7 +49,7 @@ pub enum Mode {
         test_count: Option<u64>,
     },
     /// Run single test
-    Single {
+    SoloSingle {
         /// Place where results will be saved
         #[arg(short, long)]
         output_dir: String,
@@ -63,6 +63,26 @@ pub enum Mode {
         #[arg(short, long)]
         #[clap(value_parser = PossibleValuesParser::new(filesystems_available()))]
         filesystem: String,
+    },
+    /// Run single test for 2 filesystems
+    DuoSingle {
+        /// First filesystem to test
+        #[arg(short, long)]
+        #[clap(value_parser = PossibleValuesParser::new(filesystems_available()))]
+        first_filesystem: String,
+        /// Second filesystem to test
+        #[arg(short, long)]
+        #[clap(value_parser = PossibleValuesParser::new(filesystems_available()))]
+        second_filesystem: String,
+        /// Place where results will be saved
+        #[arg(short, long)]
+        output_dir: String,
+        /// Path to testcase in JSON format
+        #[arg(short, long)]
+        path_to_test: String,
+        /// Keep FS after test
+        #[arg(short, long, default_value_t = false)]
+        keep_fs: bool,
     },
     /// Reduce testcase
     Reduce {

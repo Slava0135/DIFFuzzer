@@ -22,7 +22,7 @@ pub fn run(
     mount: &'static dyn FileSystemMount,
     fs_name: String,
 ) {
-    info!("running single test");
+    info!("running solo single test");
 
     info!("reading testcase at '{}'", test_path);
     let input = read_to_string(test_path)
