@@ -57,6 +57,7 @@
     printf("\n");        \
   } while (0)
 
+/// Size of read and write buffers.
 const size_t BUFFER_SIZE = 1024 * 1024;
 const size_t RANDOM_SEED = 123;
 
@@ -74,9 +75,12 @@ const char *READ = "READ";
 const char *FSYNC = "FSYNC";
 
 enum ExitCode : int {
+  /// Test finished with no failures.
   OK = 0,
+  /// Test finished with at least 1 failure.
   FAIL = 1,
-
+  /// Serious problem when executing test.
+  /// Can be caused by system/program issues, or the workload.
   ERROR = 2,
 };
 
@@ -95,14 +99,18 @@ static void append_trace(int idx, const char *cmd, int ret_code, int err,
   traces.push_back(Trace{idx, cmd, ret_code, err, extra});
 }
 
+/// Directory where files will be created/deleted/etc.
 const char *workspace = nullptr;
 
 static int failure_n = 0;
 static int success_n = 0;
 
+/// Used by write operations as data source.
 const char *write_buffer;
+/// Used by read operation as data sink.
 char *read_buffer;
 
+/// Hashcode algorithm from Java for buffers.
 static uint64_t buffer_hashcode(const char *buffer, size_t len) {
   uint64_t h = 1;
   for (size_t i = 0; i < len; i++) {
@@ -247,6 +255,7 @@ int main(int argc, char *argv[]) {
   return OK;
 }
 
+/// All paths in operations must be prefixed with workspace path. 
 static std::string patch_path(const std::string &path) {
   if (path[0] != '/') {
     DPRINTF("[ERROR] when patching path '%s', expected path to start with '/'",
@@ -261,6 +270,7 @@ static std::string path_join(const std::string &prefix,
   return prefix + "/" + file_name;
 }
 
+/// Current operation index.
 static int idx = -1;
 
 static void success(int status, const char *cmd, std::string extra) {
