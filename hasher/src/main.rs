@@ -23,9 +23,9 @@ fn main() {
         mode: args.mode,
     };
 
-    let skip =  match args.exclude {
+    let skip = match args.exclude {
         None => RegexSet::new::<_, &str>([]).unwrap(),
-        Some(v) => RegexSet::new(v).unwrap()
+        Some(v) => RegexSet::new(v).unwrap(),
     };
     let (hash, files) = calc_dir_hash(Path::new(&args.target_path), &skip, &hasher_options);
     println!("{}", hash);
