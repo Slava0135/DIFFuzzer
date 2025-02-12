@@ -6,13 +6,11 @@ use clap::Parser;
 use regex::RegexSet;
 use serde_json::to_string;
 
-use crate::mount::mount::FileSystemMount;
 use args::Args;
 use hasher::{calc_dir_hash, HasherOptions};
 
 mod args;
 mod lib;
-mod mount;
 
 fn main() {
     let args = Args::parse();
