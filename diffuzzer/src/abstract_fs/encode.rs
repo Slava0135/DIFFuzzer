@@ -2,11 +2,13 @@ use std::cmp::max;
 
 use super::{flags::Mode, node::FileDescriptorIndex, operation::Operation, workload::Workload};
 
+/// Generates name of variable for the descriptor.
 fn descriptor_to_var(des: &FileDescriptorIndex) -> String {
     format!("fd_{}", des.0)
 }
 
 impl Workload {
+    /// Generates C code from workload, that can be run after building with executor.
     pub fn encode_c(&self) -> String {
         let mut result = String::new();
         result.push_str("#include \"executor.h\"\n");

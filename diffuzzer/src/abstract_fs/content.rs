@@ -2,9 +2,15 @@ use std::{cmp::max, collections::VecDeque};
 
 use thiserror::Error;
 
+/// Represents a slice of data from some "source" (e.g. file/string/array) as indices, without storing actual data.
+///
+/// Example: let the "source" be "abcdefgh",
+/// then a slice (1:4) represents "bcde".
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct SourceSlice {
+    /// Inclusive
     pub from: u64,
+    /// Inclusive
     pub to: u64,
 }
 
@@ -18,6 +24,10 @@ impl SourceSlice {
     }
 }
 
+/// Emulates contents of file as a sequence of slices of some "source", without storing actual data.
+///
+/// Example: let the "source" be "abcdefgh",
+/// the a content with slices [(1:4), (6:6), (6:6)] represents "bcdegg".
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Content {
     slices: VecDeque<SourceSlice>,
@@ -40,6 +50,7 @@ impl Content {
         self.slices.iter().map(|s| s.to_owned()).collect()
     }
 
+    /// Similar to "append" mode when writing to file, writes data at the end.
     pub fn write_back(&mut self, src_offset: u64, size: u64) {
         if size > 0 {
             self.slices.push_back(SourceSlice {
@@ -49,6 +60,7 @@ impl Content {
         }
     }
 
+    /// Writes some slice of "source" data, at the specified offset.
     pub fn write(
         &mut self,
         src_offset: u64,
@@ -136,6 +148,7 @@ impl Content {
         Ok(())
     }
 
+    /// Reads data at specified offset and size.
     pub fn read(&self, offset: u64, size: u64) -> Result<Content, ContentError> {
         if offset > self.size() {
             return Err(ContentError::BadOffset(offset, self.size()));

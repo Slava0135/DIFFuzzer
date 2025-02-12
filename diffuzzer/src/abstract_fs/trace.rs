@@ -3,6 +3,7 @@ use std::num::ParseIntError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+/// Stores results of executing test workload operations.
 #[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 pub struct Trace {
     pub rows: Vec<TraceRow>,

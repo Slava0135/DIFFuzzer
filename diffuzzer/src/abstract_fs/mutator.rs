@@ -16,6 +16,7 @@ pub enum MutationKind {
     REMOVE,
 }
 
+/// Weights determine the likelihood of mutation to be picked.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct MutationWeights {
     pub weights: Vec<(MutationKind, u32)>,
@@ -28,6 +29,7 @@ impl MutationWeights {
     }
 }
 
+/// Tries to remove operation from workload at the index.
 pub fn remove(workload: &Workload, index: usize) -> Option<Workload> {
     let mut ops = workload.ops.clone();
     ops.remove(index);
@@ -39,6 +41,7 @@ pub fn remove(workload: &Workload, index: usize) -> Option<Workload> {
     }
 }
 
+/// Tries to insert random operation to workload at the index.
 pub fn insert(
     rng: &mut impl Rng,
     workload: &Workload,

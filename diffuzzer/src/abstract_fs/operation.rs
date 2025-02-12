@@ -58,6 +58,8 @@ pub enum OperationKind {
     FSYNC,
 }
 
+/// Weights determine the likelihood of operation to be picked.
+/// Weight is only considered if operation can be applied.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct OperationWeights {
     pub weights: Vec<(OperationKind, u32)>,

@@ -29,6 +29,7 @@ fn random_interesting_unsigned(rng: &mut impl Rng) -> u64 {
     INTERESTING_UNSIGNED.choose(rng).unwrap().clone()
 }
 
+/// Generates new random test workload of specified size.
 pub fn generate_new(rng: &mut impl Rng, size: usize, weights: &OperationWeights) -> Workload {
     let mut fs = AbstractFS::new();
     let mut name_idx: usize = 0;
@@ -43,6 +44,7 @@ pub fn generate_new(rng: &mut impl Rng, size: usize, weights: &OperationWeights)
     fs.recording
 }
 
+/// Appends one random operation at the end of workload.
 pub fn append_one(
     rng: &mut impl Rng,
     fs: &mut AbstractFS,

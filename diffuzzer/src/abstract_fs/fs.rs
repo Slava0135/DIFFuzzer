@@ -41,15 +41,19 @@ pub enum FsError {
     ContentError(#[from] ContentError),
 }
 
+/// Abstract model of filesystem that approximates filesystem functions.
+/// 
+/// All file nodes are stored as vectors and can be accessed using indicies (similar to inodes).
+/// Deleted nodes are not removed from the vectors to keep indicies unchanged.
 pub struct AbstractFS {
     pub dirs: Vec<Dir>,
     pub files: Vec<File>,
-
     pub descriptors: Vec<FileDescriptor>,
-
+    /// Every succesful operation is recorded and can be replayed from scratch.
     pub recording: Workload,
 }
 
+/// File nodes that are accessible from root (not deleted).
 #[derive(Debug, PartialEq, Eq)]
 pub struct AliveNodes {
     pub dirs: Vec<PathName>,
@@ -68,6 +72,7 @@ impl AbstractFS {
         }
     }
 
+    /// Removes node, similar to `unlink` (for files) and `rmdir` (for dirs).
     pub fn remove(&mut self, path: PathName) -> Result<()> {
         if path.is_root() {
             return Err(FsError::RootRemovalForbidden);
@@ -83,6 +88,7 @@ impl AbstractFS {
         Ok(())
     }
 
+    /// Creates an empty directory, similar to `mkdir`.
     pub fn mkdir(&mut self, path: PathName, mode: Mode) -> Result<DirIndex> {
         let (parent_path, name) = path.split();
         let parent = self.resolve_dir(parent_path.to_owned())?;
@@ -101,6 +107,7 @@ impl AbstractFS {
         Ok(dir_idx)
     }
 
+    /// Creates an empty file, similar to `creat` but without open file descriptor.
     pub fn create(&mut self, path: PathName, mode: Mode) -> Result<FileIndex> {
         let (parent_path, name) = path.split();
         let parent = self.resolve_dir(parent_path.to_owned())?;
@@ -120,6 +127,8 @@ impl AbstractFS {
         Ok(file_idx)
     }
 
+    /// Creates a "hard" link from one file to another, similar to `link`.
+    /// Both files refer to the same node (in the file tree) but with different names.
     pub fn hardlink(&mut self, old_path: PathName, new_path: PathName) -> Result<FileIndex> {
         let old_file = self.resolve_file(old_path.clone())?;
         let (parent_path, name) = new_path.split();
@@ -136,6 +145,7 @@ impl AbstractFS {
         Ok(old_file.to_owned())
     }
 
+    /// Renames a file, moving it between directories if required, similar to `rename`.
     pub fn rename(&mut self, old_path: PathName, new_path: PathName) -> Result<Node> {
         if old_path.is_prefix_of(&new_path) {
             return Err(FsError::RenameToSubdirectoryError(old_path, new_path));
@@ -162,6 +172,9 @@ impl AbstractFS {
         Ok(node)
     }
 
+    /// Opens a file and returns the file descriptor, similar to `open`.
+    /// 
+    /// TODO: flags
     pub fn open(&mut self, path: PathName) -> Result<FileDescriptorIndex> {
         let des = FileDescriptorIndex(self.descriptors.len());
         let file_idx = self.resolve_file(path.clone())?;
@@ -178,6 +191,7 @@ impl AbstractFS {
         Ok(des)
     }
 
+    /// Closes a file using the file descriptor, similar to `close`.
     pub fn close(&mut self, des_idx: FileDescriptorIndex) -> Result<()> {
         let des = self.descriptor(&des_idx)?.clone();
         let file = self.file_mut(&des.file);
@@ -189,6 +203,8 @@ impl AbstractFS {
         Ok(())
     }
 
+    /// Reads content of file using the file descriptor of specified size, similar to `read`.
+    /// Read position is managed by descriptor.
     pub fn read(&mut self, des_idx: FileDescriptorIndex, size: u64) -> Result<Content> {
         let des = self.descriptor(&des_idx)?.clone();
         let offset = des.offset;
@@ -210,6 +226,8 @@ impl AbstractFS {
         Ok(content)
     }
 
+    /// Writes slice of "source" data using the file descriptor, similar to `write`. 
+    /// Write position is managed by descriptor.
     pub fn write(
         &mut self,
         des_idx: FileDescriptorIndex,
@@ -240,6 +258,7 @@ impl AbstractFS {
         Ok(())
     }
 
+    /// No-op, sync file state with storage device, similar to `fsync`.
     pub fn fsync(&mut self, des_idx: FileDescriptorIndex) -> Result<()> {
         let des = self.descriptor(&des_idx)?.clone();
         let file = self.file_mut(&des.file);
@@ -250,6 +269,7 @@ impl AbstractFS {
         Ok(())
     }
 
+    /// Replay operations from workload. Does not reset the state.
     pub fn replay(&mut self, workload: &Workload) -> Result<()> {
         for op in &workload.ops {
             match op {
@@ -371,6 +391,7 @@ impl AbstractFS {
         DirIndex(0)
     }
 
+    /// Get nodes that are considired "alive" (accessible from root)
     pub fn alive(&self) -> AliveNodes {
         let root = AbstractFS::root_index();
         let mut alive = AliveNodes {

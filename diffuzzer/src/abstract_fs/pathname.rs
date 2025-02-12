@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 
+/// Represents an abstract filesystem path.
 #[derive(Debug, Clone, Hash, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathName(String);
 
@@ -24,6 +25,7 @@ impl From<String> for PathName {
 }
 
 impl PathName {
+    /// Splits path into parent directory path and file name.
     pub fn split(&self) -> (PathName, Name) {
         let split_at = self.0.rfind('/').unwrap();
         let (parent, name) = (&self.0[..split_at], &self.0[split_at + 1..]);
@@ -72,6 +74,7 @@ impl PathName {
     }
 }
 
+/// Abstract filesystem file name.
 pub type Name = String;
 
 #[cfg(test)]
