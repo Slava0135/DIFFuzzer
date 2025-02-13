@@ -44,8 +44,8 @@ fn main() {
             if args.no_qemu {
                 GreyBoxFuzzer::new(
                     config,
-                    first_filesystem.try_into().unwrap(),
-                    second_filesystem.try_into().unwrap(),
+                    first_filesystem.into(),
+                    second_filesystem.into(),
                     LocalPath::new(Path::new("./crashes")),
                 )
                 .run(test_count);
@@ -61,8 +61,8 @@ fn main() {
             if args.no_qemu {
                 BlackBoxFuzzer::new(
                     config,
-                    first_filesystem.try_into().unwrap(),
-                    second_filesystem.try_into().unwrap(),
+                    first_filesystem.into(),
+                    second_filesystem.into(),
                     LocalPath::new(Path::new("./crashes")),
                 )
                 .run(test_count);
@@ -81,7 +81,7 @@ fn main() {
                     &LocalPath::new(Path::new(&path_to_test)),
                     &LocalPath::new(Path::new(&output_dir)),
                     keep_fs,
-                    filesystem.try_into().unwrap(),
+                    filesystem.into(),
                     config.fs_name,
                 )
             } else {
@@ -98,8 +98,8 @@ fn main() {
             if args.no_qemu {
                 DuoSingleFuzzer::new(
                     config,
-                    first_filesystem.try_into().unwrap(),
-                    second_filesystem.try_into().unwrap(),
+                    first_filesystem.into(),
+                    second_filesystem.into(),
                     LocalPath::new(Path::new(&output_dir)),
                     LocalPath::new(Path::new(&path_to_test)),
                     keep_fs,
@@ -118,8 +118,8 @@ fn main() {
             if args.no_qemu {
                 Reducer::new(
                     config,
-                    first_filesystem.try_into().unwrap(),
-                    second_filesystem.try_into().unwrap(),
+                    first_filesystem.into(),
+                    second_filesystem.into(),
                     LocalPath::new(Path::new(&output_dir)),
                 )
                 .run(

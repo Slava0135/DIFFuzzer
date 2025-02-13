@@ -18,16 +18,14 @@ pub fn filesystems_available() -> Vec<String> {
         .collect()
 }
 
-impl TryFrom<String> for &'static dyn FileSystemMount {
-    type Error = String;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+impl From<String> for &'static dyn FileSystemMount {
+    fn from(value: String) -> Self {
         let value = value.to_lowercase();
         for fs in FILESYSTEMS {
             if fs.to_string().to_lowercase() == value {
-                return Ok(*fs);
+                return *fs;
             }
         }
-        Err(format!("unknown filesystem '{}'", value))
+        panic!("unknown filesystem '{}'", value);
     }
 }
