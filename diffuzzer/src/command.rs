@@ -317,6 +317,9 @@ impl RemoteCommandInterface {
         scp.arg("-q");
         scp.arg("-i").arg(self.config.ssh_private_key_path.clone());
         scp.arg("-o").arg("StrictHostKeyChecking no");
+        scp.arg("-o").arg("ControlMaster auto");
+        scp.arg("-o").arg("ControlPath /tmp/diffuzzer-ssh-%r@%h:%p");
+        scp.arg("-o").arg("ControlPersist 1m");
         // not a typo
         scp.arg("-P").arg(self.config.ssh_port.to_string());
         scp
@@ -326,6 +329,9 @@ impl RemoteCommandInterface {
         ssh.arg("-q");
         ssh.arg("-i").arg(self.config.ssh_private_key_path.clone());
         ssh.arg("-o").arg("StrictHostKeyChecking no");
+        ssh.arg("-o").arg("ControlMaster auto");
+        ssh.arg("-o").arg("ControlPath /tmp/diffuzzer-ssh-%r@%h:%p");
+        ssh.arg("-o").arg("ControlPersist 1m");
         ssh.arg("-p").arg(self.config.ssh_port.to_string());
         ssh.arg("root@localhost");
         ssh
