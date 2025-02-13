@@ -46,7 +46,7 @@ pub enum FsError {
 }
 
 /// Abstract model of filesystem that approximates filesystem functions.
-/// 
+///
 /// All file nodes are stored as vectors and can be accessed using indicies (similar to inodes).
 /// Deleted nodes are not removed from the vectors to keep indicies unchanged.
 pub struct AbstractFS {
@@ -177,7 +177,7 @@ impl AbstractFS {
     }
 
     /// Opens a file and returns the file descriptor, similar to `open`.
-    /// 
+    ///
     /// TODO: flags
     pub fn open(&mut self, path: PathName) -> Result<FileDescriptorIndex> {
         let des = FileDescriptorIndex(self.descriptors.len());
@@ -230,7 +230,7 @@ impl AbstractFS {
         Ok(content)
     }
 
-    /// Writes slice of "source" data using the file descriptor, similar to `write`. 
+    /// Writes slice of "source" data using the file descriptor, similar to `write`.
     /// Write position is managed by descriptor.
     pub fn write(
         &mut self,

@@ -3,14 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use anyhow::{Context, Ok};
-use log::{debug, info};
+use log::info;
 use rand::prelude::StdRng;
 use rand::SeedableRng;
 use std::fs::read_to_string;
-use std::path::Path;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::abstract_fs::generator::generate_new;
 use crate::abstract_fs::workload::Workload;
 use crate::config::Config;
 

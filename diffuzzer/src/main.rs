@@ -9,7 +9,7 @@ use args::Args;
 use clap::Parser;
 use config::Config;
 use fuzzing::{
-    blackbox::fuzzer::BlackBoxFuzzer, duo_single, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
+    blackbox::fuzzer::BlackBoxFuzzer, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
     reducer::Reducer, solo_single,
 };
 use log::info;

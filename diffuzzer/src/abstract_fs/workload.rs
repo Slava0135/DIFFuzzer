@@ -8,7 +8,7 @@ use siphasher::sip128::SipHasher13;
 
 use super::operation::Operation;
 
-/// Sequence of operations to be run in test. 
+/// Sequence of operations to be run in test.
 #[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
 pub struct Workload {
     pub ops: Vec<Operation>,
