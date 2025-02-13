@@ -29,7 +29,7 @@ impl BlackBoxFuzzer {
         crashes_path: LocalPath,
     ) -> Self {
         Self {
-            runner: Runner::new(fst_mount, snd_mount, crashes_path, config),
+            runner: Runner::new(fst_mount, snd_mount, crashes_path, config, false),
             rng: StdRng::seed_from_u64(
                 SystemTime::now()
                     .duration_since(UNIX_EPOCH)
@@ -51,7 +51,7 @@ impl Fuzzer for BlackBoxFuzzer {
 
         let binary_path = self.runner().compile_test(&input)?;
 
-        let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path, false)?;
+        let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path)?;
 
         let fst_trace =
             parse_trace(&fst_outcome).with_context(|| format!("failed to parse first trace"))?;

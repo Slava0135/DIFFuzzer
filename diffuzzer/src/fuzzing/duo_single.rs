@@ -17,7 +17,6 @@ use crate::path::LocalPath;
 pub struct DuoSingleFuzzer {
     runner: Runner,
     test_path: LocalPath,
-    keep_fs: bool,
 }
 
 impl DuoSingleFuzzer {
@@ -30,9 +29,8 @@ impl DuoSingleFuzzer {
         keep_fs: bool,
     ) -> Self {
         Self {
-            runner: Runner::new(fst_mount, snd_mount, crashes_path, config),
+            runner: Runner::new(fst_mount, snd_mount, crashes_path, config, keep_fs),
             test_path,
-            keep_fs,
         }
     }
 }
@@ -51,8 +49,7 @@ impl Fuzzer for DuoSingleFuzzer {
 
         let binary_path = self.runner().compile_test(&input)?;
 
-        let keep_fs = self.keep_fs.to_owned();
-        let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path, keep_fs)?;
+        let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path)?;
 
         let fst_trace =
             parse_trace(&fst_outcome).with_context(|| format!("failed to parse first trace"))?;

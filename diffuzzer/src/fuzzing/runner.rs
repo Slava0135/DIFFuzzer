@@ -25,6 +25,8 @@ use super::outcome::Outcome;
 pub struct Runner {
     pub config: Config,
 
+    pub keep_fs: bool,
+
     pub cmdi: Box<dyn CommandInterface>,
 
     pub test_dir: RemotePath,
@@ -51,6 +53,7 @@ impl Runner {
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
         config: Config,
+        keep_fs: bool,
     ) -> Self {
         info!("new fuzzer");
 
@@ -104,6 +107,7 @@ impl Runner {
 
         Self {
             config,
+            keep_fs,
 
             cmdi,
 
@@ -136,7 +140,6 @@ impl Runner {
     pub fn run_harness(
         &mut self,
         binary_path: &RemotePath,
-        keep_fs: bool,
     ) -> anyhow::Result<(Outcome, Outcome)> {
         debug!("running harness at '{}'", binary_path);
 
@@ -147,7 +150,7 @@ impl Runner {
             .run(
                 self.cmdi.as_ref(),
                 &binary_path,
-                keep_fs,
+                self.keep_fs,
                 Some(&mut self.hash_objective.fst_fs),
             )
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
@@ -159,7 +162,7 @@ impl Runner {
             .run(
                 self.cmdi.as_ref(),
                 &binary_path,
-                keep_fs,
+                self.keep_fs,
                 Some(&mut self.hash_objective.snd_fs),
             )
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
