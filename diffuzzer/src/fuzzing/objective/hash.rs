@@ -29,7 +29,7 @@ impl HashHolder {
 pub struct HashObjective {
     pub fst_fs: HashHolder,
     pub snd_fs: HashHolder,
-    enabled: bool,
+    pub enabled: bool,
 }
 
 impl HashObjective {

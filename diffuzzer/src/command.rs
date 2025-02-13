@@ -50,10 +50,7 @@ pub trait CommandInterface {
     fn setup_remote_dir(&self) -> anyhow::Result<RemotePath> {
         let remote_dir = RemotePath::new_tmp("remote");
 
-        info!(
-            "setup remote directory at '{}'",
-            remote_dir.base.display()
-        );
+        info!("setup remote directory at '{}'", remote_dir.base.display());
         self.remove_dir_all(&remote_dir).unwrap_or(());
         self.create_dir_all(&remote_dir).with_context(|| {
             format!(
@@ -84,7 +81,7 @@ pub trait CommandInterface {
 
         info!("make test binary");
         let mut make = CommandWrapper::new("make");
-        make.arg("-C").arg(executor_dir.as_ref());
+        make.arg("-C").arg(remote_dir.base.as_ref());
         self.exec(make)
             .with_context(|| "failed to make test binary")?;
 
@@ -106,7 +103,7 @@ impl CommandWrapper {
         self.internal.arg(arg);
         self
     }
-    fn exec_local(mut self) -> anyhow::Result<Output> {
+    pub fn exec_local(mut self) -> anyhow::Result<Output> {
         let output = self
             .internal
             .output()
@@ -320,6 +317,9 @@ impl RemoteCommandInterface {
         scp.arg("-q");
         scp.arg("-i").arg(self.config.ssh_private_key_path.clone());
         scp.arg("-o").arg("StrictHostKeyChecking no");
+        scp.arg("-o").arg("ControlMaster auto");
+        scp.arg("-o").arg("ControlPath /tmp/diffuzzer-ssh-%r@%h:%p");
+        scp.arg("-o").arg("ControlPersist 1m");
         // not a typo
         scp.arg("-P").arg(self.config.ssh_port.to_string());
         scp
@@ -329,6 +329,9 @@ impl RemoteCommandInterface {
         ssh.arg("-q");
         ssh.arg("-i").arg(self.config.ssh_private_key_path.clone());
         ssh.arg("-o").arg("StrictHostKeyChecking no");
+        ssh.arg("-o").arg("ControlMaster auto");
+        ssh.arg("-o").arg("ControlPath /tmp/diffuzzer-ssh-%r@%h:%p");
+        ssh.arg("-o").arg("ControlPersist 1m");
         ssh.arg("-p").arg(self.config.ssh_port.to_string());
         ssh.arg("root@localhost");
         ssh

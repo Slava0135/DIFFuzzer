@@ -54,9 +54,8 @@ impl Runner {
         crashes_path: LocalPath,
         config: Config,
         keep_fs: bool,
+        cmdi: Box<dyn CommandInterface>,
     ) -> Self {
-        let cmdi = Box::new(LocalCommandInterface::new());
-
         let temp_dir = cmdi
             .setup_remote_dir()
             .with_context(|| "failed to setup temp dir")
@@ -135,34 +134,31 @@ impl Runner {
         Ok(binary_path)
     }
 
-    pub fn run_harness(
-        &mut self,
-        binary_path: &RemotePath,
-    ) -> anyhow::Result<(Outcome, Outcome)> {
+    pub fn run_harness(&mut self, binary_path: &RemotePath) -> anyhow::Result<(Outcome, Outcome)> {
         debug!("run harness at '{}'", binary_path);
 
         setup_dir(self.cmdi.as_ref(), &self.exec_dir)
             .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;
+        let fst_hash = if self.hash_objective.enabled {
+            Some(&mut self.hash_objective.fst_fs)
+        } else {
+            None
+        };
         let fst_outcome = self
             .fst_harness
-            .run(
-                self.cmdi.as_ref(),
-                &binary_path,
-                self.keep_fs,
-                Some(&mut self.hash_objective.fst_fs),
-            )
+            .run(self.cmdi.as_ref(), &binary_path, self.keep_fs, fst_hash)
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
 
         setup_dir(self.cmdi.as_ref(), &self.exec_dir)
             .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;
+        let snd_hash = if self.hash_objective.enabled {
+            Some(&mut self.hash_objective.snd_fs)
+        } else {
+            None
+        };
         let snd_outcome = self
             .snd_harness
-            .run(
-                self.cmdi.as_ref(),
-                &binary_path,
-                self.keep_fs,
-                Some(&mut self.hash_objective.snd_fs),
-            )
+            .run(self.cmdi.as_ref(), &binary_path, self.keep_fs, snd_hash)
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
         Ok((fst_outcome, snd_outcome))
     }

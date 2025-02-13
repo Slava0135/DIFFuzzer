@@ -9,6 +9,7 @@ use rand::SeedableRng;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
+use crate::command::LocalCommandInterface;
 use crate::config::Config;
 
 use crate::fuzzing::fuzzer::Fuzzer;
@@ -16,12 +17,12 @@ use crate::fuzzing::runner::{parse_trace, Runner};
 use crate::mount::mount::FileSystemMount;
 use crate::path::LocalPath;
 
-pub struct BlackBoxFuzzer {
+pub struct NativeBlackBoxFuzzer {
     runner: Runner,
     rng: StdRng,
 }
 
-impl BlackBoxFuzzer {
+impl NativeBlackBoxFuzzer {
     pub fn new(
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
@@ -29,7 +30,14 @@ impl BlackBoxFuzzer {
         crashes_path: LocalPath,
     ) -> Self {
         Self {
-            runner: Runner::new(fst_mount, snd_mount, crashes_path, config, false),
+            runner: Runner::new(
+                fst_mount,
+                snd_mount,
+                crashes_path,
+                config,
+                false,
+                Box::new(LocalCommandInterface::new()),
+            ),
             rng: StdRng::seed_from_u64(
                 SystemTime::now()
                     .duration_since(UNIX_EPOCH)
@@ -40,7 +48,7 @@ impl BlackBoxFuzzer {
     }
 }
 
-impl Fuzzer for BlackBoxFuzzer {
+impl Fuzzer for NativeBlackBoxFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
         debug!("generate input");
         let input = generate_new(

@@ -7,6 +7,7 @@ use log::info;
 use std::fs::read_to_string;
 
 use crate::abstract_fs::workload::Workload;
+use crate::command::LocalCommandInterface;
 use crate::config::Config;
 
 use crate::fuzzing::fuzzer::Fuzzer;
@@ -29,7 +30,14 @@ impl DuoSingleFuzzer {
         keep_fs: bool,
     ) -> Self {
         Self {
-            runner: Runner::new(fst_mount, snd_mount, crashes_path, config, keep_fs),
+            runner: Runner::new(
+                fst_mount,
+                snd_mount,
+                crashes_path,
+                config,
+                keep_fs,
+                Box::new(LocalCommandInterface::new()),
+            ),
             test_path,
         }
     }
