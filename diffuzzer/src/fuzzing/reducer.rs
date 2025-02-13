@@ -10,6 +10,7 @@ use log::{info, warn};
 
 use crate::{
     abstract_fs::{mutator::remove, workload::Workload},
+    command::LocalCommandInterface,
     config::Config,
     fuzzing::runner::parse_trace,
     mount::mount::FileSystemMount,
@@ -30,7 +31,14 @@ impl Reducer {
         crashes_path: LocalPath,
     ) -> Self {
         Self {
-            runner: Runner::new(fst_mount, snd_mount, crashes_path, config, false),
+            runner: Runner::new(
+                fst_mount,
+                snd_mount,
+                crashes_path,
+                config,
+                false,
+                Box::new(LocalCommandInterface::new()),
+            ),
         }
     }
 

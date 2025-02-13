@@ -9,8 +9,11 @@ use args::Args;
 use clap::Parser;
 use config::Config;
 use fuzzing::{
-    blackbox::fuzzer::BlackBoxFuzzer, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
-    reducer::Reducer, solo_single,
+    blackbox::{native::NativeBlackBoxFuzzer, qemu::QemuBlackBoxFuzzer},
+    fuzzer::Fuzzer,
+    greybox::fuzzer::GreyBoxFuzzer,
+    reducer::Reducer,
+    solo_single,
 };
 use log::info;
 use path::LocalPath;
@@ -68,7 +71,7 @@ fn main() {
                 first_filesystem, second_filesystem
             );
             if args.no_qemu {
-                BlackBoxFuzzer::new(
+                NativeBlackBoxFuzzer::new(
                     config,
                     first_filesystem.into(),
                     second_filesystem.into(),
@@ -76,7 +79,13 @@ fn main() {
                 )
                 .run(test_count);
             } else {
-                todo!("QEMU not supported");
+                QemuBlackBoxFuzzer::new(
+                    config,
+                    first_filesystem.into(),
+                    second_filesystem.into(),
+                    LocalPath::new(Path::new("./crashes")),
+                )
+                .run(test_count);
             }
         }
         args::Mode::SoloSingle {
@@ -129,7 +138,10 @@ fn main() {
             first_filesystem,
             second_filesystem,
         } => {
-            info!("reduce test ('{}' + '{}')", first_filesystem, second_filesystem);
+            info!(
+                "reduce test ('{}' + '{}')",
+                first_filesystem, second_filesystem
+            );
             if args.no_qemu {
                 Reducer::new(
                     config,

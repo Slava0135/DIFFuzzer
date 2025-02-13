@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::abstract_fs::{mutator::MutationWeights, operation::OperationWeights};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
     pub greybox: GreyboxConfig,
     pub operation_weights: OperationWeights,
@@ -19,14 +19,14 @@ pub struct Config {
     pub qemu: QemuConfig,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct GreyboxConfig {
     pub max_mutations: u16,
     pub save_corpus: bool,
 }
 
 /// [QEMU documentation](https://www.qemu.org/docs/master/system/invocation.html)
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct QemuConfig {
     /// Path to VM launch script
     pub launch_script: String,

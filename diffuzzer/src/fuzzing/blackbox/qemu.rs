@@ -6,9 +6,14 @@ use anyhow::{Context, Ok};
 use log::{debug, info};
 use rand::prelude::StdRng;
 use rand::SeedableRng;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::io::Write;
+use std::net::TcpStream;
+use std::process::{Child, Command, Stdio};
+use std::thread::sleep;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
+use crate::command::RemoteCommandInterface;
 use crate::config::Config;
 
 use crate::fuzzing::fuzzer::Fuzzer;
@@ -16,31 +21,71 @@ use crate::fuzzing::runner::{parse_trace, Runner};
 use crate::mount::mount::FileSystemMount;
 use crate::path::LocalPath;
 
-pub struct BlackBoxFuzzer {
+const SNAPSHOT_TAG: &str = "FRESH";
+
+pub struct QemuBlackBoxFuzzer {
     runner: Runner,
     rng: StdRng,
+    qemu_process: Child,
+    monitor_stream: TcpStream,
 }
 
-impl BlackBoxFuzzer {
+impl QemuBlackBoxFuzzer {
     pub fn new(
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
     ) -> Self {
+        let mut launch = Command::new(&config.qemu.launch_script);
+        launch
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        let qemu_process = launch.spawn().expect(&format!(
+            "failed to run qemu vm from script '{}'",
+            &config.qemu.launch_script
+        ));
+
+        info!("wait for VM to init");
+        sleep(Duration::from_secs(10));
+
+        let runner = Runner::new(
+            fst_mount,
+            snd_mount,
+            crashes_path,
+            config.clone(),
+            false,
+            Box::new(RemoteCommandInterface::new(config.qemu.clone())),
+        );
+
+        let addr = format!("localhost:{}", config.qemu.monitor_port);
+        let mut monitor_stream = TcpStream::connect(addr.clone()).expect(&format!(
+            "failed to connect to qemu monitor at address '{}'",
+            addr
+        ));
+        monitor_stream
+            .set_nodelay(true)
+            .expect("failed to call nodelay");
+        monitor_stream
+            .write_all(format!("savevm {}", SNAPSHOT_TAG).as_bytes())
+            .expect("failed to save vm snapshot");
+
         Self {
-            runner: Runner::new(fst_mount, snd_mount, crashes_path, config, false),
+            runner,
             rng: StdRng::seed_from_u64(
                 SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
                     .as_millis() as u64,
             ),
+            qemu_process,
+            monitor_stream,
         }
     }
 }
 
-impl Fuzzer for BlackBoxFuzzer {
+impl Fuzzer for QemuBlackBoxFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
         debug!("generate input");
         let input = generate_new(
@@ -50,6 +95,8 @@ impl Fuzzer for BlackBoxFuzzer {
         );
 
         let binary_path = self.runner().compile_test(&input)?;
+
+        debug!("run harness at '{}'", binary_path);
 
         let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path)?;
 

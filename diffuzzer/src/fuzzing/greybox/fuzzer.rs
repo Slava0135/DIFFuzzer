@@ -10,6 +10,7 @@ use anyhow::{Context, Ok};
 use log::{debug, info};
 use rand::{rngs::StdRng, SeedableRng};
 
+use crate::command::LocalCommandInterface;
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::outcome::Outcome;
 use crate::fuzzing::runner::{parse_trace, Runner};
@@ -61,7 +62,14 @@ impl GreyBoxFuzzer {
             None
         };
 
-        let runner = Runner::new(fst_mount, snd_mount, crashes_path, config, false);
+        let runner = Runner::new(
+            fst_mount,
+            snd_mount,
+            crashes_path,
+            config,
+            false,
+            Box::new(LocalCommandInterface::new()),
+        );
 
         let fst_kcov_feedback = KCovFeedback::new();
         let snd_kcov_feedback = KCovFeedback::new();

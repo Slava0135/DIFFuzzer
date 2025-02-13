@@ -3,10 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use anyhow::{Context, Ok};
-use log::info;
-use std::fs::read_to_string;
+use log::{debug, info};
+use rand::prelude::StdRng;
+use rand::SeedableRng;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-use crate::abstract_fs::workload::Workload;
+use crate::abstract_fs::generator::generate_new;
 use crate::command::LocalCommandInterface;
 use crate::config::Config;
 
@@ -15,19 +17,17 @@ use crate::fuzzing::runner::{parse_trace, Runner};
 use crate::mount::mount::FileSystemMount;
 use crate::path::LocalPath;
 
-pub struct DuoSingleFuzzer {
+pub struct NativeBlackBoxFuzzer {
     runner: Runner,
-    test_path: LocalPath,
+    rng: StdRng,
 }
 
-impl DuoSingleFuzzer {
+impl NativeBlackBoxFuzzer {
     pub fn new(
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
-        test_path: LocalPath,
-        keep_fs: bool,
     ) -> Self {
         Self {
             runner: Runner::new(
@@ -35,23 +35,27 @@ impl DuoSingleFuzzer {
                 snd_mount,
                 crashes_path,
                 config,
-                keep_fs,
+                false,
                 Box::new(LocalCommandInterface::new()),
             ),
-            test_path,
+            rng: StdRng::seed_from_u64(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64,
+            ),
         }
     }
 }
 
-impl Fuzzer for DuoSingleFuzzer {
+impl Fuzzer for NativeBlackBoxFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
-        info!("read testcase at '{}'", self.test_path);
-        let input = read_to_string(&self.test_path)
-            .with_context(|| format!("failed to read testcase"))
-            .unwrap();
-        let input: Workload = serde_json::from_str(&input)
-            .with_context(|| format!("failed to parse json"))
-            .unwrap();
+        debug!("generate input");
+        let input = generate_new(
+            &mut self.rng,
+            self.runner.config.max_workload_length.into(),
+            &self.runner.config.operation_weights,
+        );
 
         let binary_path = self.runner().compile_test(&input)?;
 
@@ -85,7 +89,20 @@ impl Fuzzer for DuoSingleFuzzer {
         Ok(())
     }
 
-    fn show_stats(&mut self) {}
+    fn show_stats(&mut self) {
+        self.runner.stats.last_time_showed = Instant::now();
+        let since_start = Instant::now().duration_since(self.runner.stats.start);
+        let secs = since_start.as_secs();
+        info!(
+            "crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
+            self.runner.stats.crashes,
+            self.runner.stats.executions,
+            (self.runner.stats.executions as f64) / (secs as f64),
+            secs / (60 * 60),
+            (secs / (60)) % 60,
+            secs % 60,
+        );
+    }
 
     fn runner(&mut self) -> &mut Runner {
         &mut self.runner
