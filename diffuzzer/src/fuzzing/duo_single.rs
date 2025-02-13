@@ -4,10 +4,7 @@
 
 use anyhow::{Context, Ok};
 use log::info;
-use rand::prelude::StdRng;
-use rand::SeedableRng;
 use std::fs::read_to_string;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::workload::Workload;
 use crate::config::Config;
@@ -19,7 +16,6 @@ use crate::path::LocalPath;
 
 pub struct DuoSingleFuzzer {
     runner: Runner,
-    rng: StdRng,
     test_path: LocalPath,
     keep_fs: bool,
 }
@@ -35,12 +31,6 @@ impl DuoSingleFuzzer {
     ) -> Self {
         Self {
             runner: Runner::new(fst_mount, snd_mount, crashes_path, config),
-            rng: StdRng::seed_from_u64(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64,
-            ),
             test_path,
             keep_fs,
         }
