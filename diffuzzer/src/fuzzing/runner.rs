@@ -5,14 +5,14 @@
 use crate::abstract_fs::trace::{Trace, TRACE_FILENAME};
 
 use crate::abstract_fs::workload::Workload;
-use crate::command::{CommandInterface, LocalCommandInterface};
+use crate::command::CommandInterface;
 use crate::config::Config;
 use crate::mount::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
 use crate::save::{save_diff, save_outcome, save_testcase};
 use anyhow::{Context, Ok};
 use hasher::FileDiff;
-use log::{debug, info};
+use log::{debug, info, warn};
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
@@ -80,6 +80,9 @@ impl Runner {
             .join(snd_fs_name.to_lowercase())
             .join(&config.fs_name);
 
+        if !config.hashing_enabled {
+            warn!("hashing objective is disabled")
+        }
         let hash_objective = HashObjective::new(
             fst_fs_dir.clone(),
             snd_fs_dir.clone(),
