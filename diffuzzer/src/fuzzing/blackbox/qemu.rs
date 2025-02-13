@@ -47,8 +47,8 @@ impl QemuBlackBoxFuzzer {
             &config.qemu.launch_script
         ));
 
-        info!("wait for VM to init");
-        sleep(Duration::from_secs(10));
+        info!("wait for VM to init ({}s)", config.qemu.boot_wait_time);
+        sleep(Duration::from_secs(config.qemu.boot_wait_time.into()));
 
         let runner = Runner::new(
             fst_mount,

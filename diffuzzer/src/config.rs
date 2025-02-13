@@ -38,4 +38,6 @@ pub struct QemuConfig {
     pub ssh_port: u16,
     /// Path to OS image
     pub os_image: String,
+    /// Time to wait until OS is considered booted
+    pub boot_wait_time: u8,
 }
