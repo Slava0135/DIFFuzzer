@@ -101,6 +101,4 @@ Done!
 
 ## License
 
-Licensed under "Mozilla Public License Version 2.0"
-
-Copyright (c) 2025 Vyacheslav Kovalevsky
+All the code is licensed under the "Mozilla Public License Version 2.0", unless specified otherwise.
