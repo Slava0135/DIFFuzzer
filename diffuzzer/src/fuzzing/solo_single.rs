@@ -26,9 +26,7 @@ pub fn run(
     mount: &'static dyn FileSystemMount,
     fs_name: String,
 ) {
-    info!("running solo single test");
-
-    info!("reading testcase at '{}'", test_path);
+    info!("read testcase at '{}'", test_path);
     let input = read_to_string(test_path)
         .with_context(|| format!("failed to read testcase"))
         .unwrap();
@@ -47,7 +45,7 @@ pub fn run(
     let exec_dir = remote_dir.join("exec");
     setup_dir(&cmdi, &exec_dir).unwrap();
 
-    info!("compiling test at '{}'", test_dir);
+    info!("compile test at '{}'", test_dir);
     let binary_path = input
         .compile(&cmdi, &test_dir)
         .with_context(|| format!("failed to compile test"))
@@ -64,13 +62,13 @@ pub fn run(
         LocalPath::new_tmp("outcome-single"),
     );
 
-    info!("running harness");
+    info!("run harness");
     let outcome = harness
         .run(&cmdi, &binary_path, keep_fs, None)
         .with_context(|| format!("failed to run harness"))
         .unwrap();
 
-    info!("saving results");
+    info!("save results");
     fs::create_dir_all(output_dir).unwrap();
     save_testcase(&cmdi, output_dir, &binary_path, &input)
         .with_context(|| format!("failed to save testcase"))

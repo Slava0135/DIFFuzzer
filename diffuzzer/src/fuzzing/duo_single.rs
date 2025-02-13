@@ -37,9 +37,7 @@ impl DuoSingleFuzzer {
 
 impl Fuzzer for DuoSingleFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
-        info!("running duo single test");
-
-        info!("reading testcase at '{}'", self.test_path);
+        info!("read testcase at '{}'", self.test_path);
         let input = read_to_string(&self.test_path)
             .with_context(|| format!("failed to read testcase"))
             .unwrap();

@@ -55,8 +55,6 @@ impl Runner {
         config: Config,
         keep_fs: bool,
     ) -> Self {
-        info!("new fuzzer");
-
         let cmdi = Box::new(LocalCommandInterface::new());
 
         let temp_dir = cmdi
@@ -64,7 +62,7 @@ impl Runner {
             .with_context(|| "failed to setup temp dir")
             .unwrap();
 
-        info!("setting up fuzzing components");
+        info!("init runner components");
         let test_dir = temp_dir.clone();
         let exec_dir = temp_dir.join("exec");
 
@@ -130,7 +128,7 @@ impl Runner {
     }
 
     pub fn compile_test(&mut self, input: &Workload) -> anyhow::Result<RemotePath> {
-        debug!("compiling test at '{}'", self.test_dir);
+        debug!("compile test at '{}'", self.test_dir);
         let binary_path = input
             .compile(self.cmdi.as_ref(), &self.test_dir)
             .with_context(|| format!("failed to compile test"))?;
@@ -141,7 +139,7 @@ impl Runner {
         &mut self,
         binary_path: &RemotePath,
     ) -> anyhow::Result<(Outcome, Outcome)> {
-        debug!("running harness at '{}'", binary_path);
+        debug!("run harness at '{}'", binary_path);
 
         setup_dir(self.cmdi.as_ref(), &self.exec_dir)
             .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;

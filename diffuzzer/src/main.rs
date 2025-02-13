@@ -30,10 +30,11 @@ fn main() {
     let args = Args::parse();
 
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();
-    info!("logger initialized");
-    info!("reading configuration");
+    info!("init logger");
+
+    info!("read configuration");
     let config = fs::read_to_string(args.config_path).expect("failed to read configuration file");
-    let config: Config = toml::from_str(&config).expect("bad configuration");
+    let config: Config = toml::from_str(&config).expect("bad configuration file");
 
     match args.mode {
         args::Mode::Greybox {

@@ -18,7 +18,7 @@ const DEVICE: &str = "/dev/ram0";
 
 pub trait FileSystemMount: Display {
     fn setup(&self, cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<()> {
-        debug!("setting up '{}' filesystem at '{}'", self, path);
+        debug!("setup '{}' filesystem at '{}'", self, path);
 
         cmdi.create_dir_all(path)
             .with_context(|| "failed to create mountpoint")?;
@@ -54,7 +54,7 @@ pub trait FileSystemMount: Display {
     }
 
     fn teardown(&self, cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<()> {
-        debug!("tearing down '{}' filesystem at '{}'", self, path);
+        debug!("teardown '{}' filesystem at '{}'", self, path);
 
         let mut umount = CommandWrapper::new("umount");
         umount.arg("-fl").arg(path.base.as_ref());

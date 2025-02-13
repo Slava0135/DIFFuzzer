@@ -35,8 +35,7 @@ impl Reducer {
     }
 
     pub fn run(&mut self, test_path: &LocalPath, save_to_dir: &LocalPath) -> anyhow::Result<()> {
-        info!("running reducer");
-        info!("reading testcase at '{}'", test_path);
+        info!("read testcase at '{}'", test_path);
         let input = read_to_string(test_path)
             .with_context(|| format!("failed to read testcase"))
             .unwrap();
@@ -80,7 +79,7 @@ impl Reducer {
         old_diff: Vec<FileDiff>,
         output_dir: &LocalPath,
     ) -> anyhow::Result<()> {
-        info!("reducing using hash difference");
+        info!("reduce using hash difference");
         let mut index = input.ops.len() - 1;
         let mut workload = input;
         loop {
@@ -96,7 +95,7 @@ impl Reducer {
                     let new_diff = self.runner.hash_objective.get_diff();
                     if old_diff == new_diff {
                         workload = reduced;
-                        info!("reduced workload (length = {})", workload.ops.len());
+                        info!("workload reduced (length = {})", workload.ops.len());
                         self.runner.report_crash(
                             &workload,
                             &binary_path,

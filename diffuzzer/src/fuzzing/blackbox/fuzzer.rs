@@ -42,7 +42,7 @@ impl BlackBoxFuzzer {
 
 impl Fuzzer for BlackBoxFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
-        debug!("generating input");
+        debug!("generate input");
         let input = generate_new(
             &mut self.rng,
             self.runner.config.max_workload_length.into(),

@@ -17,7 +17,7 @@ use super::{outcome::Outcome, runner::Runner};
 
 pub trait Fuzzer {
     fn run(&mut self, test_count: Option<u64>) {
-        info!("starting fuzzing loop");
+        info!("start fuzzing loop");
         self.runner().stats.start = Instant::now();
         match test_count {
             None => loop {
@@ -65,7 +65,7 @@ pub trait Fuzzer {
         snd_outcome: &Outcome,
     ) -> anyhow::Result<bool> {
         let runner = self.runner();
-        debug!("doing objectives");
+        debug!("do objectives");
         let hash_diff_interesting = runner
             .hash_objective
             .is_interesting()
@@ -76,7 +76,7 @@ pub trait Fuzzer {
             .with_context(|| format!("failed to do trace objective"))?;
         if trace_is_interesting || hash_diff_interesting {
             debug!(
-                "Error detected by: trace?: {}, hash?: {}",
+                "error detected by: trace?: {}, hash?: {}",
                 trace_is_interesting, hash_diff_interesting
             );
             let mut diff: Vec<FileDiff> = vec![];
@@ -110,7 +110,7 @@ pub trait Fuzzer {
         fst_outcome: &Outcome,
         snd_outcome: &Outcome,
     ) -> anyhow::Result<bool> {
-        debug!("detecting errors");
+        debug!("detect errors");
         if fst_trace.has_errors() && snd_trace.has_errors() {
             warn!("both traces contain errors, potential bug in model");
             let accidents_path = self.runner().accidents_path.clone();

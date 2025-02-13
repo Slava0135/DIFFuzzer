@@ -90,7 +90,7 @@ impl GreyBoxFuzzer {
     }
 
     fn add_to_corpus(&mut self, input: Workload) {
-        debug!("adding new input to corpus");
+        debug!("add new input to corpus");
         self.corpus.push(input);
     }
 
@@ -119,10 +119,10 @@ impl GreyBoxFuzzer {
 
 impl Fuzzer for GreyBoxFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
-        debug!("picking input");
+        debug!("pick input");
         let input = self.pick_input();
 
-        debug!("mutating input");
+        debug!("mutate input");
         let input = self.mutator.mutate(input);
 
         let binary_path = self.runner().compile_test(&input)?;
@@ -156,7 +156,7 @@ impl Fuzzer for GreyBoxFuzzer {
             return Ok(());
         }
 
-        debug!("getting feedback");
+        debug!("get feedback");
         let fst_kcov_is_interesting = self
             .fst_kcov_feedback
             .is_interesting(&fst_outcome)
