@@ -42,6 +42,10 @@ fn main() {
             second_filesystem,
             test_count,
         } => {
+            info!(
+                "start greybox fuzzing ('{}' + '{}')",
+                first_filesystem, second_filesystem
+            );
             if args.no_qemu {
                 GreyBoxFuzzer::new(
                     config,
@@ -59,6 +63,10 @@ fn main() {
             second_filesystem,
             test_count,
         } => {
+            info!(
+                "start blackbox fuzzing ('{}' + '{}')",
+                first_filesystem, second_filesystem
+            );
             if args.no_qemu {
                 BlackBoxFuzzer::new(
                     config,
@@ -77,6 +85,7 @@ fn main() {
             keep_fs,
             filesystem,
         } => {
+            info!("run single test ('{}')", filesystem);
             if args.no_qemu {
                 solo_single::run(
                     &LocalPath::new(Path::new(&path_to_test)),
@@ -96,6 +105,10 @@ fn main() {
             path_to_test,
             keep_fs,
         } => {
+            info!(
+                "run single test ('{}' + '{}')",
+                first_filesystem, second_filesystem
+            );
             if args.no_qemu {
                 DuoSingleFuzzer::new(
                     config,
@@ -116,6 +129,7 @@ fn main() {
             first_filesystem,
             second_filesystem,
         } => {
+            info!("reduce test ('{}' + '{}')", first_filesystem, second_filesystem);
             if args.no_qemu {
                 Reducer::new(
                     config,
