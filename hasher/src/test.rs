@@ -23,8 +23,10 @@ fn test_hash_eq() {
 
     let ext4_dirs = RegexSet::new([r"^/?lost\+found($|/)"]).unwrap();
     let hash_options = Default::default();
-    let (hash_fst, fst_content) = calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options);
-    let (hash_snd, snd_content) = calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options);
+    let (hash_fst, fst_content) =
+        calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options).unwrap();
+    let (hash_snd, snd_content) =
+        calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options).unwrap();
     let diff = get_diff(
         &fst_content,
         &snd_content,
@@ -32,7 +34,6 @@ fn test_hash_eq() {
         &ext4_dirs,
         &hash_options,
     );
-    println!("{:?}", diff);
     assert_eq!(hash_fst, hash_snd);
     assert_eq!(diff.len(), 0);
 }
@@ -53,8 +54,10 @@ fn test_hash_not_eq() {
 
     let ext4_dirs = RegexSet::new([r"^/?lost\+found($|/)"]).unwrap();
     let hash_options = Default::default();
-    let (hash_fst, fst_content) = calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options);
-    let (hash_snd, snd_content) = calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options);
+    let (hash_fst, fst_content) =
+        calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options).unwrap();
+    let (hash_snd, snd_content) =
+        calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options).unwrap();
     assert_ne!(hash_fst, hash_snd);
 
     let diff = get_diff(
@@ -83,8 +86,10 @@ fn test_hash_eq_skip() {
 
     let ext4_dirs = RegexSet::new([r"^/?lost\+found($|/)"]).unwrap();
     let hash_options = Default::default();
-    let (hash_fst, fst_content) = calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options);
-    let (hash_snd, snd_content) = calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options);
+    let (hash_fst, fst_content) =
+        calc_dir_hash(cmp_dirs[0].as_path(), &ext4_dirs, &hash_options).unwrap();
+    let (hash_snd, snd_content) =
+        calc_dir_hash(cmp_dirs[1].as_path(), &ext4_dirs, &hash_options).unwrap();
     let diff = get_diff(
         &fst_content,
         &snd_content,

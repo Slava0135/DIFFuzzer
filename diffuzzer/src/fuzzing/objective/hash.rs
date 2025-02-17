@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use anyhow::Context;
 use log::debug;
 use regex::RegexSet;
 
@@ -18,11 +19,15 @@ pub struct HashHolder {
 }
 
 impl HashHolder {
-    pub fn calc_and_save_hash(&mut self) {
+    pub fn calc_and_save_hash(&mut self) -> anyhow::Result<()> {
         let (hash, fs_content) =
-            calc_dir_hash(&self.fs_dir.base, &self.fs_internal, &self.hasher_options);
+            calc_dir_hash(&self.fs_dir.base, &self.fs_internal, &self.hasher_options)
+                .with_context(|| {
+                    format!("failed to calculate directory hash at '{}'", self.fs_dir)
+                })?;
         self.fs_content = fs_content;
         self.hash = hash;
+        Ok(())
     }
 }
 

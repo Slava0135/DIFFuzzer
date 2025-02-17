@@ -27,7 +27,8 @@ fn main() {
     };
 
     let skip = RegexSet::new(args.exclude.unwrap_or(vec![])).unwrap();
-    let (hash, files) = calc_dir_hash(Path::new(&args.target_path), &skip, &hasher_options);
+    let (hash, files) =
+        calc_dir_hash(Path::new(&args.target_path), &skip, &hasher_options).unwrap();
     println!("{}", hash);
     let serialized_file = to_string(&files).unwrap();
     fs::write(Path::new(&args.output_path), serialized_file)

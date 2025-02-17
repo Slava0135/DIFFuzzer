@@ -53,7 +53,7 @@ impl Harness {
             .with_context(|| "failed to run test binary")?;
 
         match hash_holder {
-            Some(holder) => holder.calc_and_save_hash(),
+            Some(holder) => holder.calc_and_save_hash()?,
             _ => {}
         }
 

@@ -8,6 +8,7 @@ use std::hash::Hasher;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
+use anyhow::{Context, Ok};
 use regex::RegexSet;
 use serde::{Deserialize, Serialize};
 use twox_hash::XxHash64;
@@ -77,21 +78,28 @@ pub fn calc_dir_hash(
     path: &Path,
     skip: &RegexSet,
     hasher_options: &HasherOptions,
-) -> (u64, Vec<FileInfo>) {
+) -> anyhow::Result<(u64, Vec<FileInfo>)> {
     let mut hasher = XxHash64::default();
     let mut res: Vec<FileInfo> = Vec::new();
 
     for entry in WalkDir::new(path).sort_by(|a, b| a.file_name().cmp(b.file_name())) {
-        let entry = entry.unwrap();
-        let rel_path = entry.path().strip_prefix(path).unwrap().to_str().unwrap();
+        let entry = entry.with_context(|| "failed to get directory entry")?;
+        let rel_path = entry
+            .path()
+            .strip_prefix(path)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
 
-        if skip.is_match(rel_path) {
+        if skip.is_match(&rel_path) {
             continue;
         }
 
-        let metadata = entry.metadata().unwrap();
+        let metadata = entry
+            .metadata()
+            .with_context(|| "failed to get entry metadata")?;
         let file_info = FileInfo {
-            abs_path: entry.path().to_str().unwrap().to_owned(),
+            abs_path: entry.path().to_string_lossy().into_owned(),
             rel_path: rel_path.to_owned(),
             gid: metadata.gid(),
             uid: metadata.uid(),
@@ -103,7 +111,7 @@ pub fn calc_dir_hash(
         res.push(file_info);
     }
 
-    return (hasher.finish(), res);
+    return Ok((hasher.finish(), res));
 }
 
 pub fn calc_fileinfo_hash(
