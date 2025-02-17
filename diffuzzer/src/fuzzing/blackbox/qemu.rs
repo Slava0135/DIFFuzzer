@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use anyhow::{Context, Ok};
+use anyhow::Context;
 use log::{debug, info};
 use rand::prelude::StdRng;
 use rand::SeedableRng;
@@ -32,6 +32,10 @@ impl QemuBlackBoxFuzzer {
         crashes_path: LocalPath,
     ) -> Self {
         let mut launch = Command::new(&config.qemu.launch_script);
+        launch
+            .env("OS_IMAGE", config.qemu.os_image.clone())
+            .env("MONITOR_PORT", config.qemu.monitor_port.to_string())
+            .env("SSH_PORT", config.qemu.ssh_port.to_string());
         launch
             .stdin(Stdio::null())
             .stdout(Stdio::null())
