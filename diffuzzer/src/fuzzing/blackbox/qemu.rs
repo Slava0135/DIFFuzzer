@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use anyhow::Context;
-use log::{debug, info};
+use log::{debug, error, info};
 use rand::prelude::StdRng;
 use rand::SeedableRng;
 use std::process::{Command, Stdio};
@@ -47,7 +47,14 @@ impl QemuBlackBoxFuzzer {
                 .spawn()
                 .with_context(|| format!("failed to run qemu vm from script '{}'", script))
                 .unwrap();
-            child.wait().unwrap();
+            match child.wait() {
+                Ok(status) => {
+                    error!("qemu finished unexpectedly ({})", status);
+                }
+                Err(err) => {
+                    error!("qemu finished with error:\n{}", err)
+                }
+            }
         });
 
         info!("wait for VM to init ({}s)", config.qemu.boot_wait_time);
@@ -89,8 +96,7 @@ impl Fuzzer for QemuBlackBoxFuzzer {
 
         let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path)?;
 
-        let fst_trace =
-            parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
+        let fst_trace = parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
         let snd_trace =
             parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
 
