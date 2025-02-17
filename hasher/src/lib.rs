@@ -52,20 +52,11 @@ pub enum FileDiff {
     OneExists(FileInfo),
 }
 
+#[derive(Default)]
 pub struct HasherOptions {
     pub size: bool,
     pub nlink: bool,
     pub mode: bool,
-}
-
-impl Default for HasherOptions {
-    fn default() -> Self {
-        Self {
-            size: false,
-            nlink: false,
-            mode: false,
-        }
-    }
 }
 
 impl Display for FileInfo {
@@ -111,21 +102,21 @@ pub fn calc_dir_hash(
         res.push(file_info);
     }
 
-    return Ok((hasher.finish(), res));
+    Ok((hasher.finish(), res))
 }
 
 pub fn calc_fileinfo_hash(
     vec: &Vec<FileInfo>,
-    rel_path: &String,
+    rel_path: &str,
     hasher_options: &HasherOptions,
 ) -> u64 {
     let mut hasher = XxHash64::default();
     for file_info in vec {
-        if file_info.rel_path.starts_with(rel_path.as_str()) {
+        if file_info.rel_path.starts_with(rel_path) {
             file_info.add_to_hasher(&mut hasher, hasher_options);
         }
     }
-    return hasher.finish();
+    hasher.finish()
 }
 
 pub fn get_diff(
@@ -198,7 +189,7 @@ pub fn get_diff(
     res
 }
 
-fn handle_last_diff(mut i: usize, vec_data: &Vec<FileInfo>, res: &mut Vec<FileDiff>) {
+fn handle_last_diff(mut i: usize, vec_data: &[FileInfo], res: &mut Vec<FileDiff>) {
     if i > 0 {
         loop {
             res.push(OneExists(vec_data[i].clone()));

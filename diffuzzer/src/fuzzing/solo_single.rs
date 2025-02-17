@@ -28,10 +28,10 @@ pub fn run(
 ) {
     info!("read testcase at '{}'", test_path);
     let input = read_to_string(test_path)
-        .with_context(|| format!("failed to read testcase"))
+        .with_context(|| "failed to read testcase")
         .unwrap();
     let input: Workload = serde_json::from_str(&input)
-        .with_context(|| format!("failed to parse json"))
+        .with_context(|| "failed to parse json")
         .unwrap();
 
     let cmdi = LocalCommandInterface::new();
@@ -48,7 +48,7 @@ pub fn run(
     info!("compile test at '{}'", test_dir);
     let binary_path = input
         .compile(&cmdi, &test_dir)
-        .with_context(|| format!("failed to compile test"))
+        .with_context(|| "failed to compile test")
         .unwrap();
 
     let fs_str = mount.to_string();
@@ -65,15 +65,15 @@ pub fn run(
     info!("run harness");
     let outcome = harness
         .run(&cmdi, &binary_path, keep_fs, None)
-        .with_context(|| format!("failed to run harness"))
+        .with_context(|| "failed to run harness")
         .unwrap();
 
     info!("save results");
     fs::create_dir_all(output_dir).unwrap();
     save_testcase(&cmdi, output_dir, &binary_path, &input)
-        .with_context(|| format!("failed to save testcase"))
+        .with_context(|| "failed to save testcase")
         .unwrap();
     save_outcome(output_dir, &fs_str, &outcome)
-        .with_context(|| format!("failed to save outcome"))
+        .with_context(|| "failed to save outcome")
         .unwrap();
 }

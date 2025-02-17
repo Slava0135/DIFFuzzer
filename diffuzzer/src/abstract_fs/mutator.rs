@@ -15,9 +15,10 @@ use super::{
 };
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum MutationKind {
-    INSERT,
-    REMOVE,
+    Insert,
+    Remove,
 }
 
 /// Weights determine the likelihood of mutation to be picked.
@@ -38,7 +39,7 @@ pub fn remove(workload: &Workload, index: usize) -> Option<Workload> {
     let mut ops = workload.ops.clone();
     ops.remove(index);
     let mut fs = AbstractFS::new();
-    if !fs.replay(&Workload { ops }).is_ok() {
+    if fs.replay(&Workload { ops }).is_err() {
         None
     } else {
         Some(fs.recording)
@@ -55,18 +56,18 @@ pub fn insert(
     let mut used_names = HashSet::new();
     for op in workload.ops.iter() {
         match op {
-            Operation::MKDIR { path, mode: _ } => {
+            Operation::MkDir { path, mode: _ } => {
                 for segment in path.segments() {
                     used_names.insert(segment);
                 }
             }
-            Operation::CREATE { path, mode: _ } => {
+            Operation::Create { path, mode: _ } => {
                 for segment in path.segments() {
                     used_names.insert(segment);
                 }
             }
-            Operation::REMOVE { path: _ } => {}
-            Operation::HARDLINK { old_path, new_path } => {
+            Operation::Remove { path: _ } => {}
+            Operation::Hardlink { old_path, new_path } => {
                 for segment in old_path.segments() {
                     used_names.insert(segment);
                 }
@@ -74,7 +75,7 @@ pub fn insert(
                     used_names.insert(segment);
                 }
             }
-            Operation::RENAME { old_path, new_path } => {
+            Operation::Rename { old_path, new_path } => {
                 for segment in old_path.segments() {
                     used_names.insert(segment);
                 }
@@ -82,29 +83,29 @@ pub fn insert(
                     used_names.insert(segment);
                 }
             }
-            Operation::OPEN { path, des: _ } => {
+            Operation::Open { path, des: _ } => {
                 for segment in path.segments() {
                     used_names.insert(segment);
                 }
             }
-            Operation::CLOSE { des: _ } => {}
-            Operation::READ { des: _, size: _ } => {}
-            Operation::WRITE {
+            Operation::Close { des: _ } => {}
+            Operation::Read { des: _, size: _ } => {}
+            Operation::Write {
                 des: _,
                 src_offset: _,
                 size: _,
             } => {}
-            Operation::FSYNC { des: _ } => {}
+            Operation::FSync { des: _ } => {}
         }
     }
 
     let (before, after) = workload.ops.split_at(index);
     let mut fs = AbstractFS::new();
-    if !fs
+    if fs
         .replay(&Workload {
             ops: before.to_vec(),
         })
-        .is_ok()
+        .is_err()
     {
         return None;
     }
@@ -118,11 +119,11 @@ pub fn insert(
         }
     };
     append_one(rng, &mut fs, weights, &mut gen_name);
-    if !fs
+    if fs
         .replay(&Workload {
             ops: after.to_vec(),
         })
-        .is_ok()
+        .is_err()
     {
         None
     } else {
@@ -142,15 +143,15 @@ mod tests {
     fn test_remove() {
         let w = Workload {
             ops: vec![
-                Operation::MKDIR {
+                Operation::MkDir {
                     path: "/foobar".into(),
                     mode: vec![],
                 },
-                Operation::CREATE {
+                Operation::Create {
                     path: "/foobar/boo".into(),
                     mode: vec![],
                 },
-                Operation::CREATE {
+                Operation::Create {
                     path: "/foobar/zoo".into(),
                     mode: vec![],
                 },
@@ -160,11 +161,11 @@ mod tests {
         assert_eq!(
             Some(Workload {
                 ops: vec![
-                    Operation::MKDIR {
+                    Operation::MkDir {
                         path: "/foobar".into(),
                         mode: vec![],
                     },
-                    Operation::CREATE {
+                    Operation::Create {
                         path: "/foobar/zoo".into(),
                         mode: vec![],
                     },
@@ -179,15 +180,15 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(123);
         let w = Workload {
             ops: vec![
-                Operation::MKDIR {
+                Operation::MkDir {
                     path: "/foobar".into(),
                     mode: vec![],
                 },
-                Operation::CREATE {
+                Operation::Create {
                     path: "/foobar/boo".into(),
                     mode: vec![],
                 },
-                Operation::REMOVE {
+                Operation::Remove {
                     path: "/foobar/boo".into(),
                 },
             ],
@@ -198,24 +199,24 @@ mod tests {
                 &mut rng,
                 &w,
                 1,
-                &OperationWeights::new(vec![(OperationKind::REMOVE, 100)])
+                &OperationWeights::new(vec![(OperationKind::Remove, 100)])
             )
         );
         assert_eq!(
             Some(Workload {
                 ops: vec![
-                    Operation::MKDIR {
+                    Operation::MkDir {
                         path: "/foobar".into(),
                         mode: vec![],
                     },
-                    Operation::CREATE {
+                    Operation::Create {
                         path: "/foobar/boo".into(),
                         mode: vec![],
                     },
-                    Operation::REMOVE {
+                    Operation::Remove {
                         path: "/foobar/boo".into(),
                     },
-                    Operation::REMOVE {
+                    Operation::Remove {
                         path: "/foobar".into(),
                     },
                 ],
@@ -224,7 +225,7 @@ mod tests {
                 &mut rng,
                 &w,
                 3,
-                &OperationWeights::new(vec![(OperationKind::REMOVE, 100)])
+                &OperationWeights::new(vec![(OperationKind::Remove, 100)])
             )
         );
     }

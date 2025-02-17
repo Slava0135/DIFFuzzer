@@ -88,7 +88,7 @@ impl AbstractFS {
             return Err(FsError::NotFound(path));
         }
         self.recording
-            .push(Operation::REMOVE { path: path.clone() });
+            .push(Operation::Remove { path: path.clone() });
         Ok(())
     }
 
@@ -106,8 +106,8 @@ impl AbstractFS {
         self.dirs.push(dir);
         self.dir_mut(&parent)
             .children
-            .insert(name, Node::DIR(dir_idx));
-        self.recording.push(Operation::MKDIR { path, mode });
+            .insert(name, Node::Dir(dir_idx));
+        self.recording.push(Operation::MkDir { path, mode });
         Ok(dir_idx)
     }
 
@@ -126,8 +126,8 @@ impl AbstractFS {
         self.files.push(file);
         self.dir_mut(&parent)
             .children
-            .insert(name.clone(), Node::FILE(file_idx));
-        self.recording.push(Operation::CREATE { path, mode });
+            .insert(name.clone(), Node::File(file_idx));
+        self.recording.push(Operation::Create { path, mode });
         Ok(file_idx)
     }
 
@@ -143,9 +143,9 @@ impl AbstractFS {
         let parent_dir = self.dir_mut(&parent);
         parent_dir
             .children
-            .insert(name.clone(), Node::FILE(old_file.to_owned()));
+            .insert(name.clone(), Node::File(old_file.to_owned()));
         self.recording
-            .push(Operation::HARDLINK { old_path, new_path });
+            .push(Operation::Hardlink { old_path, new_path });
         Ok(old_file.to_owned())
     }
 
@@ -172,7 +172,7 @@ impl AbstractFS {
         parent_dir.children.remove(&name);
 
         self.recording
-            .push(Operation::RENAME { old_path, new_path });
+            .push(Operation::Rename { old_path, new_path });
         Ok(node)
     }
 
@@ -191,7 +191,7 @@ impl AbstractFS {
             file: file_idx,
             offset: 0,
         });
-        self.recording.push(Operation::OPEN { path, des });
+        self.recording.push(Operation::Open { path, des });
         Ok(des)
     }
 
@@ -203,7 +203,7 @@ impl AbstractFS {
             return Err(FsError::DescriptorWasClosed(des_idx));
         }
         file.descriptor = None;
-        self.recording.push(Operation::CLOSE { des: des_idx });
+        self.recording.push(Operation::Close { des: des_idx });
         Ok(())
     }
 
@@ -226,7 +226,7 @@ impl AbstractFS {
             des.offset,
             file_size
         );
-        self.recording.push(Operation::READ { des: des_idx, size });
+        self.recording.push(Operation::Read { des: des_idx, size });
         Ok(content)
     }
 
@@ -254,7 +254,7 @@ impl AbstractFS {
             des.offset,
             file_size
         );
-        self.recording.push(Operation::WRITE {
+        self.recording.push(Operation::Write {
             des: des_idx,
             src_offset,
             size,
@@ -269,7 +269,7 @@ impl AbstractFS {
         if file.descriptor != Some(des_idx) {
             return Err(FsError::DescriptorWasClosed(des_idx));
         }
-        self.recording.push(Operation::FSYNC { des: des_idx });
+        self.recording.push(Operation::FSync { des: des_idx });
         Ok(())
     }
 
@@ -277,37 +277,37 @@ impl AbstractFS {
     pub fn replay(&mut self, workload: &Workload) -> Result<()> {
         for op in &workload.ops {
             match op {
-                Operation::MKDIR { path, mode } => {
+                Operation::MkDir { path, mode } => {
                     self.mkdir(path.clone(), mode.clone())?;
                 }
-                Operation::CREATE { path, mode } => {
+                Operation::Create { path, mode } => {
                     self.create(path.clone(), mode.clone())?;
                 }
-                Operation::REMOVE { path } => self.remove(path.clone())?,
-                Operation::HARDLINK { old_path, new_path } => {
+                Operation::Remove { path } => self.remove(path.clone())?,
+                Operation::Hardlink { old_path, new_path } => {
                     self.hardlink(old_path.clone(), new_path.clone())?;
                 }
-                Operation::RENAME { old_path, new_path } => {
+                Operation::Rename { old_path, new_path } => {
                     self.rename(old_path.clone(), new_path.clone())?;
                 }
-                Operation::OPEN { path, des: _ } => {
+                Operation::Open { path, des: _ } => {
                     self.open(path.clone())?;
                 }
-                Operation::CLOSE { des } => {
-                    self.close(des.clone())?;
+                Operation::Close { des } => {
+                    self.close(*des)?;
                 }
-                Operation::READ { des, size } => {
-                    self.read(des.clone(), size.clone())?;
+                Operation::Read { des, size } => {
+                    self.read(*des, *size)?;
                 }
-                Operation::WRITE {
+                Operation::Write {
                     des,
                     src_offset,
                     size,
                 } => {
-                    self.write(des.clone(), src_offset.clone(), size.clone())?;
+                    self.write(*des, *src_offset, *size)?;
                 }
-                Operation::FSYNC { des } => {
-                    self.fsync(des.clone())?;
+                Operation::FSync { des } => {
+                    self.fsync(*des)?;
                 }
             };
         }
@@ -336,22 +336,20 @@ impl AbstractFS {
 
     #[allow(dead_code)]
     fn root(&self) -> &Dir {
-        self.dirs.get(0).unwrap()
+        self.dirs.first().unwrap()
     }
 
     fn descriptor(&self, idx: &FileDescriptorIndex) -> Result<&FileDescriptor> {
-        Ok(self
-            .descriptors
+        self.descriptors
             .get(idx.0)
-            .ok_or(FsError::BadDescriptor(idx.clone(), self.descriptors.len()))?)
+            .ok_or(FsError::BadDescriptor(*idx, self.descriptors.len()))
     }
 
     fn descriptor_mut(&mut self, idx: &FileDescriptorIndex) -> Result<&mut FileDescriptor> {
         let len = self.descriptors.len();
-        Ok(self
-            .descriptors
+        self.descriptors
             .get_mut(idx.0)
-            .ok_or(FsError::BadDescriptor(idx.clone(), len))?)
+            .ok_or(FsError::BadDescriptor(*idx, len))
     }
 
     pub fn resolve_node(&self, path: PathName) -> Result<Node> {
@@ -359,13 +357,13 @@ impl AbstractFS {
             return Err(FsError::InvalidPath(path));
         }
         let segments: Vec<&str> = path.segments();
-        let mut last = Node::DIR(AbstractFS::root_index());
+        let mut last = Node::Dir(AbstractFS::root_index());
         let mut path = String::new();
         for segment in &segments {
-            path.push_str("/");
+            path.push('/');
             path.push_str(segment);
             let dir = match last {
-                Node::DIR(dir_index) => self.dir(&dir_index),
+                Node::Dir(dir_index) => self.dir(&dir_index),
                 _ => return Err(FsError::NotADir(path.into())),
             };
             last = dir
@@ -379,14 +377,14 @@ impl AbstractFS {
 
     pub fn resolve_file(&self, path: PathName) -> Result<FileIndex> {
         match self.resolve_node(path.clone())? {
-            Node::FILE(idx) => Ok(idx),
+            Node::File(idx) => Ok(idx),
             _ => Err(FsError::NotAFile(path)),
         }
     }
 
     pub fn resolve_dir(&self, path: PathName) -> Result<DirIndex> {
         match self.resolve_node(path.clone())? {
-            Node::DIR(idx) => Ok(idx),
+            Node::Dir(idx) => Ok(idx),
             _ => Err(FsError::NotADir(path)),
         }
     }
@@ -409,13 +407,13 @@ impl AbstractFS {
             let dir = self.dir(idx);
             for (name, node) in dir.children.iter() {
                 match node {
-                    Node::DIR(idx) => {
+                    Node::Dir(idx) => {
                         let path = path.join(name.to_owned());
                         queue.push_back((path.clone(), idx));
                         alive.dirs.push(path.clone());
                     }
-                    Node::FILE(idx) => {
-                        alive.files.push((idx.clone(), path.join(name.to_owned())));
+                    Node::File(idx) => {
+                        alive.files.push((*idx, path.join(name.to_owned())));
                     }
                 }
             }
@@ -454,10 +452,10 @@ mod tests {
     fn test_mkdir() {
         let mut fs = AbstractFS::new();
         let foo = fs.mkdir("/foobar".into(), vec![]).unwrap();
-        assert_eq!(Node::DIR(foo), *fs.root().children.get("foobar").unwrap());
+        assert_eq!(Node::Dir(foo), *fs.root().children.get("foobar").unwrap());
         assert_eq!(
             Workload {
-                ops: vec![Operation::MKDIR {
+                ops: vec![Operation::MkDir {
                     path: "/foobar".into(),
                     mode: vec![],
                 }],
@@ -488,7 +486,7 @@ mod tests {
     fn test_create() {
         let mut fs = AbstractFS::new();
         let foo = fs.create("/foobar".into(), vec![]).unwrap();
-        assert_eq!(Node::FILE(foo), *fs.root().children.get("foobar").unwrap());
+        assert_eq!(Node::File(foo), *fs.root().children.get("foobar").unwrap());
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
@@ -498,7 +496,7 @@ mod tests {
         );
         assert_eq!(
             Workload {
-                ops: vec![Operation::CREATE {
+                ops: vec![Operation::Create {
                     path: "/foobar".into(),
                     mode: vec![],
                 }]
@@ -535,7 +533,7 @@ mod tests {
         fs.remove("/foobar".into()).unwrap();
 
         assert_eq!(1, fs.root().children.len());
-        assert_eq!(Node::FILE(boo), *fs.root().children.get("boo").unwrap());
+        assert_eq!(Node::File(boo), *fs.root().children.get("boo").unwrap());
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into()],
@@ -546,15 +544,15 @@ mod tests {
         assert_eq!(
             Workload {
                 ops: vec![
-                    Operation::CREATE {
+                    Operation::Create {
                         path: "/foobar".into(),
                         mode: vec![],
                     },
-                    Operation::CREATE {
+                    Operation::Create {
                         path: "/boo".into(),
                         mode: vec![],
                     },
-                    Operation::REMOVE {
+                    Operation::Remove {
                         path: "/foobar".into(),
                     }
                 ],
@@ -592,15 +590,15 @@ mod tests {
         assert_eq!(
             Workload {
                 ops: vec![
-                    Operation::CREATE {
+                    Operation::Create {
                         path: "/foo".into(),
                         mode: vec![],
                     },
-                    Operation::MKDIR {
+                    Operation::MkDir {
                         path: "/bar".into(),
                         mode: vec![],
                     },
-                    Operation::HARDLINK {
+                    Operation::Hardlink {
                         old_path: "/foo".into(),
                         new_path: "/bar/boo".into(),
                     }
@@ -631,15 +629,15 @@ mod tests {
         assert_eq!(
             Workload {
                 ops: vec![
-                    Operation::CREATE {
+                    Operation::Create {
                         path: "/foo".into(),
                         mode: vec![],
                     },
-                    Operation::HARDLINK {
+                    Operation::Hardlink {
                         old_path: "/foo".into(),
                         new_path: "/bar".into(),
                     },
-                    Operation::REMOVE {
+                    Operation::Remove {
                         path: "/bar".into(),
                     }
                 ],
@@ -693,7 +691,7 @@ mod tests {
         fs.remove("/foobar".into()).unwrap();
 
         assert_eq!(1, fs.root().children.len());
-        assert_eq!(Node::DIR(boo), *fs.root().children.get("boo").unwrap());
+        assert_eq!(Node::Dir(boo), *fs.root().children.get("boo").unwrap());
         assert_eq!(
             AliveNodes {
                 dirs: vec!["/".into(), "/boo".into()],
@@ -704,15 +702,15 @@ mod tests {
         assert_eq!(
             Workload {
                 ops: vec![
-                    Operation::MKDIR {
+                    Operation::MkDir {
                         path: "/foobar".into(),
                         mode: vec![],
                     },
-                    Operation::MKDIR {
+                    Operation::MkDir {
                         path: "/boo".into(),
                         mode: vec![],
                     },
-                    Operation::REMOVE {
+                    Operation::Remove {
                         path: "/foobar".into(),
                     }
                 ],
@@ -745,11 +743,11 @@ mod tests {
         assert_eq!(
             Workload {
                 ops: vec![
-                    Operation::CREATE {
+                    Operation::Create {
                         path: "/foo".into(),
                         mode: vec![]
                     },
-                    Operation::RENAME {
+                    Operation::Rename {
                         old_path: "/foo".into(),
                         new_path: "/bar".into(),
                     }
@@ -775,11 +773,11 @@ mod tests {
         assert_eq!(
             Workload {
                 ops: vec![
-                    Operation::MKDIR {
+                    Operation::MkDir {
                         path: "/foo".into(),
                         mode: vec![]
                     },
-                    Operation::RENAME {
+                    Operation::Rename {
                         old_path: "/foo".into(),
                         new_path: "/bar".into(),
                     }
@@ -830,15 +828,15 @@ mod tests {
         assert_eq!(
             Workload {
                 ops: vec![
-                    Operation::CREATE {
+                    Operation::Create {
                         path: "/foo".into(),
                         mode: vec![]
                     },
-                    Operation::OPEN {
+                    Operation::Open {
                         path: "/foo".into(),
                         des
                     },
-                    Operation::CLOSE { des }
+                    Operation::Close { des }
                 ]
             },
             fs.recording
@@ -901,16 +899,16 @@ mod tests {
         assert_eq!(
             Workload {
                 ops: vec![
-                    Operation::CREATE {
+                    Operation::Create {
                         path: "/foo".into(),
                         mode: vec![]
                     },
-                    Operation::OPEN {
+                    Operation::Open {
                         path: "/foo".into(),
                         des
                     },
-                    Operation::READ { des, size: 1024 },
-                    Operation::CLOSE { des },
+                    Operation::Read { des, size: 1024 },
+                    Operation::Close { des },
                 ]
             },
             fs.recording
@@ -953,20 +951,20 @@ mod tests {
         assert_eq!(
             Workload {
                 ops: vec![
-                    Operation::CREATE {
+                    Operation::Create {
                         path: "/foo".into(),
                         mode: vec![]
                     },
-                    Operation::OPEN {
+                    Operation::Open {
                         path: "/foo".into(),
                         des
                     },
-                    Operation::WRITE {
+                    Operation::Write {
                         des,
                         src_offset: 999,
                         size: 1024
                     },
-                    Operation::CLOSE { des },
+                    Operation::Close { des },
                 ]
             },
             fs.recording
@@ -1002,30 +1000,30 @@ mod tests {
         assert_eq!(
             Workload {
                 ops: vec![
-                    Operation::CREATE {
+                    Operation::Create {
                         path: "/foo".into(),
                         mode: vec![]
                     },
-                    Operation::OPEN {
+                    Operation::Open {
                         path: "/foo".into(),
                         des: des_1
                     },
-                    Operation::WRITE {
+                    Operation::Write {
                         des: des_1,
                         src_offset: 13,
                         size: 100
                     },
-                    Operation::CLOSE { des: des_1 },
-                    Operation::OPEN {
+                    Operation::Close { des: des_1 },
+                    Operation::Open {
                         path: "/foo".into(),
                         des: des_2
                     },
-                    Operation::WRITE {
+                    Operation::Write {
                         des: des_2,
                         src_offset: 42,
                         size: 55
                     },
-                    Operation::CLOSE { des: des_2 },
+                    Operation::Close { des: des_2 },
                 ]
             },
             fs.recording
@@ -1078,46 +1076,46 @@ mod tests {
         assert_eq!(
             Workload {
                 ops: vec![
-                    Operation::CREATE {
+                    Operation::Create {
                         path: "/foo".into(),
                         mode: vec![]
                     },
-                    Operation::OPEN {
+                    Operation::Open {
                         path: "/foo".into(),
                         des: des_write
                     },
-                    Operation::WRITE {
+                    Operation::Write {
                         des: des_write,
                         src_offset: 13,
                         size: 100
                     },
-                    Operation::WRITE {
+                    Operation::Write {
                         des: des_write,
                         src_offset: 42,
                         size: 55
                     },
-                    Operation::CLOSE { des: des_write },
-                    Operation::OPEN {
+                    Operation::Close { des: des_write },
+                    Operation::Open {
                         path: "/foo".into(),
                         des: des_read
                     },
-                    Operation::READ {
+                    Operation::Read {
                         des: des_read,
                         size: 0
                     },
-                    Operation::READ {
+                    Operation::Read {
                         des: des_read,
                         size: 10
                     },
-                    Operation::READ {
+                    Operation::Read {
                         des: des_read,
                         size: 10
                     },
-                    Operation::READ {
+                    Operation::Read {
                         des: des_read,
                         size: 1024
                     },
-                    Operation::CLOSE { des: des_read },
+                    Operation::Close { des: des_read },
                 ]
             },
             fs.recording
@@ -1152,16 +1150,16 @@ mod tests {
         assert_eq!(
             Workload {
                 ops: vec![
-                    Operation::CREATE {
+                    Operation::Create {
                         path: "/foo".into(),
                         mode: vec![]
                     },
-                    Operation::OPEN {
+                    Operation::Open {
                         path: "/foo".into(),
                         des
                     },
-                    Operation::FSYNC { des },
-                    Operation::CLOSE { des },
+                    Operation::FSync { des },
+                    Operation::Close { des },
                 ]
             },
             fs.recording
@@ -1173,7 +1171,7 @@ mod tests {
     fn test_resolve_node() {
         let mut fs = AbstractFS::new();
         assert_eq!(
-            Node::DIR(AbstractFS::root_index()),
+            Node::Dir(AbstractFS::root_index()),
             fs.resolve_node("/".into()).unwrap()
         );
         let foo = fs.mkdir("/foo".into(), vec![]).unwrap();
@@ -1191,10 +1189,10 @@ mod tests {
             Err(FsError::InvalidPath("/foo/".into())),
             fs.resolve_node("/foo/".into())
         );
-        assert_eq!(Node::DIR(foo), fs.resolve_node("/foo".into()).unwrap());
-        assert_eq!(Node::DIR(bar), fs.resolve_node("/foo/bar".into()).unwrap());
+        assert_eq!(Node::Dir(foo), fs.resolve_node("/foo".into()).unwrap());
+        assert_eq!(Node::Dir(bar), fs.resolve_node("/foo/bar".into()).unwrap());
         assert_eq!(
-            Node::FILE(boo),
+            Node::File(boo),
             fs.resolve_node("/foo/bar/boo".into()).unwrap()
         );
         test_replay(fs.recording);

@@ -75,7 +75,7 @@ impl Trace {
                 .map(|s| s.to_owned())
                 .collect();
             let name = errno_parts
-                .get(0)
+                .first()
                 .ok_or(TraceError::InvalidErrno(errno_string.clone()))?
                 .clone();
             let code: i32 = errno_parts

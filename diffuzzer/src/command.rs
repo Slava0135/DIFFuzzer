@@ -60,7 +60,7 @@ pub trait CommandInterface {
         })?;
 
         info!("copy executor to remote directory",);
-        let executor_dir = LocalPath::new(&Path::new(EXECUTOR_SOURCE_DIR));
+        let executor_dir = LocalPath::new(Path::new(EXECUTOR_SOURCE_DIR));
         self.copy_to_remote(
             &executor_dir.join(MAKEFILE_NAME),
             &remote_dir.join(MAKEFILE_NAME),

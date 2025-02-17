@@ -30,7 +30,7 @@ const INTERESTING_UNSIGNED: &[u64] = &[
 ];
 
 fn random_interesting_unsigned(rng: &mut impl Rng) -> u64 {
-    INTERESTING_UNSIGNED.choose(rng).unwrap().clone()
+    *INTERESTING_UNSIGNED.choose(rng).unwrap()
 }
 
 /// Generates new random test workload of specified size.
@@ -43,7 +43,7 @@ pub fn generate_new(rng: &mut impl Rng, size: usize, weights: &OperationWeights)
         name
     };
     for _ in 0..size {
-        append_one(rng, &mut fs, &weights, &mut gen_name);
+        append_one(rng, &mut fs, weights, &mut gen_name);
     }
     fs.recording
 }
@@ -66,49 +66,49 @@ pub fn append_one(
         .dirs
         .iter()
         .filter(|d| **d != "/".into())
-        .map(|d| d.clone())
+        .cloned()
         .collect();
     let alive_closed_files: Vec<PathName> = alive
         .files
         .iter()
         .filter(|(idx, _)| fs.file(idx).descriptor.is_none())
-        .map(|(_, p)| p.clone())
+        .map(|(_, p)| p)
+        .cloned()
         .collect();
     let alive_open_files: Vec<FileDescriptorIndex> = alive
         .files
         .iter()
-        .map(|(idx, _)| fs.file(idx).descriptor)
-        .flatten()
+        .filter_map(|(idx, _)| fs.file(idx).descriptor)
         .collect();
     let mut ops = weights.clone();
     if alive_dirs_except_root.is_empty() {
-        ops.weights.retain(|(op, _)| *op != OperationKind::REMOVE);
+        ops.weights.retain(|(op, _)| *op != OperationKind::Remove);
     }
     if alive.files.is_empty() {
-        ops.weights.retain(|(op, _)| *op != OperationKind::HARDLINK);
+        ops.weights.retain(|(op, _)| *op != OperationKind::Hardlink);
     }
     if alive_dirs_except_root.is_empty() && alive.files.is_empty() {
-        ops.weights.retain(|(op, _)| *op != OperationKind::RENAME);
+        ops.weights.retain(|(op, _)| *op != OperationKind::Rename);
     }
     if alive_closed_files.is_empty() {
-        ops.weights.retain(|(op, _)| *op != OperationKind::OPEN);
+        ops.weights.retain(|(op, _)| *op != OperationKind::Open);
     }
     if alive_open_files.is_empty() {
-        ops.weights.retain(|(op, _)| *op != OperationKind::CLOSE);
-        ops.weights.retain(|(op, _)| *op != OperationKind::READ);
-        ops.weights.retain(|(op, _)| *op != OperationKind::WRITE);
-        ops.weights.retain(|(op, _)| *op != OperationKind::FSYNC);
+        ops.weights.retain(|(op, _)| *op != OperationKind::Close);
+        ops.weights.retain(|(op, _)| *op != OperationKind::Read);
+        ops.weights.retain(|(op, _)| *op != OperationKind::Write);
+        ops.weights.retain(|(op, _)| *op != OperationKind::FSync);
     }
     match ops.weights.choose_weighted(rng, |item| item.1).unwrap().0 {
-        OperationKind::MKDIR => {
+        OperationKind::MkDir => {
             let path = alive.dirs.choose(rng).unwrap().to_owned();
             fs.mkdir(path.join(gen_name()), mode.clone()).unwrap();
         }
-        OperationKind::CREATE => {
+        OperationKind::Create => {
             let path = alive.dirs.choose(rng).unwrap().to_owned();
             fs.create(path.join(gen_name()), mode.clone()).unwrap();
         }
-        OperationKind::REMOVE => {
+        OperationKind::Remove => {
             let path = [
                 alive_dirs_except_root,
                 alive.files.iter().map(|(_, path)| path.clone()).collect(),
@@ -119,12 +119,12 @@ pub fn append_one(
             .to_owned();
             fs.remove(path).unwrap();
         }
-        OperationKind::HARDLINK => {
+        OperationKind::Hardlink => {
             let file_path = alive.files.choose(rng).unwrap().to_owned().1;
             let dir_path = alive.dirs.choose(rng).unwrap().to_owned();
             fs.hardlink(file_path, dir_path.join(gen_name())).unwrap();
         }
-        OperationKind::RENAME => {
+        OperationKind::Rename => {
             let old_path = [
                 alive_dirs_except_root,
                 alive.files.iter().map(|(_, path)| path.clone()).collect(),
@@ -137,24 +137,24 @@ pub fn append_one(
                 .dirs
                 .iter()
                 .filter(|p| !old_path.is_prefix_of(p))
-                .map(|p| p.clone())
+                .cloned()
                 .collect();
             let new_path = alive_non_subdirectories.choose(rng).unwrap().to_owned();
             fs.rename(old_path, new_path.join(gen_name())).unwrap();
         }
-        OperationKind::OPEN => {
+        OperationKind::Open => {
             let path = alive_closed_files.choose(rng).unwrap().to_owned();
             fs.open(path).unwrap();
         }
-        OperationKind::CLOSE => {
+        OperationKind::Close => {
             let des = alive_open_files.choose(rng).unwrap().to_owned();
             fs.close(des).unwrap();
         }
-        OperationKind::WRITE => {
+        OperationKind::Write => {
             let des = alive_open_files.choose(rng).unwrap().to_owned();
             fs.read(des, random_interesting_unsigned(rng)).unwrap();
         }
-        OperationKind::READ => {
+        OperationKind::Read => {
             let des = alive_open_files.choose(rng).unwrap().to_owned();
             fs.write(
                 des,
@@ -163,7 +163,7 @@ pub fn append_one(
             )
             .unwrap();
         }
-        OperationKind::FSYNC => {
+        OperationKind::FSync => {
             let des = alive_open_files.choose(rng).unwrap().to_owned();
             fs.fsync(des).unwrap();
         }

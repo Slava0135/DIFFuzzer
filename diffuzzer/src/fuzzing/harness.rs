@@ -52,9 +52,8 @@ impl Harness {
             .exec_in_dir(exec, &self.exec_dir)
             .with_context(|| "failed to run test binary")?;
 
-        match hash_holder {
-            Some(holder) => holder.calc_and_save_hash()?,
-            _ => {}
+        if let Some(holder) = hash_holder {
+            holder.calc_and_save_hash()?;
         }
 
         if !keep_fs {
@@ -69,12 +68,12 @@ impl Harness {
         }
 
         let stdout = String::from_utf8(output.stdout)
-            .with_context(|| format!("failed to convert stdout to string"))?;
+            .with_context(|| "failed to convert stdout to string")?;
         let stderr = String::from_utf8(output.stderr)
-            .with_context(|| format!("failed to convert stderr to string"))?;
+            .with_context(|| "failed to convert stderr to string")?;
 
         cmdi.copy_dir_from_remote(&self.exec_dir, &self.outcome_dir)
-            .with_context(|| format!("failed to copy test output files"))?;
+            .with_context(|| "failed to copy test output files")?;
 
         Ok(Outcome {
             exit_status: output.status,

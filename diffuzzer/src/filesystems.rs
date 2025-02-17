@@ -1,13 +1,13 @@
 /* Any copyright is dedicated to the Public Domain.
  * https://creativecommons.org/publicdomain/zero/1.0/ */
 
-use crate::mount::{btrfs::Btrfs, ext4::Ext4, f2fs::F2FS, mount::FileSystemMount, xfs::XFS};
+use crate::mount::{btrfs::Btrfs, ext4::Ext4, f2fs::F2FS, mount::FileSystemMount, xfs::Xfs};
 
 pub const FILESYSTEMS: &[&dyn FileSystemMount] = &[
     &Ext4::new(),
     &Btrfs::new(),
     &F2FS::new(),
-    &XFS::new(),
+    &Xfs::new(),
     // your filesystem here
 ];
 

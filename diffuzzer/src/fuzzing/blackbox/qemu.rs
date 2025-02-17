@@ -7,7 +7,7 @@ use log::{debug, info};
 use rand::prelude::StdRng;
 use rand::SeedableRng;
 use std::process::{Command, Stdio};
-use std::thread::sleep;
+use std::thread::{self, sleep};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
@@ -40,10 +40,15 @@ impl QemuBlackBoxFuzzer {
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null());
-        launch.spawn().expect(&format!(
-            "failed to run qemu vm from script '{}'",
-            &config.qemu.launch_script
-        ));
+
+        let script = config.qemu.launch_script.clone();
+        thread::spawn(move || {
+            let mut child = launch
+                .spawn()
+                .with_context(|| format!("failed to run qemu vm from script '{}'", script))
+                .unwrap();
+            child.wait().unwrap();
+        });
 
         info!("wait for VM to init ({}s)", config.qemu.boot_wait_time);
         sleep(Duration::from_secs(config.qemu.boot_wait_time.into()));
@@ -85,9 +90,9 @@ impl Fuzzer for QemuBlackBoxFuzzer {
         let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path)?;
 
         let fst_trace =
-            parse_trace(&fst_outcome).with_context(|| format!("failed to parse first trace"))?;
+            parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
         let snd_trace =
-            parse_trace(&snd_outcome).with_context(|| format!("failed to parse second trace"))?;
+            parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
 
         if self.detect_errors(
             &input,

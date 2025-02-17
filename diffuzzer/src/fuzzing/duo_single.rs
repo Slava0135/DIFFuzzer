@@ -47,20 +47,19 @@ impl Fuzzer for DuoSingleFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
         info!("read testcase at '{}'", self.test_path);
         let input = read_to_string(&self.test_path)
-            .with_context(|| format!("failed to read testcase"))
+            .with_context(|| "failed to read testcase")
             .unwrap();
         let input: Workload = serde_json::from_str(&input)
-            .with_context(|| format!("failed to parse json"))
+            .with_context(|| "failed to parse json")
             .unwrap();
 
         let binary_path = self.runner().compile_test(&input)?;
 
         let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path)?;
 
-        let fst_trace =
-            parse_trace(&fst_outcome).with_context(|| format!("failed to parse first trace"))?;
+        let fst_trace = parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
         let snd_trace =
-            parse_trace(&snd_outcome).with_context(|| format!("failed to parse second trace"))?;
+            parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
 
         if self.detect_errors(
             &input,

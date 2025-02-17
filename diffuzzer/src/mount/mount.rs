@@ -67,7 +67,7 @@ pub trait FileSystemMount: Display {
             .with_context(|| "failed to remove module 'brd'")?;
 
         cmdi.remove_dir_all(path)
-            .with_context(|| format!("failed to remove mountpoint"))?;
+            .with_context(|| "failed to remove mountpoint")?;
 
         Ok(())
     }

@@ -18,11 +18,8 @@ impl Workload {
         result.push_str("#include \"executor.h\"\n");
         let mut descriptors_n = 0;
         for op in self.ops.iter() {
-            match op {
-                Operation::OPEN { path: _, des } => {
-                    descriptors_n = max(descriptors_n, des.0 + 1);
-                }
-                _ => {}
+            if let Operation::Open { path: _, des } = op {
+                descriptors_n = max(descriptors_n, des.0 + 1);
             }
         }
         if descriptors_n > 0 {
@@ -36,45 +33,45 @@ impl Workload {
         result.push_str("{\n");
         for op in &self.ops {
             match op {
-                Operation::CREATE { path, mode } => {
+                Operation::Create { path, mode } => {
                     result.push_str(
                         format!("do_create(\"{}\", {});\n", path, encode_mode(mode).as_str())
                             .as_str(),
                     );
                 }
-                Operation::MKDIR { path, mode } => {
+                Operation::MkDir { path, mode } => {
                     result.push_str(
                         format!("do_mkdir(\"{}\", {});\n", path, encode_mode(mode).as_str())
                             .as_str(),
                     );
                 }
-                Operation::REMOVE { path } => {
+                Operation::Remove { path } => {
                     result.push_str(format!("do_remove(\"{}\");\n", path).as_str());
                 }
-                Operation::HARDLINK { old_path, new_path } => {
+                Operation::Hardlink { old_path, new_path } => {
                     result.push_str(
                         format!("do_hardlink(\"{}\", \"{}\");\n", old_path, new_path).as_str(),
                     );
                 }
-                Operation::RENAME { old_path, new_path } => {
+                Operation::Rename { old_path, new_path } => {
                     result.push_str(
                         format!("do_rename(\"{}\", \"{}\");\n", old_path, new_path).as_str(),
                     );
                 }
-                Operation::OPEN { path, des } => {
+                Operation::Open { path, des } => {
                     result.push_str(
                         format!("{} = do_open(\"{}\");\n", descriptor_to_var(des), path).as_str(),
                     );
                 }
-                Operation::CLOSE { des } => {
+                Operation::Close { des } => {
                     result.push_str(format!("do_close({});\n", descriptor_to_var(des)).as_str());
                 }
-                Operation::READ { des, size } => {
+                Operation::Read { des, size } => {
                     result.push_str(
                         format!("do_read({}, {});\n", descriptor_to_var(des), size).as_str(),
                     );
                 }
-                Operation::WRITE {
+                Operation::Write {
                     des,
                     src_offset,
                     size,
@@ -89,12 +86,12 @@ impl Workload {
                         .as_str(),
                     );
                 }
-                Operation::FSYNC { des } => {
+                Operation::FSync { des } => {
                     result.push_str(format!("do_fsync({});\n", descriptor_to_var(des)).as_str());
                 }
             }
         }
-        result.push_str("}");
+        result.push('}');
         result
     }
 }
@@ -162,49 +159,49 @@ do_remove("/foo");
         ];
         let actual = Workload {
             ops: vec![
-                Operation::MKDIR {
+                Operation::MkDir {
                     path: "/foo".into(),
                     mode: vec![],
                 },
-                Operation::CREATE {
+                Operation::Create {
                     path: "/foo/bar".into(),
                     mode: mode.clone(),
                 },
-                Operation::OPEN {
+                Operation::Open {
                     path: "/foo/bar".into(),
                     des: FileDescriptorIndex(0),
                 },
-                Operation::WRITE {
+                Operation::Write {
                     des: FileDescriptorIndex(0),
                     src_offset: 999,
                     size: 1024,
                 },
-                Operation::CLOSE {
+                Operation::Close {
                     des: FileDescriptorIndex(0),
                 },
-                Operation::HARDLINK {
+                Operation::Hardlink {
                     old_path: "/foo/bar".into(),
                     new_path: "/baz".into(),
                 },
-                Operation::OPEN {
+                Operation::Open {
                     path: "/baz".into(),
                     des: FileDescriptorIndex(1),
                 },
-                Operation::READ {
+                Operation::Read {
                     des: FileDescriptorIndex(1),
                     size: 1024,
                 },
-                Operation::FSYNC {
+                Operation::FSync {
                     des: FileDescriptorIndex(1),
                 },
-                Operation::CLOSE {
+                Operation::Close {
                     des: FileDescriptorIndex(1),
                 },
-                Operation::RENAME {
+                Operation::Rename {
                     old_path: "/baz".into(),
                     new_path: "/gaz".into(),
                 },
-                Operation::REMOVE {
+                Operation::Remove {
                     path: "/foo".into(),
                 },
             ],

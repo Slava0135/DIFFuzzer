@@ -45,31 +45,30 @@ impl Reducer {
     pub fn run(&mut self, test_path: &LocalPath, save_to_dir: &LocalPath) -> anyhow::Result<()> {
         info!("read testcase at '{}'", test_path);
         let input = read_to_string(test_path)
-            .with_context(|| format!("failed to read testcase"))
+            .with_context(|| "failed to read testcase")
             .unwrap();
         let input: Workload = serde_json::from_str(&input)
-            .with_context(|| format!("failed to parse json"))
+            .with_context(|| "failed to parse json")
             .unwrap();
 
         let binary_path = self.runner.compile_test(&input)?;
 
         let (fst_outcome, snd_outcome) = self.runner.run_harness(&binary_path)?;
 
-        let fst_trace =
-            parse_trace(&fst_outcome).with_context(|| format!("failed to parse first trace"))?;
+        let fst_trace = parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
         let snd_trace =
-            parse_trace(&snd_outcome).with_context(|| format!("failed to parse second trace"))?;
+            parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
 
         let hash_diff_interesting = self
             .runner
             .hash_objective
             .is_interesting()
-            .with_context(|| format!("failed to do hash objective"))?;
-        let trace_is_interesting = self
+            .with_context(|| "failed to do hash objective")?;
+        let _trace_is_interesting = self
             .runner
             .trace_objective
             .is_interesting(&fst_trace, &snd_trace)
-            .with_context(|| format!("failed to do trace objective"))?;
+            .with_context(|| "failed to do trace objective")?;
 
         if hash_diff_interesting {
             let old_diff = self.runner.hash_objective.get_diff();
@@ -98,7 +97,7 @@ impl Reducer {
                     .runner
                     .hash_objective
                     .is_interesting()
-                    .with_context(|| format!("failed to do hash objective"))?;
+                    .with_context(|| "failed to do hash objective")?;
                 if hash_diff_interesting {
                     let new_diff = self.runner.hash_objective.get_diff();
                     if old_diff == new_diff {

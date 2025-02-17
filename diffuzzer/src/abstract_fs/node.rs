@@ -42,6 +42,6 @@ pub struct Dir {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Node {
-    FILE(FileIndex),
-    DIR(DirIndex),
+    File(FileIndex),
+    Dir(DirIndex),
 }

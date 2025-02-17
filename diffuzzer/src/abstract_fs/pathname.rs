@@ -53,9 +53,7 @@ impl PathName {
     }
 
     pub fn is_valid(&self) -> bool {
-        !(self.0.is_empty()
-            || !self.0.starts_with('/')
-            || (!self.is_root() && self.0.ends_with('/')))
+        (!self.0.ends_with('/') || self.is_root()) && self.0.starts_with('/') && !self.0.is_empty()
     }
 
     pub fn is_root(&self) -> bool {
@@ -66,14 +64,14 @@ impl PathName {
         let segments = self.segments();
         let other_segments = other.segments();
         if other_segments.len() < segments.len() {
-            return false;
+            false
         } else {
             for i in 0..segments.len() {
                 if segments[i] != other_segments[i] {
                     return false;
                 }
             }
-            return true;
+            true
         }
     }
 }

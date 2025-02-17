@@ -7,59 +7,61 @@ use serde::{Deserialize, Serialize};
 use super::{flags::Mode, node::FileDescriptorIndex, pathname::PathName};
 
 #[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum Operation {
-    MKDIR {
+    MkDir {
         path: PathName,
         mode: Mode,
     },
-    CREATE {
+    Create {
         path: PathName,
         mode: Mode,
     },
-    REMOVE {
+    Remove {
         path: PathName,
     },
-    HARDLINK {
+    Hardlink {
         old_path: PathName,
         new_path: PathName,
     },
-    RENAME {
+    Rename {
         old_path: PathName,
         new_path: PathName,
     },
-    OPEN {
+    Open {
         path: PathName,
         des: FileDescriptorIndex,
     },
-    CLOSE {
+    Close {
         des: FileDescriptorIndex,
     },
-    READ {
+    Read {
         des: FileDescriptorIndex,
         size: u64,
     },
-    WRITE {
+    Write {
         des: FileDescriptorIndex,
         src_offset: u64,
         size: u64,
     },
-    FSYNC {
+    FSync {
         des: FileDescriptorIndex,
     },
 }
 
 #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Copy)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum OperationKind {
-    MKDIR,
-    CREATE,
-    REMOVE,
-    HARDLINK,
-    RENAME,
-    OPEN,
-    CLOSE,
-    READ,
-    WRITE,
-    FSYNC,
+    MkDir,
+    Create,
+    Remove,
+    Hardlink,
+    Rename,
+    Open,
+    Close,
+    Read,
+    Write,
+    FSync,
 }
 
 /// Weights determine the likelihood of operation to be picked.
@@ -78,16 +80,16 @@ impl OperationWeights {
     pub fn uniform() -> Self {
         Self {
             weights: vec![
-                (OperationKind::CREATE, 100),
-                (OperationKind::MKDIR, 100),
-                (OperationKind::REMOVE, 100),
-                (OperationKind::HARDLINK, 100),
-                (OperationKind::RENAME, 100),
-                (OperationKind::OPEN, 100),
-                (OperationKind::CLOSE, 100),
-                (OperationKind::READ, 100),
-                (OperationKind::WRITE, 100),
-                (OperationKind::FSYNC, 100),
+                (OperationKind::Create, 100),
+                (OperationKind::MkDir, 100),
+                (OperationKind::Remove, 100),
+                (OperationKind::Hardlink, 100),
+                (OperationKind::Rename, 100),
+                (OperationKind::Open, 100),
+                (OperationKind::Close, 100),
+                (OperationKind::Read, 100),
+                (OperationKind::Write, 100),
+                (OperationKind::FSync, 100),
             ],
         }
     }

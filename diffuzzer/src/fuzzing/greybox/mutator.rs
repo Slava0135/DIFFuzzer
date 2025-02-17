@@ -53,12 +53,12 @@ impl Mutator {
         if input.ops.is_empty() {
             mutations
                 .weights
-                .retain(|(op, _)| *op != MutationKind::REMOVE);
+                .retain(|(op, _)| *op != MutationKind::Remove);
         }
         if input.ops.len() >= self.max_length.into() {
             mutations
                 .weights
-                .retain(|(op, _)| *op != MutationKind::INSERT);
+                .retain(|(op, _)| *op != MutationKind::Insert);
         }
         match mutations
             .weights
@@ -66,10 +66,9 @@ impl Mutator {
             .unwrap()
             .0
         {
-            MutationKind::INSERT => {
+            MutationKind::Insert => {
                 let index = self.rng.gen_range(0..=input.ops.len());
-                if let Some(workload) =
-                    insert(&mut self.rng, &input, index, &self.operation_weights)
+                if let Some(workload) = insert(&mut self.rng, input, index, &self.operation_weights)
                 {
                     *input = workload;
                     true
@@ -77,9 +76,9 @@ impl Mutator {
                     false
                 }
             }
-            MutationKind::REMOVE => {
+            MutationKind::Remove => {
                 let index = self.rng.gen_range(0..input.ops.len());
-                if let Some(workload) = remove(&input, index) {
+                if let Some(workload) = remove(input, index) {
                     *input = workload;
                     true
                 } else {

@@ -17,6 +17,6 @@ impl TraceObjective {
 impl TraceObjective {
     pub fn is_interesting(&mut self, fst_trace: &Trace, snd_trace: &Trace) -> anyhow::Result<bool> {
         debug!("do trace objective");
-        Ok(!fst_trace.same_as(&snd_trace))
+        Ok(!fst_trace.same_as(snd_trace))
     }
 }

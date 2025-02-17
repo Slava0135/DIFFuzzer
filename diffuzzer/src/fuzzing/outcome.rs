@@ -7,6 +7,7 @@ use std::process::ExitStatus;
 use crate::path::LocalPath;
 
 pub struct Outcome {
+    #[allow(dead_code)]
     pub exit_status: ExitStatus,
     pub stdout: String,
     pub stderr: String,

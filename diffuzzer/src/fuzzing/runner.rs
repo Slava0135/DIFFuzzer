@@ -133,7 +133,7 @@ impl Runner {
         debug!("compile test at '{}'", self.test_dir);
         let binary_path = input
             .compile(self.cmdi.as_ref(), &self.test_dir)
-            .with_context(|| format!("failed to compile test"))?;
+            .with_context(|| "failed to compile test")?;
         Ok(binary_path)
     }
 
@@ -149,7 +149,7 @@ impl Runner {
         };
         let fst_outcome = self
             .fst_harness
-            .run(self.cmdi.as_ref(), &binary_path, self.keep_fs, fst_hash)
+            .run(self.cmdi.as_ref(), binary_path, self.keep_fs, fst_hash)
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
 
         setup_dir(self.cmdi.as_ref(), &self.exec_dir)
@@ -161,7 +161,7 @@ impl Runner {
         };
         let snd_outcome = self
             .snd_harness
-            .run(self.cmdi.as_ref(), &binary_path, self.keep_fs, snd_hash)
+            .run(self.cmdi.as_ref(), binary_path, self.keep_fs, snd_hash)
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
         Ok((fst_outcome, snd_outcome))
     }
@@ -182,14 +182,13 @@ impl Runner {
         fs::create_dir_all(&crash_dir)
             .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
 
-        save_testcase(self.cmdi.as_ref(), &crash_dir, binary_path, &input)?;
-        save_outcome(&crash_dir, &self.fst_fs_name, &fst_outcome)
-            .with_context(|| format!("failed to save first outcome"))?;
-        save_outcome(&crash_dir, &self.snd_fs_name, &snd_outcome)
-            .with_context(|| format!("failed to save second outcome"))?;
+        save_testcase(self.cmdi.as_ref(), &crash_dir, binary_path, input)?;
+        save_outcome(&crash_dir, &self.fst_fs_name, fst_outcome)
+            .with_context(|| "failed to save first outcome")?;
+        save_outcome(&crash_dir, &self.snd_fs_name, snd_outcome)
+            .with_context(|| "failed to save second outcome")?;
 
-        save_diff(&crash_dir, hash_diff)
-            .with_context(|| format!("failed to save hash differences"))?;
+        save_diff(&crash_dir, hash_diff).with_context(|| "failed to save hash differences")?;
         info!("crash saved at '{}'", crash_dir);
 
         anyhow::Ok(())
@@ -215,8 +214,8 @@ impl Stats {
 }
 
 pub fn parse_trace(outcome: &Outcome) -> anyhow::Result<Trace> {
-    let trace = fs::read_to_string(&outcome.dir.join(TRACE_FILENAME))?;
-    anyhow::Ok(Trace::try_parse(trace).with_context(|| format!("failed to parse trace"))?)
+    let trace = fs::read_to_string(outcome.dir.join(TRACE_FILENAME))?;
+    anyhow::Ok(Trace::try_parse(trace).with_context(|| "failed to parse trace")?)
 }
 
 pub fn setup_dir(cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<()> {

@@ -50,6 +50,7 @@ impl Content {
         }
     }
 
+    #[allow(dead_code)]
     pub fn slices(&self) -> Vec<SourceSlice> {
         self.slices.iter().map(|s| s.to_owned()).collect()
     }

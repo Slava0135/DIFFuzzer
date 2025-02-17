@@ -27,7 +27,7 @@ impl KCovFeedback {
             .with_context(|| "failed to read kcov file")?;
         let mut new_coverage = HashSet::new();
         for line in kcov.lines() {
-            let addr = parse_addr(&line)
+            let addr = parse_addr(line)
                 .with_context(|| format!("failed to parse addr from kcov line '{}'", line))?;
             new_coverage.insert(addr);
         }
@@ -37,7 +37,7 @@ impl KCovFeedback {
             Ok(false)
         } else {
             for v in diff {
-                self.all_coverage.insert(v.clone());
+                self.all_coverage.insert(*v);
             }
             Ok(true)
         }

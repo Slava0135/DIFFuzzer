@@ -69,11 +69,11 @@ pub trait Fuzzer {
         let hash_diff_interesting = runner
             .hash_objective
             .is_interesting()
-            .with_context(|| format!("failed to do hash objective"))?;
+            .with_context(|| "failed to do hash objective")?;
         let trace_is_interesting = runner
             .trace_objective
             .is_interesting(fst_trace, snd_trace)
-            .with_context(|| format!("failed to do trace objective"))?;
+            .with_context(|| "failed to do trace objective")?;
         if trace_is_interesting || hash_diff_interesting {
             debug!(
                 "error detected by: trace?: {}, hash?: {}",
@@ -85,14 +85,14 @@ pub trait Fuzzer {
             }
             runner
                 .report_crash(
-                    &input,
+                    input,
                     binary_path,
                     runner.crashes_path.clone(),
                     diff,
                     fst_outcome,
                     snd_outcome,
                 )
-                .with_context(|| format!("failed to report crash"))?;
+                .with_context(|| "failed to report crash")?;
             self.runner().stats.crashes += 1;
             self.show_stats();
             Ok(true)
@@ -116,14 +116,14 @@ pub trait Fuzzer {
             let accidents_path = self.runner().accidents_path.clone();
             self.runner()
                 .report_crash(
-                    &input,
+                    input,
                     binary_path,
                     accidents_path,
                     vec![],
                     fst_outcome,
                     snd_outcome,
                 )
-                .with_context(|| format!("failed to report accident"))?;
+                .with_context(|| "failed to report accident")?;
             Ok(true)
         } else {
             Ok(false)

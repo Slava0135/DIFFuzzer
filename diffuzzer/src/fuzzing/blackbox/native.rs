@@ -62,9 +62,9 @@ impl Fuzzer for NativeBlackBoxFuzzer {
         let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path)?;
 
         let fst_trace =
-            parse_trace(&fst_outcome).with_context(|| format!("failed to parse first trace"))?;
+            parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
         let snd_trace =
-            parse_trace(&snd_outcome).with_context(|| format!("failed to parse second trace"))?;
+            parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
 
         if self.detect_errors(
             &input,

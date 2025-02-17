@@ -6,15 +6,15 @@ use std::fmt::Display;
 
 use super::mount::FileSystemMount;
 
-pub struct XFS;
+pub struct Xfs;
 
-impl Display for XFS {
+impl Display for Xfs {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "XFS")
     }
 }
 
-impl FileSystemMount for XFS {
+impl FileSystemMount for Xfs {
     fn mkfs_cmd(&self) -> String {
         "mkfs.xfs".to_owned()
     }
@@ -23,7 +23,7 @@ impl FileSystemMount for XFS {
     }
 }
 
-impl XFS {
+impl Xfs {
     pub const fn new() -> Self {
         Self {}
     }

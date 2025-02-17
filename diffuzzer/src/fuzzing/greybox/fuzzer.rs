@@ -118,9 +118,9 @@ impl GreyBoxFuzzer {
 
         save_testcase(self.runner.cmdi.as_ref(), &corpus_dir, binary_path, &input)?;
         save_outcome(&corpus_dir, &self.runner.fst_fs_name, fst_outcome)
-            .with_context(|| format!("failed to save outcome for first harness"))?;
+            .with_context(|| "failed to save outcome for first harness")?;
         save_outcome(&corpus_dir, &self.runner.snd_fs_name, snd_outcome)
-            .with_context(|| format!("failed to save outcome for second harness"))?;
+            .with_context(|| "failed to save outcome for second harness")?;
         Ok(())
     }
 }
@@ -137,10 +137,9 @@ impl Fuzzer for GreyBoxFuzzer {
 
         let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path)?;
 
-        let fst_trace =
-            parse_trace(&fst_outcome).with_context(|| format!("failed to parse first trace"))?;
+        let fst_trace = parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
         let snd_trace =
-            parse_trace(&snd_outcome).with_context(|| format!("failed to parse second trace"))?;
+            parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
 
         if self.detect_errors(
             &input,
@@ -188,7 +187,7 @@ impl Fuzzer for GreyBoxFuzzer {
             self.show_stats();
             if self.corpus_path.is_some() {
                 self.save_input(input, &binary_path, &fst_outcome, &snd_outcome)
-                    .with_context(|| format!("failed to save input"))?;
+                    .with_context(|| "failed to save input")?;
             }
             return Ok(());
         }
