@@ -14,7 +14,7 @@ use crate::config::Config;
 
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::runner::{parse_trace, Runner};
-use crate::mount::mount::FileSystemMount;
+use crate::mount::FileSystemMount;
 use crate::path::LocalPath;
 
 pub struct NativeBlackBoxFuzzer {

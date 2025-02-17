@@ -16,7 +16,7 @@ use crate::fuzzing::outcome::Outcome;
 use crate::fuzzing::runner::{parse_trace, Runner};
 use crate::path::{LocalPath, RemotePath};
 use crate::save::{save_outcome, save_testcase};
-use crate::{abstract_fs::workload::Workload, config::Config, mount::mount::FileSystemMount};
+use crate::{abstract_fs::workload::Workload, config::Config, mount::FileSystemMount};
 
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 

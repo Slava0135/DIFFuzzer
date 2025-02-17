@@ -4,7 +4,7 @@
 
 use std::fmt::Display;
 
-use super::mount::FileSystemMount;
+use super::FileSystemMount;
 
 pub struct Xfs;
 

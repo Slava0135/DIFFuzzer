@@ -7,7 +7,7 @@ use crate::abstract_fs::trace::{Trace, TRACE_FILENAME};
 use crate::abstract_fs::workload::Workload;
 use crate::command::CommandInterface;
 use crate::config::Config;
-use crate::mount::mount::FileSystemMount;
+use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
 use crate::save::{save_diff, save_outcome, save_testcase};
 use anyhow::{Context, Ok};

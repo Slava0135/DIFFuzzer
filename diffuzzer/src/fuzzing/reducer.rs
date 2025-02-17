@@ -13,7 +13,7 @@ use crate::{
     command::LocalCommandInterface,
     config::Config,
     fuzzing::runner::parse_trace,
-    mount::mount::FileSystemMount,
+    mount::FileSystemMount,
     path::LocalPath,
 };
 

@@ -6,7 +6,7 @@ use anyhow::Context;
 
 use crate::command::{CommandInterface, CommandWrapper};
 use crate::fuzzing::objective::hash::HashHolder;
-use crate::mount::mount::FileSystemMount;
+use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
 
 use super::outcome::Outcome;

@@ -14,7 +14,7 @@ use crate::{
     abstract_fs::workload::Workload,
     command::{CommandInterface, LocalCommandInterface},
     fuzzing::{harness::Harness, runner::setup_dir},
-    mount::mount::FileSystemMount,
+    mount::FileSystemMount,
     path::{LocalPath, RemotePath},
     save::{save_outcome, save_testcase},
 };

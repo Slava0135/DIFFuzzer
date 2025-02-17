@@ -6,7 +6,7 @@ use std::fmt::Display;
 
 use regex::RegexSet;
 
-use super::mount::FileSystemMount;
+use super::FileSystemMount;
 
 pub struct F2FS;
 
