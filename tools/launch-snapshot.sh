@@ -3,6 +3,7 @@
 : "${OS_IMAGE:="./disk.img"}"
 : "${MONITOR_PORT:="55555"}"
 : "${SSH_PORT:="2222"}"
+: "${QMP_SOCKET_PATH:="/tmp/qemu-monitor.sock"}"
 
 qemu-system-x86_64  \
   -machine accel=kvm,type=q35 \
@@ -12,6 +13,7 @@ qemu-system-x86_64  \
   -nographic \
   -enable-kvm \
   -monitor tcp::"$MONITOR_PORT",server,nowait \
+  -qmp unix:"$QMP_SOCKET_PATH",server,nowait \
   -device virtio-net-pci,netdev=net0 \
   -netdev user,id=net0,hostfwd=tcp::"$SSH_PORT"-:22 \
   -drive if=virtio,format=qcow2,file="$OS_IMAGE" \
