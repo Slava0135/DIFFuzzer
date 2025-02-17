@@ -77,7 +77,7 @@ pub fn save_diff(output_dir: &LocalPath, diff_hash: Vec<FileDiff>) -> anyhow::Re
         .append(true)
         .create(true)
         .open(&diff_hash_path)
-        .unwrap();
+        .with_context(|| format!("failed to save hash difference at '{}'", diff_hash_path))?;
 
     for diff in diff_hash {
         let txt = match diff {
