@@ -5,6 +5,7 @@
 use std::{fs, path::Path};
 
 use crate::fuzzing::duo_single::DuoSingleFuzzer;
+use anyhow::{Context, Ok};
 use args::Args;
 use clap::Parser;
 use config::Config;
@@ -29,15 +30,17 @@ mod mount;
 mod path;
 mod save;
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    log4rs::init_file("log4rs.yml", Default::default()).unwrap();
+    log4rs::init_file("log4rs.yml", Default::default()).with_context(|| "failed to init logger")?;
     info!("init logger");
 
     info!("read configuration");
-    let config = fs::read_to_string(args.config_path).expect("failed to read configuration file");
-    let config: Config = toml::from_str(&config).expect("bad configuration file");
+    let config = fs::read_to_string(args.config_path)
+        .with_context(|| "failed to read configuration file")?;
+    let config: Config =
+        toml::from_str(&config).with_context(|| "failed to parse configuration")?;
 
     match args.mode {
         args::Mode::Greybox {
@@ -50,12 +53,12 @@ fn main() {
                 first_filesystem, second_filesystem
             );
             if args.no_qemu {
-                GreyBoxFuzzer::new(
+                GreyBoxFuzzer::create(
                     config,
                     first_filesystem.into(),
                     second_filesystem.into(),
                     LocalPath::new(Path::new("./crashes")),
-                )
+                )?
                 .run(test_count);
             } else {
                 todo!("QEMU not supported");
@@ -71,20 +74,20 @@ fn main() {
                 first_filesystem, second_filesystem
             );
             if args.no_qemu {
-                NativeBlackBoxFuzzer::new(
+                NativeBlackBoxFuzzer::create(
                     config,
                     first_filesystem.into(),
                     second_filesystem.into(),
                     LocalPath::new(Path::new("./crashes")),
-                )
+                )?
                 .run(test_count);
             } else {
-                QemuBlackBoxFuzzer::new(
+                QemuBlackBoxFuzzer::create(
                     config,
                     first_filesystem.into(),
                     second_filesystem.into(),
                     LocalPath::new(Path::new("./crashes")),
-                )
+                )?
                 .run(test_count);
             }
         }
@@ -102,7 +105,7 @@ fn main() {
                     keep_fs,
                     filesystem.into(),
                     config.fs_name,
-                )
+                )?
             } else {
                 todo!("QEMU not supported");
             }
@@ -119,14 +122,14 @@ fn main() {
                 first_filesystem, second_filesystem
             );
             if args.no_qemu {
-                DuoSingleFuzzer::new(
+                DuoSingleFuzzer::create(
                     config,
                     first_filesystem.into(),
                     second_filesystem.into(),
                     LocalPath::new(Path::new(&output_dir)),
                     LocalPath::new(Path::new(&path_to_test)),
                     keep_fs,
-                )
+                )?
                 .run(Some(1u64));
             } else {
                 todo!("QEMU not supported");
@@ -143,20 +146,20 @@ fn main() {
                 first_filesystem, second_filesystem
             );
             if args.no_qemu {
-                Reducer::new(
+                Reducer::create(
                     config,
                     first_filesystem.into(),
                     second_filesystem.into(),
                     LocalPath::new(Path::new(&output_dir)),
-                )
+                )?
                 .run(
                     &LocalPath::new(Path::new(&path_to_test)),
                     &LocalPath::new(Path::new(&output_dir)),
-                )
-                .unwrap();
+                )?;
             } else {
                 todo!("QEMU not supported");
             }
         }
     }
+    Ok(())
 }

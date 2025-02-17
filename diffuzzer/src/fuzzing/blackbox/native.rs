@@ -23,28 +23,27 @@ pub struct NativeBlackBoxFuzzer {
 }
 
 impl NativeBlackBoxFuzzer {
-    pub fn new(
+    pub fn create(
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
-    ) -> Self {
-        Self {
-            runner: Runner::new(
-                fst_mount,
-                snd_mount,
-                crashes_path,
-                config,
-                false,
-                Box::new(LocalCommandInterface::new()),
-            ),
+    ) -> anyhow::Result<Self> {
+        let runner = Runner::create(
+            fst_mount,
+            snd_mount,
+            crashes_path,
+            config,
+            false,
+            Box::new(LocalCommandInterface::new()),
+        )
+        .with_context(|| "failed to create runner")?;
+        Ok(Self {
+            runner,
             rng: StdRng::seed_from_u64(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64,
+                SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64
             ),
-        }
+        })
     }
 }
 
@@ -61,8 +60,7 @@ impl Fuzzer for NativeBlackBoxFuzzer {
 
         let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path)?;
 
-        let fst_trace =
-            parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
+        let fst_trace = parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
         let snd_trace =
             parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
 

@@ -21,37 +21,33 @@ pub struct DuoSingleFuzzer {
 }
 
 impl DuoSingleFuzzer {
-    pub fn new(
+    pub fn create(
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
         test_path: LocalPath,
         keep_fs: bool,
-    ) -> Self {
-        Self {
-            runner: Runner::new(
-                fst_mount,
-                snd_mount,
-                crashes_path,
-                config,
-                keep_fs,
-                Box::new(LocalCommandInterface::new()),
-            ),
-            test_path,
-        }
+    ) -> anyhow::Result<Self> {
+        let runner = Runner::create(
+            fst_mount,
+            snd_mount,
+            crashes_path,
+            config,
+            keep_fs,
+            Box::new(LocalCommandInterface::new()),
+        )
+        .with_context(|| "failed to create runner")?;
+        Ok(Self { runner, test_path })
     }
 }
 
 impl Fuzzer for DuoSingleFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
         info!("read testcase at '{}'", self.test_path);
-        let input = read_to_string(&self.test_path)
-            .with_context(|| "failed to read testcase")
-            .unwrap();
-        let input: Workload = serde_json::from_str(&input)
-            .with_context(|| "failed to parse json")
-            .unwrap();
+        let input = read_to_string(&self.test_path).with_context(|| "failed to read testcase")?;
+        let input: Workload =
+            serde_json::from_str(&input).with_context(|| "failed to parse json")?;
 
         let binary_path = self.runner().compile_test(&input)?;
 

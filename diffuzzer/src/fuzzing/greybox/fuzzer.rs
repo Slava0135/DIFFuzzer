@@ -35,19 +35,14 @@ pub struct GreyBoxFuzzer {
 }
 
 impl GreyBoxFuzzer {
-    pub fn new(
+    pub fn create(
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let mutator = Mutator::new(
-            StdRng::seed_from_u64(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64,
-            ),
+            StdRng::seed_from_u64(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64),
             config.operation_weights.clone(),
             config.mutation_weights.clone(),
             config.max_workload_length,
@@ -56,25 +51,26 @@ impl GreyBoxFuzzer {
 
         let corpus_path = if config.greybox.save_corpus {
             let path = Path::new("./corpus");
-            fs::create_dir_all(path).unwrap();
+            fs::create_dir_all(path).with_context(|| "failed to create directory for corpus")?;
             Some(LocalPath::new(path))
         } else {
             None
         };
 
-        let runner = Runner::new(
+        let runner = Runner::create(
             fst_mount,
             snd_mount,
             crashes_path,
             config,
             false,
             Box::new(LocalCommandInterface::new()),
-        );
+        )
+        .with_context(|| "failed to create runner")?;
 
         let fst_kcov_feedback = KCovFeedback::new();
         let snd_kcov_feedback = KCovFeedback::new();
 
-        Self {
+        Ok(Self {
             runner,
             corpus: vec![Workload::new()],
             next_seed: 0,
@@ -85,7 +81,7 @@ impl GreyBoxFuzzer {
             mutator,
 
             corpus_path,
-        }
+        })
     }
 
     fn pick_input(&mut self) -> Workload {

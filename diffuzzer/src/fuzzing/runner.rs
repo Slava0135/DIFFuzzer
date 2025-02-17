@@ -48,27 +48,26 @@ pub struct Runner {
 }
 
 impl Runner {
-    pub fn new(
+    pub fn create(
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
         config: Config,
         keep_fs: bool,
         cmdi: Box<dyn CommandInterface>,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let temp_dir = cmdi
             .setup_remote_dir()
-            .with_context(|| "failed to setup temp dir")
-            .unwrap();
+            .with_context(|| "failed to setup temp dir")?;
 
         info!("init runner components");
         let test_dir = temp_dir.clone();
         let exec_dir = temp_dir.join("exec");
 
-        fs::create_dir_all(&crashes_path).unwrap();
+        fs::create_dir_all(&crashes_path)?;
 
         let accidents_path = LocalPath::new(Path::new("./accidents"));
-        fs::create_dir_all(&accidents_path).unwrap();
+        fs::create_dir_all(&accidents_path)?;
 
         let fst_fs_name = fst_mount.to_string();
         let snd_fs_name = snd_mount.to_string();
@@ -105,7 +104,7 @@ impl Runner {
             LocalPath::new_tmp("outcome-2"),
         );
 
-        Self {
+        Ok(Self {
             config,
             keep_fs,
 
@@ -126,7 +125,7 @@ impl Runner {
             snd_harness,
 
             stats: Stats::new(),
-        }
+        })
     }
 
     pub fn compile_test(&mut self, input: &Workload) -> anyhow::Result<RemotePath> {

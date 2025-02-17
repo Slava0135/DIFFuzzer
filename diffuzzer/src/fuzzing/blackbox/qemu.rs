@@ -25,12 +25,12 @@ pub struct QemuBlackBoxFuzzer {
 }
 
 impl QemuBlackBoxFuzzer {
-    pub fn new(
+    pub fn create(
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let mut launch = Command::new(&config.qemu.launch_script);
         launch
             .env("OS_IMAGE", config.qemu.os_image.clone())
@@ -43,41 +43,41 @@ impl QemuBlackBoxFuzzer {
 
         let script = config.qemu.launch_script.clone();
         thread::spawn(move || {
-            let mut child = launch
+            match launch
                 .spawn()
                 .with_context(|| format!("failed to run qemu vm from script '{}'", script))
-                .unwrap();
-            match child.wait() {
-                Ok(status) => {
-                    error!("qemu finished unexpectedly ({})", status);
-                }
-                Err(err) => {
-                    error!("qemu finished with error:\n{}", err)
-                }
-            }
+            {
+                Ok(mut child) => match child.wait() {
+                    Ok(status) => {
+                        error!("qemu finished unexpectedly ({})", status);
+                    }
+                    Err(err) => {
+                        error!("qemu finished with error:\n{}", err)
+                    }
+                },
+                Err(err) => error!("{}", err),
+            };
         });
 
         info!("wait for VM to init ({}s)", config.qemu.boot_wait_time);
         sleep(Duration::from_secs(config.qemu.boot_wait_time.into()));
 
-        let runner = Runner::new(
+        let runner = Runner::create(
             fst_mount,
             snd_mount,
             crashes_path,
             config.clone(),
             false,
             Box::new(RemoteCommandInterface::new(config.qemu.clone())),
-        );
+        )
+        .with_context(|| "failed to create runner")?;
 
-        Self {
+        Ok(Self {
             runner,
             rng: StdRng::seed_from_u64(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64,
+                SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64
             ),
-        }
+        })
     }
 }
 

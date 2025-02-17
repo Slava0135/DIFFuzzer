@@ -24,32 +24,29 @@ pub struct Reducer {
 }
 
 impl Reducer {
-    pub fn new(
+    pub fn create(
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
-    ) -> Self {
-        Self {
-            runner: Runner::new(
-                fst_mount,
-                snd_mount,
-                crashes_path,
-                config,
-                false,
-                Box::new(LocalCommandInterface::new()),
-            ),
-        }
+    ) -> anyhow::Result<Self> {
+        let runner = Runner::create(
+            fst_mount,
+            snd_mount,
+            crashes_path,
+            config,
+            false,
+            Box::new(LocalCommandInterface::new()),
+        )
+        .with_context(|| "failed to create runner")?;
+        Ok(Self { runner })
     }
 
     pub fn run(&mut self, test_path: &LocalPath, save_to_dir: &LocalPath) -> anyhow::Result<()> {
         info!("read testcase at '{}'", test_path);
-        let input = read_to_string(test_path)
-            .with_context(|| "failed to read testcase")
-            .unwrap();
-        let input: Workload = serde_json::from_str(&input)
-            .with_context(|| "failed to parse json")
-            .unwrap();
+        let input = read_to_string(test_path).with_context(|| "failed to read testcase")?;
+        let input: Workload =
+            serde_json::from_str(&input).with_context(|| "failed to parse json")?;
 
         let binary_path = self.runner.compile_test(&input)?;
 
