@@ -23,8 +23,9 @@ impl KCovFeedback {
     }
     pub fn is_interesting(&mut self, outcome: &Outcome) -> anyhow::Result<bool> {
         debug!("do kcov feedback");
-        let kcov = fs::read_to_string(outcome.dir.join(KCOV_FILENAME))
-            .with_context(|| "failed to read kcov file")?;
+        let path = outcome.dir.join(KCOV_FILENAME);
+        let kcov = fs::read_to_string(&path)
+            .with_context(|| format!("failed to read kcov file at {}", path))?;
         let mut new_coverage = HashSet::new();
         for line in kcov.lines() {
             let addr = parse_addr(line)
