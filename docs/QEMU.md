@@ -1,6 +1,6 @@
 # QEMU configuration
 
-> Note: all scripts are executed from root directory.
+> Note: all scripts are executed from project top directory.
 
 ## Ubuntu Cloud Image
 
