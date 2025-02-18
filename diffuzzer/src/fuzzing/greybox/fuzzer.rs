@@ -10,7 +10,7 @@ use anyhow::{Context, Ok};
 use log::{debug, info};
 use rand::{rngs::StdRng, SeedableRng};
 
-use crate::command::LocalCommandInterface;
+use crate::command::CommandInterface;
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::outcome::Outcome;
 use crate::fuzzing::runner::{parse_trace, Runner};
@@ -40,6 +40,7 @@ impl GreyBoxFuzzer {
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
+        cmdi: Box<dyn CommandInterface>,
     ) -> anyhow::Result<Self> {
         let mutator = Mutator::new(
             StdRng::seed_from_u64(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64),
@@ -57,15 +58,8 @@ impl GreyBoxFuzzer {
             None
         };
 
-        let runner = Runner::create(
-            fst_mount,
-            snd_mount,
-            crashes_path,
-            config,
-            false,
-            Box::new(LocalCommandInterface::new()),
-        )
-        .with_context(|| "failed to create runner")?;
+        let runner = Runner::create(fst_mount, snd_mount, crashes_path, config, false, cmdi)
+            .with_context(|| "failed to create runner")?;
 
         let fst_kcov_feedback = KCovFeedback::new();
         let snd_kcov_feedback = KCovFeedback::new();

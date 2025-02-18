@@ -11,6 +11,7 @@ os_image = "./disk.img"
 ssh_port = 2222
 ssh_private_key_path = "./ssh.key"
 boot_wait_time = 10 # in seconds
+log_path = "./qemu.log"
 
 [greybox]
 max_mutations = 10

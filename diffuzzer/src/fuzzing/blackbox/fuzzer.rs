@@ -9,7 +9,7 @@ use rand::SeedableRng;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
-use crate::command::LocalCommandInterface;
+use crate::command::CommandInterface;
 use crate::config::Config;
 
 use crate::fuzzing::fuzzer::Fuzzer;
@@ -17,27 +17,21 @@ use crate::fuzzing::runner::{parse_trace, Runner};
 use crate::mount::FileSystemMount;
 use crate::path::LocalPath;
 
-pub struct NativeBlackBoxFuzzer {
+pub struct BlackBoxFuzzer {
     runner: Runner,
     rng: StdRng,
 }
 
-impl NativeBlackBoxFuzzer {
+impl BlackBoxFuzzer {
     pub fn create(
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
+        cmdi: Box<dyn CommandInterface>,
     ) -> anyhow::Result<Self> {
-        let runner = Runner::create(
-            fst_mount,
-            snd_mount,
-            crashes_path,
-            config,
-            false,
-            Box::new(LocalCommandInterface::new()),
-        )
-        .with_context(|| "failed to create runner")?;
+        let runner = Runner::create(fst_mount, snd_mount, crashes_path, config, false, cmdi)
+            .with_context(|| "failed to create runner")?;
         Ok(Self {
             runner,
             rng: StdRng::seed_from_u64(
@@ -47,7 +41,7 @@ impl NativeBlackBoxFuzzer {
     }
 }
 
-impl Fuzzer for NativeBlackBoxFuzzer {
+impl Fuzzer for BlackBoxFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
         debug!("generate input");
         let input = generate_new(

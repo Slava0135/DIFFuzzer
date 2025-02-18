@@ -40,4 +40,6 @@ pub struct QemuConfig {
     pub os_image: String,
     /// Time to wait until OS is considered booted
     pub boot_wait_time: u8,
+    /// Path to QEMU log file
+    pub log_path: String,
 }
