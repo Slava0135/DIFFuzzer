@@ -1,6 +1,6 @@
 # QEMU configuration
 
-> Note: all scripts are executed from root directory
+> Note: all scripts are executed from root directory.
 
 ## Ubuntu Cloud Image
 
@@ -14,13 +14,17 @@ For example:
 >
 > QCow2 UEFI/GPT Bootable disk image with linux-kvm KVM optimised kernel
 
-*You can rename file to `disk.img` for convenience.*
+*Rename file to `disk.img` for convenience.*
+
+> Note: scripts use predefined filenames that can be changed by passing environment variables:
+>
+> `$ PATH_TO_FILE=SOME_VALUE ./some-script.sh`
 
 ### Generate SSH keys
 
 > If you are not familiar with SSH, read some documentation first.
 >
-> But basically, it allows us to execute commands on remote server (in our case server is running inside VM).
+> But basically, it allows user to execute commands on remote server (in our case server is running inside VM).
 >
 > Additionally, you can copy files from/to server using `scp`.
 
@@ -32,7 +36,7 @@ Execute:
 
 This will generate 2 keys: private and public (`.pub` extension).
 
-__Private__ key is for client (__host__) and __public__ key is for server (__guest__).
+__Private__ key is for client (__host__) and __public__ key is for server (__guest VM__).
 
 ### Make cloud configuration image
 
@@ -58,6 +62,8 @@ Execute:
 This will produce binary file `seed.img` with the configuration.
 
 ### First boot
+
+> Note: cloud images come with 2 GB root file system which may fill up quickly. If image is resized (using `qemu-img`) __before__ booting with cloud-init seed image, the file system will be resized automatically. Otherwise, see the section below about resizing file system.
 
 Execute:
 
@@ -120,7 +126,7 @@ tmpfs               5120       0      5120   0% /run/lock
 tmpfs             203892       4    203888   1% /run/user/0
 ```
 
-There are many ways to stop vm, but for now just do (__inside SSH session__)
+There are many ways to stop vm, but for now just do (__in SSH session!__)
 
 ```sh
 root@ubuntu:~# shutdown now
@@ -139,4 +145,46 @@ There are 2 scripts for this:
 ./tools/launch-snapshot.sh   # for fuzzing / experiments 
 ```
 
->TODO
+Execute:
+
+```sh
+./tools/launch-persistent.sh
+```
+
+You will be met with login message - connect via SSH instead (again):
+
+```sh
+./tools/connect-ssh.sh
+```
+
+In order to compile C code, you need to install some packages:
+
+```sh
+apt-get update # update repositories
+apt install build-essential
+```
+
+This should install `g++`, `make` and other required packages.
+
+> This can fill root file system completely, you might want to resize image at this point. See section below.
+
+Now, shutdown the system:
+
+```sh
+root@ubuntu:~# shutdown now
+```
+
+*This should be enough to run black-box fuzzing, though you won't be able to detect memory bugs in Linux kernel.*
+
+---
+>TODO resizing
+---
+>TODO copying files / testing environment
+---
+>TODO monitor
+---
+>TODO kernel
+---
+>TODO qmp
+---
+>TODO how to kernel panic
