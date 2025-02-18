@@ -4,9 +4,10 @@
 : "${MONITOR_PORT:="55555"}"
 : "${SSH_PORT:="2222"}"
 : "${QMP_SOCKET_PATH:="/tmp/qemu-monitor.sock"}"
+: "${SEED_IMAGE:="./seed.img"}"
 
-# Launch VM in snapshot mode (no changes are saved to disk).
-# Use for fuzzing to avoid any image modifications.
+# Launch VM with changes being saved to disk.
+# Use to setup cloud image OS with seed image, generated from cloud config file. 
 
 qemu-system-x86_64  \
   -machine accel=kvm,type=q35 \
@@ -20,4 +21,4 @@ qemu-system-x86_64  \
   -device virtio-net-pci,netdev=net0 \
   -netdev user,id=net0,hostfwd=tcp::"$SSH_PORT"-:22 \
   -drive if=virtio,format=qcow2,file="$OS_IMAGE" \
-  -snapshot
+  -drive if=virtio,format=raw,file="$SEED_IMAGE" \
