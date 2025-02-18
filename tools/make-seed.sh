@@ -1,6 +1,6 @@
 #!/bin/bash
 
-: "${CONFIG:="./cloud-config.yml"}"
+: "${CONFIG:="./tools/cloud-config.yml"}"
 : "${SEED_IMAGE:="./seed.img"}"
 
 # Make cloud init (seed) image from configuration
