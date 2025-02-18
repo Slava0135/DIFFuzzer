@@ -7,14 +7,14 @@ timeout = 10 # in seconds
 [qemu]
 launch_script = "./tools/launch-snapshot.sh"
 monitor_port = 55555
-os_image = "./disk-full-instrumented.img"
+os_image = "./disk.img"
 ssh_port = 2222
 ssh_private_key_path = "./ssh.key"
 boot_wait_time = 10 # in seconds
 
 [greybox]
 max_mutations = 10
-save_corpus = true
+save_corpus = false
 
 [operation_weights]
 weights = [
