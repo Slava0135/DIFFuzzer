@@ -61,7 +61,7 @@ fn main() -> anyhow::Result<()> {
                 )?
                 .run(test_count);
             } else {
-                qemu::launch(&config.qemu);
+                qemu::launch(&config.qemu)?;
                 GreyBoxFuzzer::create(
                     config.clone(),
                     first_filesystem.into(),
@@ -91,7 +91,7 @@ fn main() -> anyhow::Result<()> {
                 )?
                 .run(test_count);
             } else {
-                qemu::launch(&config.qemu);
+                qemu::launch(&config.qemu)?;
                 BlackBoxFuzzer::create(
                     config.clone(),
                     first_filesystem.into(),

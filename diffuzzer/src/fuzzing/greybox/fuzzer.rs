@@ -10,7 +10,7 @@ use anyhow::{Context, Ok};
 use log::{debug, info};
 use rand::{rngs::StdRng, SeedableRng};
 
-use crate::command::{CommandInterface, LocalCommandInterface};
+use crate::command::CommandInterface;
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::outcome::Outcome;
 use crate::fuzzing::runner::{parse_trace, Runner};
