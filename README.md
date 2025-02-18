@@ -89,7 +89,7 @@ DIFFuzzer comes with many modes:
 
 ## Adding New Filesystem
 
-Implement [trait](./diffuzzer/src/mount/mount.rs) (interface) for mounting filesystem. Default implementation uses `mkfs` and `mount` and can be used for most kernel filesystems (e.g. Ext4, Btrfs).
+Implement [trait](./diffuzzer/src/mount/mod.rs) (interface) for mounting filesystem. Default implementation uses `mkfs` and `mount` and can be used for most kernel filesystems (e.g. Ext4, Btrfs).
 
 Add filesystem to [this file](./diffuzzer/src/filesystems.rs).
 
