@@ -65,7 +65,7 @@ Configure with:
 
 ## QEMU
 
->TODO: QEMU
+Read [QEMU configuration](./docs/QEMU.md) docs.
 
 ## Usage
 
