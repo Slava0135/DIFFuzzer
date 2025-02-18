@@ -8,13 +8,11 @@ use crate::fuzzing::duo_single::DuoSingleFuzzer;
 use anyhow::{Context, Ok};
 use args::Args;
 use clap::Parser;
+use command::{LocalCommandInterface, RemoteCommandInterface};
 use config::Config;
 use fuzzing::{
-    blackbox::{native::NativeBlackBoxFuzzer, qemu::QemuBlackBoxFuzzer},
-    fuzzer::Fuzzer,
-    greybox::fuzzer::GreyBoxFuzzer,
-    reducer::Reducer,
-    solo_single,
+    blackbox::fuzzer::BlackBoxFuzzer, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
+    reducer::Reducer, solo_single,
 };
 use log::info;
 use path::LocalPath;
@@ -28,6 +26,7 @@ mod filesystems;
 mod fuzzing;
 mod mount;
 mod path;
+mod qemu;
 mod save;
 
 fn main() -> anyhow::Result<()> {
@@ -58,10 +57,19 @@ fn main() -> anyhow::Result<()> {
                     first_filesystem.into(),
                     second_filesystem.into(),
                     LocalPath::new(Path::new("./crashes")),
+                    Box::new(LocalCommandInterface::new()),
                 )?
                 .run(test_count);
             } else {
-                todo!("QEMU not supported");
+                qemu::launch(&config.qemu);
+                GreyBoxFuzzer::create(
+                    config.clone(),
+                    first_filesystem.into(),
+                    second_filesystem.into(),
+                    LocalPath::new(Path::new("./crashes")),
+                    Box::new(RemoteCommandInterface::new(config.qemu)),
+                )?
+                .run(test_count);
             }
         }
         args::Mode::Blackbox {
@@ -74,19 +82,22 @@ fn main() -> anyhow::Result<()> {
                 first_filesystem, second_filesystem
             );
             if args.no_qemu {
-                NativeBlackBoxFuzzer::create(
+                BlackBoxFuzzer::create(
                     config,
                     first_filesystem.into(),
                     second_filesystem.into(),
                     LocalPath::new(Path::new("./crashes")),
+                    Box::new(LocalCommandInterface::new()),
                 )?
                 .run(test_count);
             } else {
-                QemuBlackBoxFuzzer::create(
-                    config,
+                qemu::launch(&config.qemu);
+                BlackBoxFuzzer::create(
+                    config.clone(),
                     first_filesystem.into(),
                     second_filesystem.into(),
                     LocalPath::new(Path::new("./crashes")),
+                    Box::new(RemoteCommandInterface::new(config.qemu)),
                 )?
                 .run(test_count);
             }
