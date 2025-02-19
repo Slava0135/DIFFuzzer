@@ -168,16 +168,16 @@ impl Runner {
     pub fn report_crash(
         &mut self,
         input: &Workload,
+        dir_name: String,
         binary_path: &RemotePath,
         crash_dir: LocalPath,
         hash_diff: Vec<FileDiff>,
         fst_outcome: &Outcome,
         snd_outcome: &Outcome,
     ) -> anyhow::Result<()> {
-        let name = input.generate_name();
-        debug!("report crash '{}'", name);
+        debug!("report crash '{}'", dir_name);
 
-        let crash_dir = crash_dir.join(name);
+        let crash_dir = crash_dir.join(dir_name);
         fs::create_dir_all(&crash_dir)
             .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
 

@@ -102,6 +102,7 @@ impl Reducer {
                         info!("workload reduced (length = {})", workload.ops.len());
                         self.runner.report_crash(
                             &workload,
+                            index.to_string(),
                             &binary_path,
                             output_dir.clone(),
                             new_diff,
