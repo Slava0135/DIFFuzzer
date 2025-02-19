@@ -83,9 +83,11 @@ pub trait Fuzzer {
             if hash_diff_interesting {
                 diff = runner.hash_objective.get_diff();
             }
+            let dir_name = input.generate_name();
             runner
                 .report_crash(
                     input,
+                    dir_name,
                     binary_path,
                     runner.crashes_path.clone(),
                     diff,
@@ -114,9 +116,11 @@ pub trait Fuzzer {
         if fst_trace.has_errors() && snd_trace.has_errors() {
             warn!("both traces contain errors, potential bug in model");
             let accidents_path = self.runner().accidents_path.clone();
+            let dir_name = input.generate_name();
             self.runner()
                 .report_crash(
                     input,
+                    dir_name,
                     binary_path,
                     accidents_path,
                     vec![],
