@@ -11,8 +11,8 @@
 qemu-system-x86_64  \
   -machine accel=kvm,type=q35 \
   -cpu host \
-  -smp cores=2 \
-  -m 2G \
+  -smp cores=4 \
+  -m 8G \
   -nographic \
   -enable-kvm \
   -monitor tcp::"$MONITOR_PORT",server,nowait \
