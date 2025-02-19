@@ -161,7 +161,7 @@ root@ubuntu:/linux-5.15.178# fakeroot make -j6
 
 > You may be asked questions about further module configuration, just pick default answers.
 
-Make sure make finished successfully:
+Make sure `make` finished successfully:
 
 ```sh
 ...
@@ -170,7 +170,7 @@ root@ubuntu:/linux-5.15.178# echo $?
 0
 ```
 
-Otherwise, run again, to get error message:
+Otherwise, run `make` again, to get error message:
 
 ```sh
 root@ubuntu:/linux-5.15.178# make
