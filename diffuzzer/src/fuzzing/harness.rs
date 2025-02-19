@@ -74,7 +74,7 @@ impl Harness {
         let stderr = String::from_utf8(output.stderr)
             .with_context(|| "failed to convert stderr to string")?;
 
-        fs::remove_dir_all(&self.outcome_dir).with_context(|| "failed to clear test output dir")?;
+        fs::remove_dir_all(&self.outcome_dir).unwrap_or(());
         cmdi.copy_dir_from_remote(&self.exec_dir, &self.outcome_dir)
             .with_context(|| "failed to copy test output files")?;
 
