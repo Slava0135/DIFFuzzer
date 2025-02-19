@@ -1,6 +1,6 @@
 # QEMU configuration
 
-> Note: all scripts are executed from project top directory.
+> All scripts are executed from project top directory.
 
 ## Ubuntu Cloud Image
 
@@ -14,15 +14,17 @@ For example:
 >
 > QCow2 UEFI/GPT Bootable disk image with linux-kvm KVM optimised kernel
 
-*Rename file to `disk.img` for convenience.*
+Rename file to `disk.img` for convenience, and copy to project directory.
 
-> Note: scripts use predefined filenames that can be changed by passing environment variables:
+> Scripts use predefined filenames that can be changed by passing environment variables:
 >
-> `$ PATH_TO_FILE=SOME_VALUE ./some-script.sh`
+> `$ OS_IMAGE=path/to/disk.img ./launch.sh`
 
 ### Generate SSH keys
 
 > If you are not familiar with SSH, read some documentation first.
+>
+> <https://www.openssh.com/manual.html>
 >
 > But basically, it allows user to execute commands on remote server (in our case server is running inside VM).
 >
@@ -63,7 +65,9 @@ This will produce binary file `seed.img` with the configuration.
 
 ### First boot
 
-> Note: cloud images come with 2 GB root file system which may fill up quickly. If image is resized (using `qemu-img`) __before__ booting with cloud-init seed image, the file system will be resized automatically. Otherwise, see the section below about resizing file system.
+> Cloud images come with 2 GB root file system which may fill up quickly. If image is resized (using `qemu-img`) __before__ booting with cloud-init seed image, the file system will be resized automatically. Otherwise, see the section below about resizing file system.
+
+Install `qemu` packages (e.g. `qemu-system-x86_64`). Package names can vary in different distributions.
 
 Execute:
 
@@ -157,11 +161,13 @@ You will be met with login message - connect via SSH instead (again):
 ./tools/connect-ssh.sh
 ```
 
+> You can also execute single commands using `./tools/execute-ssh.sh CMD`
+
 In order to compile C code, you need to install some packages:
 
 ```sh
-apt-get update # update repositories
-apt install build-essential
+root@ubuntu:~# apt-get update
+root@ubuntu:~# apt install build-essential
 ```
 
 This should install `g++`, `make` and other required packages.
@@ -176,8 +182,67 @@ root@ubuntu:~# shutdown now
 
 *This should be enough to run black-box fuzzing, though you won't be able to detect memory bugs in Linux kernel.*
 
----
->TODO resizing
+### Resizing image
+
+First, resize image itself, 10G should be enough:
+
+```sh
+qemu-img resize disk.img 10G
+```
+
+Now, boot the VM:
+
+> You might want to backup the image file, in case something goes wrong.
+
+```sh
+./tools/launch-persistent.sh
+```
+
+Before doing anything, determine device name:
+
+```sh
+root@ubuntu:~# fdisk -l
+Disk /dev/vda: 2.2 GiB, 2361393152 bytes, 4612096 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: gpt
+Disk identifier: C7D1CFC4-329F-4776-BBFF-EFE0D4150C20
+
+Device      Start     End Sectors  Size Type
+/dev/vda1  227328 4612062 4384735  2.1G Linux filesystem
+/dev/vda14   2048   10239    8192    4M BIOS boot
+/dev/vda15  10240  227327  217088  106M EFI System
+...
+```
+
+Root file system should be the largest one (`/dev/vda1`).
+
+Grow partition 1 on `/dev/vda` using `growpart`:
+
+```sh
+root@ubuntu:~# growpart /dev/vda 1
+CHANGED: partition=1 start=227328 old: size=4384735 end=4612063 new: size=20744159 end=20971487
+```
+
+And resize filesystem itself:
+
+```sh
+root@ubuntu:~# resize2fs /dev/vda1
+resize2fs 1.46.5 (30-Dec-2021)
+Filesystem at /dev/vda1 is mounted on /; on-line resizing required
+old_desc_blocks = 1, new_desc_blocks = 2
+The filesystem on /dev/vda1 is now 2593019 (4k) blocks long.
+```
+
+Verify:
+
+```sh
+root@ubuntu:~# df -h
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root       9.6G  1.9G  7.7G  20% /
+```
+
 ---
 >TODO copying files / testing environment
 ---
