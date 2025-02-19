@@ -361,7 +361,7 @@ More commands:
 
 Supports more commands, but not human-friendly. Should be used for scripts etc.
 
-> Documentation: <https://qemu-project.gitlab.io/qemu/interop/qemu-qmp-ref.html#qapidoc-2014>
+> Documentation: <https://qemu-project.gitlab.io/qemu/interop/qemu-qmp-ref.html>
 
 Start session:
 
@@ -395,8 +395,6 @@ Get VM status:
 {"return": {"status": "running", "running": true}} // Response
 ```
 
----
->TODO how to kernel panic
----
->TODO kernel
+#### Building Custom Kernel
 
+Read [Kernel](./docs/Kernel.md) docs.
