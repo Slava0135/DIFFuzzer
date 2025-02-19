@@ -243,13 +243,160 @@ Filesystem      Size  Used Avail Use% Mounted on
 /dev/root       9.6G  1.9G  7.7G  20% /
 ```
 
----
->TODO copying files / testing environment
----
->TODO monitor
----
->TODO kernel
----
->TODO qmp
+### Copying files and testing environment
+
+Start VM in __snapshot__ mode:
+
+```sh
+./tools/launch-snapshot.sh
+```
+
+> File transfer is implemented using `scp` utility.
+
+Let's copy test runtime:
+
+```sh
+./tools/copy-dir-to.sh ./executor /executor
+```
+
+This will copy local directory `executor` to `/executor` on the remote host (VM).
+
+Connect to SSH:
+
+```sh
+./tools/connect-ssh.sh
+```
+
+Change directory:
+
+```sh
+root@ubuntu:~# cd /executor/
+```
+
+Compile test:
+
+```sh
+root@ubuntu:/executor# make clean
+rm *.o *.out
+root@ubuntu:/executor# make
+g++ -std=c++20 -Wall -Wextra -Werror -pedantic -c executor.cpp
+g++ -std=c++20 -Wall -Wextra -Werror -pedantic -c test.c
+g++ -std=c++20 -Wall -Wextra -Werror -pedantic executor.o test.o -o test.out
+```
+
+Run test:
+
+```sh
+root@ubuntu:/executor# ./test.out fstest
+:: prepare workspace 'fstest'
+==> mkdir 'fstest'
+:: set up kcov
+executor.cpp:156: [WARNING] failed to open kcov file, coverage disabled
+:: init buffers
+:: test workload
+==> done
+:: dump trace
+==> trace dump saved at '/executor/trace.csv'
+:: summary
+#SUCCESS: 11 | #FAILURE: 0
+```
+
+Test execution should end successfully and produce some output (e.g. trace file).
+
+Let's copy trace back to host.
+
+```sh
+./tools/copy-from.sh /executor/trace.csv ./trace.csv
+```
+
+You should see the file in the directory.
+
+Because machine was launched in snapshot mode, you can just use `Ctrl-C` in terminal where you started QEMU to stop the VM.
+
+### QEMU monitor
+
+The QEMU monitor is used to give complex commands to the QEMU emulator. You can use it to:
+
+- Remove or insert removable media images (such as CD-ROM or floppies).
+- Freeze/unfreeze the Virtual Machine (VM) and save or restore its state from a disk file.
+- Inspect the VM state without an external debugger.
+
+There are 2 ways to access it:
+
+- Using Human Monitor Protocol (interactive).
+- QEMU Machine Protocol (JSON-based).
+
+Install `netcat` (__OpenBSD edition!__), in order to use monitor.
+
+> *`netcat` is almost 30 years old, but people use `telnet` to this day...*
+
+#### HMP
+
+> Documentation: <https://qemu-project.gitlab.io/qemu/system/monitor.html>
+
+Start VM.
+
+Show VM status:
+
+```sh
+./tools/monitor.sh info status
+QEMU 9.2.0 monitor - type 'help' for more information
+(qemu) info status
+VM status: running
+```
+
+Shutdown VM:
+
+```sh
+./tools/monitor.sh system_powerdown
+```
+
+More commands:
+
+```sh
+./tools/monitor.sh help
+```
+
+#### QMP
+
+Supports more commands, but not human-friendly. Should be used for scripts etc.
+
+> Documentation: <https://qemu-project.gitlab.io/qemu/interop/qemu-qmp-ref.html#qapidoc-2014>
+
+Start session:
+
+```sh
+./tools/qmp.sh
+```
+
+You will get a welcoming message:
+
+```json
+{"QMP": {"version": {"qemu": {"micro": 0, "minor": 2, "major": 9}, "package": ""}, "capabilities": ["oob"]}}
+```
+
+Send this message to start communication:
+
+```json
+{ "execute": "qmp_capabilities" }
+```
+
+```json
+{"return": {}} // Response
+```
+
+Get VM status:
+
+```json
+{ "execute": "query-status" }
+```
+
+```json
+{"return": {"status": "running", "running": true}} // Response
+```
+
 ---
 >TODO how to kernel panic
+---
+>TODO kernel
+
