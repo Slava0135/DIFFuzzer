@@ -2,6 +2,12 @@
 
 > All scripts are executed from project top directory.
 
+## Useful links
+
+- <https://wiki.archlinux.org/title/QEMU>
+- <https://documentation.ubuntu.com/public-images/en/latest/public-images-how-to/use-local-cloud-init-ds/>
+- <https://www.baeldung.com/linux/cloud-init-ssh-keys>
+
 ## Ubuntu Cloud Image
 
 ### Download
