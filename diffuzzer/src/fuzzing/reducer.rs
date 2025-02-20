@@ -88,7 +88,7 @@ impl Reducer {
         let mut workload = input;
         loop {
             if let Some(reduced) = remove(&workload, index) {
-                let binary_path = self.runner.compile_test(&workload)?;
+                let binary_path = self.runner.compile_test(&reduced)?;
                 let (fst_outcome, snd_outcome) = self.runner.run_harness(&binary_path)?;
                 let hash_diff_interesting = self
                     .runner
