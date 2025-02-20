@@ -167,6 +167,8 @@ impl CommandInterface for LocalCommandInterface {
         remote_path: &RemotePath,
         local_path: &LocalPath,
     ) -> anyhow::Result<()> {
+        // to match remote (scp) implementation
+        fs::remove_dir_all(local_path).unwrap_or(());
         fs::create_dir_all(local_path)?;
         for entry in fs::read_dir(remote_path.base.as_ref())? {
             let entry = entry?;
@@ -261,6 +263,8 @@ impl CommandInterface for RemoteCommandInterface {
         remote_path: &RemotePath,
         local_path: &LocalPath,
     ) -> anyhow::Result<()> {
+        // because if local directory exists scp will copy remote directory inside local directory, for some reason...
+        fs::remove_dir_all(local_path).unwrap_or(());
         let mut scp = self.copy_common();
         scp.arg("-r");
         scp.arg(format!("root@localhost:{}", remote_path));

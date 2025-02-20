@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::fs;
-
 use anyhow::Context;
 
 use crate::command::{CommandInterface, CommandWrapper};
@@ -74,7 +72,6 @@ impl Harness {
         let stderr = String::from_utf8(output.stderr)
             .with_context(|| "failed to convert stderr to string")?;
 
-        fs::remove_dir_all(&self.outcome_dir).unwrap_or(());
         cmdi.copy_dir_from_remote(&self.exec_dir, &self.outcome_dir)
             .with_context(|| "failed to copy test output files")?;
 
