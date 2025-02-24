@@ -22,6 +22,7 @@ mod args;
 mod command;
 mod compile;
 mod config;
+mod event;
 mod filesystems;
 mod fuzzing;
 mod mount;

@@ -42,4 +42,6 @@ pub struct QemuConfig {
     pub boot_wait_time: u8,
     /// Path to QEMU log file
     pub log_path: String,
+    /// Path to QMP monitor unix socket
+    pub qmp_socket_path: String,
 }

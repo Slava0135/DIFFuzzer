@@ -5,6 +5,7 @@
 use anyhow::{Context, bail};
 
 use crate::command::{CommandInterface, CommandWrapper, ExecError};
+use crate::event::EventHandler;
 use crate::fuzzing::objective::hash::HashHolder;
 use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
@@ -41,6 +42,7 @@ impl Harness {
         binary_path: &RemotePath,
         keep_fs: bool,
         hash_holder: Option<&mut HashHolder>,
+        event_handler: Option<&mut EventHandler>,
     ) -> anyhow::Result<Outcome> {
         self.fs_mount.setup(cmdi, &self.fs_dir).with_context(|| {
             format!(
@@ -78,13 +80,30 @@ impl Harness {
                     stderr,
                 }))
             }
-            Err(ExecError::TimedOut(msg)) => Ok(Outcome::TimedOut { msg }),
+            Err(ExecError::TimedOut(msg)) => match event_handler {
+                Some(event_handler) => {
+                    if event_handler.panicked()? {
+                        Ok(Outcome::Panicked)
+                    } else {
+                        if !keep_fs {
+                            self.teardown(cmdi)?;
+                        }
+                        Ok(Outcome::TimedOut { msg })
+                    }
+                }
+                None => {
+                    if !keep_fs {
+                        self.teardown(cmdi)?;
+                    }
+                    Ok(Outcome::TimedOut { msg })
+                }
+            },
             Err(ExecError::IoError(msg)) => {
                 bail!("failed to run test binary: {}", msg);
             }
         }
     }
-    pub fn teardown(&self, cmdi: &dyn CommandInterface) -> anyhow::Result<()> {
+    fn teardown(&self, cmdi: &dyn CommandInterface) -> anyhow::Result<()> {
         self.fs_mount.teardown(cmdi, &self.fs_dir).with_context(|| {
             format!(
                 "failed to teardown fs '{}' at '{}'",

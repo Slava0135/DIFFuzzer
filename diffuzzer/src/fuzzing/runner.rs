@@ -7,9 +7,10 @@ use crate::abstract_fs::trace::{TRACE_FILENAME, Trace};
 use crate::abstract_fs::workload::Workload;
 use crate::command::CommandInterface;
 use crate::config::Config;
+use crate::event::EventHandler;
 use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
-use crate::save::{save_diff, save_completed, save_testcase};
+use crate::save::{save_completed, save_diff, save_testcase};
 use anyhow::{Context, Ok};
 use hasher::FileDiff;
 use log::{debug, info, warn};
@@ -28,6 +29,7 @@ pub struct Runner {
     pub keep_fs: bool,
 
     pub cmdi: Box<dyn CommandInterface>,
+    pub event_handler: EventHandler,
 
     pub test_dir: RemotePath,
     pub exec_dir: RemotePath,
@@ -106,11 +108,15 @@ impl Runner {
             config.timeout,
         );
 
+        let event_handler = EventHandler::create(config.qemu.qmp_socket_path.clone())
+            .with_context(|| "failed to create event handler")?;
+
         Ok(Self {
             config,
             keep_fs,
 
             cmdi,
+            event_handler,
 
             exec_dir,
 
@@ -150,7 +156,13 @@ impl Runner {
         };
         let fst_outcome = self
             .fst_harness
-            .run(self.cmdi.as_ref(), binary_path, self.keep_fs, fst_hash)
+            .run(
+                self.cmdi.as_ref(),
+                binary_path,
+                self.keep_fs,
+                fst_hash,
+                Some(&mut self.event_handler),
+            )
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
 
         setup_dir(self.cmdi.as_ref(), &self.exec_dir)
@@ -162,7 +174,13 @@ impl Runner {
         };
         let snd_outcome = self
             .snd_harness
-            .run(self.cmdi.as_ref(), binary_path, self.keep_fs, snd_hash)
+            .run(
+                self.cmdi.as_ref(),
+                binary_path,
+                self.keep_fs,
+                snd_hash,
+                Some(&mut self.event_handler),
+            )
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
         Ok((fst_outcome, snd_outcome))
     }

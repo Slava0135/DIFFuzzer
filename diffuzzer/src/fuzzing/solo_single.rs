@@ -14,11 +14,7 @@ use crate::{
     abstract_fs::workload::Workload,
     command::{CommandInterface, LocalCommandInterface},
     config::Config,
-    fuzzing::{
-        harness::Harness,
-        outcome::Outcome,
-        runner::setup_dir,
-    },
+    fuzzing::{harness::Harness, outcome::Outcome, runner::setup_dir},
     mount::FileSystemMount,
     path::{LocalPath, RemotePath},
     save::{save_completed, save_testcase},
@@ -64,7 +60,7 @@ pub fn run(
 
     info!("run harness");
     match harness
-        .run(&cmdi, &binary_path, keep_fs, None)
+        .run(&cmdi, &binary_path, keep_fs, None, None)
         .with_context(|| "failed to run harness")?
     {
         Outcome::Completed(completed) => {

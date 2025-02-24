@@ -22,7 +22,8 @@ pub fn launch(config: &QemuConfig) -> anyhow::Result<()> {
     launch
         .env("OS_IMAGE", config.os_image.clone())
         .env("MONITOR_PORT", config.monitor_port.to_string())
-        .env("SSH_PORT", config.ssh_port.to_string());
+        .env("SSH_PORT", config.ssh_port.to_string())
+        .env("QMP_SOCKET_PATH", config.qmp_socket_path.clone());
     launch
         .stdin(Stdio::null())
         .stdout(Stdio::null())
