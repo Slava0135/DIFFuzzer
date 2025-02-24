@@ -9,7 +9,7 @@ use crate::command::CommandInterface;
 use crate::config::Config;
 use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
-use crate::save::{save_diff, save_outcome, save_testcase};
+use crate::save::{save_diff, save_completed, save_testcase};
 use anyhow::{Context, Ok};
 use hasher::FileDiff;
 use log::{debug, info, warn};
@@ -20,7 +20,7 @@ use std::time::Instant;
 use super::harness::Harness;
 use super::objective::hash::HashObjective;
 use super::objective::trace::TraceObjective;
-use super::outcome::Outcome;
+use super::outcome::{Completed, Outcome};
 
 pub struct Runner {
     pub config: Config,
@@ -174,8 +174,8 @@ impl Runner {
         binary_path: &RemotePath,
         crash_dir: LocalPath,
         hash_diff: Vec<FileDiff>,
-        fst_outcome: &Outcome,
-        snd_outcome: &Outcome,
+        fst_outcome: &Completed,
+        snd_outcome: &Completed,
     ) -> anyhow::Result<()> {
         debug!("report crash '{}'", dir_name);
 
@@ -184,9 +184,9 @@ impl Runner {
             .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
 
         save_testcase(self.cmdi.as_ref(), &crash_dir, binary_path, input)?;
-        save_outcome(&crash_dir, &self.fst_fs_name, fst_outcome)
+        save_completed(&crash_dir, &self.fst_fs_name, fst_outcome)
             .with_context(|| "failed to save first outcome")?;
-        save_outcome(&crash_dir, &self.snd_fs_name, snd_outcome)
+        save_completed(&crash_dir, &self.snd_fs_name, snd_outcome)
             .with_context(|| "failed to save second outcome")?;
 
         save_diff(&crash_dir, hash_diff).with_context(|| "failed to save hash differences")?;
@@ -214,7 +214,7 @@ impl Stats {
     }
 }
 
-pub fn parse_trace(outcome: &Outcome) -> anyhow::Result<Trace> {
+pub fn parse_trace(outcome: &Completed) -> anyhow::Result<Trace> {
     let trace = fs::read_to_string(outcome.dir.join(TRACE_FILENAME))?;
     anyhow::Ok(Trace::try_parse(trace).with_context(|| "failed to parse trace")?)
 }

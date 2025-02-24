@@ -12,7 +12,7 @@ use hasher::{FileDiff, DIFF_HASH_FILENAME};
 
 use crate::command::CommandInterface;
 use crate::compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME};
-use crate::fuzzing::outcome::Outcome;
+use crate::fuzzing::outcome::Completed;
 use crate::path::LocalPath;
 use crate::{
     abstract_fs::{trace::TRACE_FILENAME, workload::Workload},
@@ -45,10 +45,10 @@ pub fn save_testcase(
     Ok(())
 }
 
-pub fn save_outcome(
+pub fn save_completed(
     output_dir: &LocalPath,
     fs_name: &str,
-    outcome: &Outcome,
+    outcome: &Completed,
 ) -> anyhow::Result<()> {
     let fs_name = fs_name.to_lowercase();
     let trace_path = outcome.dir.join(TRACE_FILENAME);

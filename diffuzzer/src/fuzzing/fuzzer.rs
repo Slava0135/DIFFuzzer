@@ -13,7 +13,10 @@ use crate::{
 };
 use hasher::FileDiff;
 
-use super::{outcome::Outcome, runner::Runner};
+use super::{
+    outcome::Completed,
+    runner::Runner,
+};
 
 pub trait Fuzzer {
     fn run(&mut self, test_count: Option<u64>) {
@@ -61,8 +64,8 @@ pub trait Fuzzer {
         binary_path: &RemotePath,
         fst_trace: &Trace,
         snd_trace: &Trace,
-        fst_outcome: &Outcome,
-        snd_outcome: &Outcome,
+        fst_outcome: &Completed,
+        snd_outcome: &Completed,
     ) -> anyhow::Result<bool> {
         let runner = self.runner();
         debug!("do objectives");
@@ -109,8 +112,8 @@ pub trait Fuzzer {
         binary_path: &RemotePath,
         fst_trace: &Trace,
         snd_trace: &Trace,
-        fst_outcome: &Outcome,
-        snd_outcome: &Outcome,
+        fst_outcome: &Completed,
+        snd_outcome: &Completed,
     ) -> anyhow::Result<bool> {
         debug!("detect errors");
         if fst_trace.has_errors() && snd_trace.has_errors() {

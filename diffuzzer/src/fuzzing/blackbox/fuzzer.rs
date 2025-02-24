@@ -4,8 +4,8 @@
 
 use anyhow::{Context, Ok};
 use log::{debug, info};
-use rand::prelude::StdRng;
 use rand::SeedableRng;
+use rand::prelude::StdRng;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
@@ -13,7 +13,8 @@ use crate::command::CommandInterface;
 use crate::config::Config;
 
 use crate::fuzzing::fuzzer::Fuzzer;
-use crate::fuzzing::runner::{parse_trace, Runner};
+use crate::fuzzing::outcome::Outcome;
+use crate::fuzzing::runner::{Runner, parse_trace};
 use crate::mount::FileSystemMount;
 use crate::path::LocalPath;
 
@@ -52,31 +53,35 @@ impl Fuzzer for BlackBoxFuzzer {
 
         let binary_path = self.runner().compile_test(&input)?;
 
-        let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path)?;
+        match self.runner().run_harness(&binary_path)? {
+            (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
+                let fst_trace =
+                    parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
+                let snd_trace =
+                    parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
 
-        let fst_trace = parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
-        let snd_trace =
-            parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
+                if self.detect_errors(
+                    &input,
+                    &binary_path,
+                    &fst_trace,
+                    &snd_trace,
+                    &fst_outcome,
+                    &snd_outcome,
+                )? {
+                    return Ok(());
+                }
 
-        if self.detect_errors(
-            &input,
-            &binary_path,
-            &fst_trace,
-            &snd_trace,
-            &fst_outcome,
-            &snd_outcome,
-        )? {
-            return Ok(());
-        }
-
-        self.do_objective(
-            &input,
-            &binary_path,
-            &fst_trace,
-            &snd_trace,
-            &fst_outcome,
-            &snd_outcome,
-        )?;
+                self.do_objective(
+                    &input,
+                    &binary_path,
+                    &fst_trace,
+                    &snd_trace,
+                    &fst_outcome,
+                    &snd_outcome,
+                )?;
+            }
+            _ => todo!("handle all outcomes"),
+        };
 
         Ok(())
     }

@@ -8,14 +8,14 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Ok};
 use log::{debug, info};
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{SeedableRng, rngs::StdRng};
 
 use crate::command::CommandInterface;
 use crate::fuzzing::fuzzer::Fuzzer;
-use crate::fuzzing::outcome::Outcome;
-use crate::fuzzing::runner::{parse_trace, Runner};
+use crate::fuzzing::outcome::{Completed, Outcome};
+use crate::fuzzing::runner::{Runner, parse_trace};
 use crate::path::{LocalPath, RemotePath};
-use crate::save::{save_outcome, save_testcase};
+use crate::save::{save_completed, save_testcase};
 use crate::{abstract_fs::workload::Workload, config::Config, mount::FileSystemMount};
 
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
@@ -96,8 +96,8 @@ impl GreyBoxFuzzer {
         &mut self,
         input: Workload,
         binary_path: &RemotePath,
-        fst_outcome: &Outcome,
-        snd_outcome: &Outcome,
+        fst_outcome: &Completed,
+        snd_outcome: &Completed,
     ) -> anyhow::Result<()> {
         let name = input.generate_name();
         debug!("save corpus input '{}'", name);
@@ -107,9 +107,9 @@ impl GreyBoxFuzzer {
             .with_context(|| format!("failed to create corpus directory at '{}'", corpus_dir))?;
 
         save_testcase(self.runner.cmdi.as_ref(), &corpus_dir, binary_path, &input)?;
-        save_outcome(&corpus_dir, &self.runner.fst_fs_name, fst_outcome)
+        save_completed(&corpus_dir, &self.runner.fst_fs_name, fst_outcome)
             .with_context(|| "failed to save outcome for first harness")?;
-        save_outcome(&corpus_dir, &self.runner.snd_fs_name, snd_outcome)
+        save_completed(&corpus_dir, &self.runner.snd_fs_name, snd_outcome)
             .with_context(|| "failed to save outcome for second harness")?;
         Ok(())
     }
@@ -125,62 +125,66 @@ impl Fuzzer for GreyBoxFuzzer {
 
         let binary_path = self.runner().compile_test(&input)?;
 
-        let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path)?;
+        match self.runner().run_harness(&binary_path)? {
+            (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
+                let fst_trace =
+                    parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
+                let snd_trace =
+                    parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
 
-        let fst_trace = parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
-        let snd_trace =
-            parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
+                if self.detect_errors(
+                    &input,
+                    &binary_path,
+                    &fst_trace,
+                    &snd_trace,
+                    &fst_outcome,
+                    &snd_outcome,
+                )? {
+                    return Ok(());
+                }
 
-        if self.detect_errors(
-            &input,
-            &binary_path,
-            &fst_trace,
-            &snd_trace,
-            &fst_outcome,
-            &snd_outcome,
-        )? {
-            return Ok(());
-        }
+                if self.do_objective(
+                    &input,
+                    &binary_path,
+                    &fst_trace,
+                    &snd_trace,
+                    &fst_outcome,
+                    &snd_outcome,
+                )? {
+                    return Ok(());
+                }
 
-        if self.do_objective(
-            &input,
-            &binary_path,
-            &fst_trace,
-            &snd_trace,
-            &fst_outcome,
-            &snd_outcome,
-        )? {
-            return Ok(());
-        }
-
-        debug!("get feedback");
-        let fst_kcov_is_interesting = self
-            .fst_kcov_feedback
-            .is_interesting(&fst_outcome)
-            .with_context(|| {
-                format!(
-                    "failed to get first kcov feedback for '{}'",
-                    self.runner.fst_fs_name
-                )
-            })?;
-        let snd_kcov_is_interesting = self
-            .snd_kcov_feedback
-            .is_interesting(&snd_outcome)
-            .with_context(|| {
-                format!(
-                    "failed to get second kcov feedback for '{}'",
-                    self.runner.snd_fs_name
-                )
-            })?;
-        if fst_kcov_is_interesting || snd_kcov_is_interesting {
-            self.add_to_corpus(input.clone());
-            self.show_stats();
-            if self.corpus_path.is_some() {
-                self.save_input(input, &binary_path, &fst_outcome, &snd_outcome)
-                    .with_context(|| "failed to save input")?;
+                debug!("get feedback");
+                let fst_kcov_is_interesting = self
+                    .fst_kcov_feedback
+                    .is_interesting(&fst_outcome)
+                    .with_context(|| {
+                    format!(
+                        "failed to get first kcov feedback for '{}'",
+                        self.runner.fst_fs_name
+                    )
+                })?;
+                let snd_kcov_is_interesting = self
+                    .snd_kcov_feedback
+                    .is_interesting(&snd_outcome)
+                    .with_context(|| {
+                    format!(
+                        "failed to get second kcov feedback for '{}'",
+                        self.runner.snd_fs_name
+                    )
+                })?;
+                if fst_kcov_is_interesting || snd_kcov_is_interesting {
+                    self.add_to_corpus(input.clone());
+                    self.show_stats();
+                    if self.corpus_path.is_some() {
+                        self.save_input(input, &binary_path, &fst_outcome, &snd_outcome)
+                            .with_context(|| "failed to save input")?;
+                    }
+                    return Ok(());
+                }
             }
-            return Ok(());
-        }
+            _ => todo!("handle all outcomes"),
+        };
 
         Ok(())
     }

@@ -7,7 +7,7 @@ use std::{collections::HashSet, fs};
 use anyhow::Context;
 use log::debug;
 
-use crate::fuzzing::outcome::Outcome;
+use crate::fuzzing::outcome::Completed;
 
 pub const KCOV_FILENAME: &str = "kcov.dat";
 
@@ -21,7 +21,7 @@ impl KCovFeedback {
             all_coverage: HashSet::new(),
         }
     }
-    pub fn is_interesting(&mut self, outcome: &Outcome) -> anyhow::Result<bool> {
+    pub fn is_interesting(&mut self, outcome: &Completed) -> anyhow::Result<bool> {
         debug!("do kcov feedback");
         let path = outcome.dir.join(KCOV_FILENAME);
         let kcov = fs::read_to_string(&path)

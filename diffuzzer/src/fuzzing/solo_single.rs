@@ -14,10 +14,14 @@ use crate::{
     abstract_fs::workload::Workload,
     command::{CommandInterface, LocalCommandInterface},
     config::Config,
-    fuzzing::{harness::Harness, runner::setup_dir},
+    fuzzing::{
+        harness::Harness,
+        outcome::Outcome,
+        runner::setup_dir,
+    },
     mount::FileSystemMount,
     path::{LocalPath, RemotePath},
-    save::{save_outcome, save_testcase},
+    save::{save_completed, save_testcase},
 };
 
 pub fn run(
@@ -59,15 +63,20 @@ pub fn run(
     );
 
     info!("run harness");
-    let outcome = harness
+    match harness
         .run(&cmdi, &binary_path, keep_fs, None)
-        .with_context(|| "failed to run harness")?;
-
-    info!("save results");
-    fs::create_dir_all(output_dir)?;
-    save_testcase(&cmdi, output_dir, &binary_path, &input)
-        .with_context(|| "failed to save testcase")?;
-    save_outcome(output_dir, &fs_str, &outcome).with_context(|| "failed to save outcome")?;
+        .with_context(|| "failed to run harness")?
+    {
+        Outcome::Completed(completed) => {
+            info!("save results");
+            fs::create_dir_all(output_dir)?;
+            save_testcase(&cmdi, output_dir, &binary_path, &input)
+                .with_context(|| "failed to save testcase")?;
+            save_completed(output_dir, &fs_str, &completed)
+                .with_context(|| "failed to save outcome")?;
+        }
+        _ => todo!("handle all outcomes"),
+    };
 
     Ok(())
 }
