@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use crate::abstract_fs::trace::{Trace, TRACE_FILENAME};
+use crate::abstract_fs::trace::{TRACE_FILENAME, Trace};
 
 use crate::abstract_fs::workload::Workload;
 use crate::command::CommandInterface;
@@ -96,12 +96,14 @@ impl Runner {
             fst_fs_dir.clone(),
             exec_dir.clone(),
             LocalPath::new_tmp("outcome-1"),
+            config.timeout,
         );
         let snd_harness = Harness::new(
             snd_mount,
             snd_fs_dir.clone(),
             exec_dir.clone(),
             LocalPath::new_tmp("outcome-2"),
+            config.timeout,
         );
 
         Ok(Self {

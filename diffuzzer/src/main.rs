@@ -115,7 +115,7 @@ fn main() -> anyhow::Result<()> {
                     &LocalPath::new(Path::new(&output_dir)),
                     keep_fs,
                     filesystem.into(),
-                    config.fs_name,
+                    config,
                 )?
             } else {
                 todo!("QEMU not supported");

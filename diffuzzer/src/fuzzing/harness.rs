@@ -16,6 +16,7 @@ pub struct Harness {
     fs_dir: RemotePath,
     exec_dir: RemotePath,
     outcome_dir: LocalPath,
+    timeout: u8,
 }
 
 impl Harness {
@@ -24,12 +25,14 @@ impl Harness {
         fs_dir: RemotePath,
         exec_dir: RemotePath,
         outcome_dir: LocalPath,
+        timeout: u8,
     ) -> Self {
         Self {
             fs_mount,
             fs_dir,
             exec_dir,
             outcome_dir,
+            timeout,
         }
     }
     pub fn run(
@@ -49,7 +52,7 @@ impl Harness {
         let mut exec = CommandWrapper::new(binary_path.base.as_ref());
         exec.arg(self.fs_dir.base.as_ref());
         let output = cmdi
-            .exec_in_dir(exec, &self.exec_dir)
+            .exec_in_dir(exec, &self.exec_dir, Some(self.timeout))
             .with_context(|| "failed to run test binary")?;
 
         if let Some(holder) = hash_holder {

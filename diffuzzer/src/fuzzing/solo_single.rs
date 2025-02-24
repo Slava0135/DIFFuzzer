@@ -13,6 +13,7 @@ use log::info;
 use crate::{
     abstract_fs::workload::Workload,
     command::{CommandInterface, LocalCommandInterface},
+    config::Config,
     fuzzing::{harness::Harness, runner::setup_dir},
     mount::FileSystemMount,
     path::{LocalPath, RemotePath},
@@ -24,7 +25,7 @@ pub fn run(
     output_dir: &LocalPath,
     keep_fs: bool,
     mount: &'static dyn FileSystemMount,
-    fs_name: String,
+    config: Config,
 ) -> anyhow::Result<()> {
     info!("read testcase at '{}'", test_path);
     let input = read_to_string(test_path).with_context(|| "failed to read testcase")?;
@@ -48,12 +49,13 @@ pub fn run(
     let fs_str = mount.to_string();
     let fs_dir = RemotePath::new(Path::new("/mnt"))
         .join(fs_str.to_lowercase())
-        .join(&fs_name);
+        .join(&config.fs_name);
     let harness = Harness::new(
         mount,
         fs_dir,
         exec_dir,
         LocalPath::new_tmp("outcome-single"),
+        config.timeout,
     );
 
     info!("run harness");
