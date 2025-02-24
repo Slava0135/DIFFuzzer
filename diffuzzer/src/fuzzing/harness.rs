@@ -42,8 +42,12 @@ impl Harness {
         binary_path: &RemotePath,
         keep_fs: bool,
         hash_holder: Option<&mut HashHolder>,
-        event_handler: Option<&mut EventHandler>,
+        mut event_handler: Option<&mut EventHandler>,
     ) -> anyhow::Result<Outcome> {
+        if let Some(ref mut event_handler) = event_handler {
+            event_handler.clear().with_context(|| "failed to clear event handler")?;
+        }
+
         self.fs_mount.setup(cmdi, &self.fs_dir).with_context(|| {
             format!(
                 "failed to setup fs '{}' at '{}'",

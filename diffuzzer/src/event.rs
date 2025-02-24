@@ -69,4 +69,15 @@ impl EventHandler {
         }
         Ok(panicked)
     }
+
+    pub fn clear(&mut self) -> anyhow::Result<()> {
+        loop {
+            match self.rx.try_recv() {
+                Ok(()) => {}
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => bail!("event channel disconnected"),
+            }
+        }
+        Ok(())
+    }
 }
