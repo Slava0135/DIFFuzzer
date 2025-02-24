@@ -136,7 +136,7 @@ impl CommandWrapper {
         })?;
         match output.status.code() {
             Some(0) => Ok(output),
-            Some(124) => Err(ExecError::TimedOut(format!(
+            Some(124) if timeout.is_some() => Err(ExecError::TimedOut(format!(
                 "local command {:?} timed out",
                 self.internal
             ))),
