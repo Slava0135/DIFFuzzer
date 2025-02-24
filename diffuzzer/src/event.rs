@@ -14,6 +14,12 @@ pub struct EventHandler {
     rx: Receiver<()>,
 }
 
+#[derive(Debug, Deserialize)]
+struct ReturnMessage {
+    #[serde(rename = "return")]
+    _ret: Value,
+}
+
 impl EventHandler {
     pub fn create(socket_path: String) -> anyhow::Result<Self> {
         debug!("create event handler");
@@ -25,10 +31,10 @@ impl EventHandler {
             Value::deserialize(&mut de).with_context(|| "failed to deserialize response")?;
         debug!("{}", value);
         stream.write_all(b"{ \"execute\": \"qmp_capabilities\" }")?;
-        debug!("read response:");
-        let value =
-            Value::deserialize(&mut de).with_context(|| "failed to deserialize response")?;
-        debug!("{}", value);
+        debug!("read response (deserialized):");
+        let return_msg = ReturnMessage::deserialize(&mut de)
+            .with_context(|| "failed to deserialize return message")?;
+        debug!("{:?}", return_msg);
 
         let (tx, rx): (Sender<()>, Receiver<()>) = mpsc::channel();
 
