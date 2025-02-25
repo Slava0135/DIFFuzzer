@@ -1,4 +1,4 @@
-FROM rust:1.83-bullseye
+FROM rust:1.85-bullseye
 
 WORKDIR /usr/src/
 
