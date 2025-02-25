@@ -17,7 +17,7 @@ use crate::{
     fuzzing::{harness::Harness, outcome::Outcome, runner::setup_dir},
     mount::FileSystemMount,
     path::{LocalPath, RemotePath},
-    save::{save_completed, save_testcase},
+    save::{save_completed, save_reason, save_testcase},
     supervisor::Supervisor,
 };
 
@@ -60,7 +60,8 @@ pub fn run(
     );
 
     info!("run harness");
-    match harness
+
+    let outcome = harness
         .run(
             cmdi.as_ref(),
             &binary_path,
@@ -68,17 +69,42 @@ pub fn run(
             None,
             supervisor.as_mut(),
         )
-        .with_context(|| "failed to run harness")?
-    {
+        .with_context(|| "failed to run harness")?;
+
+    info!("save results");
+    fs::create_dir_all(output_dir)?;
+
+    match outcome {
         Outcome::Completed(completed) => {
-            info!("save results");
-            fs::create_dir_all(output_dir)?;
             save_testcase(cmdi.as_ref(), output_dir, Some(&binary_path), &input)
                 .with_context(|| "failed to save testcase")?;
             save_completed(output_dir, &fs_str, &completed)
                 .with_context(|| "failed to save outcome")?;
+            save_reason(
+                output_dir,
+                format!("Filesystem '{}' completed workload", fs_str),
+            )
+            .with_context(|| "failed to save reason")?;
         }
-        _ => todo!("handle all outcomes"),
+        Outcome::Panicked => {
+            save_testcase(cmdi.as_ref(), output_dir, None, &input)
+                .with_context(|| "failed to save testcase")?;
+            save_reason(output_dir, format!("Filesystem '{}' panicked", fs_str))
+                .with_context(|| "failed to save reason")?;
+        }
+        Outcome::TimedOut => {
+            save_testcase(cmdi.as_ref(), output_dir, None, &input)
+                .with_context(|| "failed to save testcase")?;
+            save_reason(
+                output_dir,
+                format!(
+                    "Filesystem '{}' timed out after {}s",
+                    fs_str, config.timeout
+                ),
+            )
+            .with_context(|| "failed to save reason")?;
+        }
+        Outcome::Skipped => {}
     };
 
     Ok(())

@@ -148,7 +148,8 @@ impl Fuzzer for BlackBoxFuzzer {
                 self.runner().stats.crashes += 1;
                 self.show_stats();
             }
-            _ => {}
+            (Outcome::Skipped, _) => {}
+            (_, Outcome::Skipped) => {}
         };
 
         Ok(())
