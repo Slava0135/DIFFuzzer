@@ -84,62 +84,34 @@ impl Fuzzer for DuoSingleFuzzer {
                 )?;
             }
             (Outcome::Panicked, _) => {
-                let dir_name = input.generate_name();
-                self.runner
-                    .report_crash(
-                        &input,
-                        dir_name,
-                        self.runner.crashes_path.clone(),
-                        format!("Filesystem '{}' panicked", self.runner.fst_fs_name),
-                    )
-                    .with_context(|| "failed to report panic")?;
-                self.runner().stats.crashes += 1;
-                self.show_stats();
+                self.report_crash(
+                    &input,
+                    format!("Filesystem '{}' panicked", self.runner.fst_fs_name),
+                )?;
             }
             (_, Outcome::Panicked) => {
-                let dir_name = input.generate_name();
-                self.runner
-                    .report_crash(
-                        &input,
-                        dir_name,
-                        self.runner.crashes_path.clone(),
-                        format!("Filesystem '{}' panicked", self.runner.snd_fs_name),
-                    )
-                    .with_context(|| "failed to report panic")?;
-                self.runner().stats.crashes += 1;
-                self.show_stats();
+                self.report_crash(
+                    &input,
+                    format!("Filesystem '{}' panicked", self.runner.snd_fs_name),
+                )?;
             }
             (Outcome::TimedOut, _) => {
-                let dir_name = input.generate_name();
-                self.runner
-                    .report_crash(
-                        &input,
-                        dir_name,
-                        self.runner.crashes_path.clone(),
-                        format!(
-                            "Filesystem '{}' timed out after {}s",
-                            self.runner.fst_fs_name, self.runner.config.timeout
-                        ),
-                    )
-                    .with_context(|| "failed to report timeout")?;
-                self.runner().stats.crashes += 1;
-                self.show_stats();
+                self.report_crash(
+                    &input,
+                    format!(
+                        "Filesystem '{}' timed out after {}s",
+                        self.runner.fst_fs_name, self.runner.config.timeout
+                    ),
+                )?;
             }
             (_, Outcome::TimedOut) => {
-                let dir_name = input.generate_name();
-                self.runner
-                    .report_crash(
-                        &input,
-                        dir_name,
-                        self.runner.crashes_path.clone(),
-                        format!(
-                            "Filesystem '{}' timed out after {}s",
-                            self.runner.snd_fs_name, self.runner.config.timeout
-                        ),
-                    )
-                    .with_context(|| "failed to report timeout")?;
-                self.runner().stats.crashes += 1;
-                self.show_stats();
+                self.report_crash(
+                    &input,
+                    format!(
+                        "Filesystem '{}' timed out after {}s",
+                        self.runner.snd_fs_name, self.runner.config.timeout
+                    ),
+                )?;
             }
             (Outcome::Skipped, _) => {}
             (_, Outcome::Skipped) => {}

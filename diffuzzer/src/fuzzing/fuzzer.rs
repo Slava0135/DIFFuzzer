@@ -8,7 +8,10 @@ use anyhow::Context;
 use log::{debug, error, info, warn};
 
 use crate::{
-    abstract_fs::{trace::Trace, workload::Workload},
+    abstract_fs::{
+        trace::Trace,
+        workload::Workload,
+    },
     path::RemotePath,
 };
 use hasher::FileDiff;
@@ -136,6 +139,17 @@ pub trait Fuzzer {
         } else {
             Ok(false)
         }
+    }
+
+    fn report_crash(&mut self, input: &Workload, reason: String) -> anyhow::Result<()> {
+        let dir_name = input.generate_name();
+        let crashes_dir = self.runner().crashes_path.clone();
+        self.runner()
+            .report_crash(&input, dir_name, crashes_dir, reason)
+            .with_context(|| "failed to report panic")?;
+        self.runner().stats.crashes += 1;
+        self.show_stats();
+        Ok(())
     }
 
     fn show_stats(&mut self);
