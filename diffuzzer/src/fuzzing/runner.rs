@@ -15,6 +15,8 @@ use anyhow::{Context, Ok};
 use hasher::FileDiff;
 use log::{debug, info, warn};
 use std::fs;
+use std::io::Write;
+use std::os::unix::net::UnixStream;
 use std::path::Path;
 use std::time::Instant;
 
@@ -23,6 +25,8 @@ use super::objective::hash::HashObjective;
 use super::objective::trace::TraceObjective;
 use super::outcome::{Completed, Outcome};
 
+const SNAPSHOT_TAG: &str = "fresh";
+
 pub struct Runner {
     pub config: Config,
 
@@ -30,6 +34,7 @@ pub struct Runner {
 
     pub cmdi: Box<dyn CommandInterface>,
     pub event_handler: EventHandler,
+    pub monitor_socket_path: LocalPath,
 
     pub test_dir: RemotePath,
     pub exec_dir: RemotePath,
@@ -111,12 +116,15 @@ impl Runner {
         let event_handler = EventHandler::create(config.qemu.qmp_socket_path.clone())
             .with_context(|| "failed to create event handler")?;
 
-        Ok(Self {
+        let monitor_socket_path = LocalPath::new(Path::new(&config.qemu.monitor_socket_path));
+
+        let runner = Self {
             config,
             keep_fs,
 
             cmdi,
             event_handler,
+            monitor_socket_path,
 
             exec_dir,
 
@@ -133,7 +141,11 @@ impl Runner {
             snd_harness,
 
             stats: Stats::new(),
-        })
+        };
+
+        runner.save_snapshot().with_context(|| "failed to save snapshot")?;
+
+        Ok(runner)
     }
 
     pub fn compile_test(&mut self, input: &Workload) -> anyhow::Result<RemotePath> {
@@ -164,6 +176,15 @@ impl Runner {
                 Some(&mut self.event_handler),
             )
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
+        match fst_outcome {
+            Outcome::Panicked => {
+                self.load_snapshot()
+                    .with_context(|| "failed to load snapshot")?;
+                return Ok((fst_outcome, Outcome::Skipped));
+            }
+            Outcome::TimedOut => return Ok((fst_outcome, Outcome::Skipped)),
+            _ => {}
+        }
 
         setup_dir(self.cmdi.as_ref(), &self.exec_dir)
             .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;
@@ -182,6 +203,12 @@ impl Runner {
                 Some(&mut self.event_handler),
             )
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
+
+        if let Outcome::Panicked = snd_outcome {
+            self.load_snapshot()
+                .with_context(|| "failed to load snapshot")?;
+        }
+
         Ok((fst_outcome, snd_outcome))
     }
 
@@ -211,6 +238,29 @@ impl Runner {
         info!("crash saved at '{}'", crash_dir);
 
         anyhow::Ok(())
+    }
+
+    fn monitor_stream(&self) -> anyhow::Result<UnixStream> {
+        UnixStream::connect(&self.monitor_socket_path).with_context(|| {
+            format!(
+                "failed to connect to monitor at '{}'",
+                &self.monitor_socket_path
+            )
+        })
+    }
+
+    fn load_snapshot(&self) -> anyhow::Result<()> {
+        info!("load vm snapshot");
+        let mut stream = self.monitor_stream()?;
+        write!(stream, "loadvm {}", SNAPSHOT_TAG)?;
+        Ok(())
+    }
+
+    fn save_snapshot(&self) -> anyhow::Result<()> {
+        info!("save vm snapshot");
+        let mut stream = self.monitor_stream()?;
+        write!(stream, "savevm {}", SNAPSHOT_TAG)?;
+        Ok(())
     }
 }
 

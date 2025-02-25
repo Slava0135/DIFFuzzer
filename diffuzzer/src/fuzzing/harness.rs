@@ -84,7 +84,7 @@ impl Harness {
                     stderr,
                 }))
             }
-            Err(ExecError::TimedOut(msg)) => match event_handler {
+            Err(ExecError::TimedOut(_)) => match event_handler {
                 Some(event_handler) => {
                     if event_handler.panicked()? {
                         Ok(Outcome::Panicked)
@@ -92,14 +92,14 @@ impl Harness {
                         if !keep_fs {
                             self.teardown(cmdi)?;
                         }
-                        Ok(Outcome::TimedOut { msg })
+                        Ok(Outcome::TimedOut)
                     }
                 }
                 None => {
                     if !keep_fs {
                         self.teardown(cmdi)?;
                     }
-                    Ok(Outcome::TimedOut { msg })
+                    Ok(Outcome::TimedOut)
                 }
             },
             Err(ExecError::IoError(msg)) => {

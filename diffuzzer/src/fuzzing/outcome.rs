@@ -12,7 +12,7 @@ pub struct Completed {
 
 pub enum Outcome {
     Completed(Completed),
-    TimedOut { msg: String },
+    TimedOut,
     Panicked,
     Skipped,
 }
