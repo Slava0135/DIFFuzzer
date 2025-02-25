@@ -99,7 +99,7 @@ impl QemuSupervisor {
                         )
                     }
                 },
-                Err(err) => error!("{}", err),
+                Err(err) => error!("{:?}", err),
             };
         });
 

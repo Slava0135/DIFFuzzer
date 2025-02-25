@@ -14,7 +14,7 @@ use fuzzing::{
     blackbox::fuzzer::BlackBoxFuzzer, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
     reducer::Reducer, solo_single,
 };
-use log::info;
+use log::{error, info};
 use path::LocalPath;
 use supervisor::{NativeSupervisor, QemuSupervisor, Supervisor};
 
@@ -30,7 +30,14 @@ mod path;
 mod save;
 mod supervisor;
 
-fn main() -> anyhow::Result<()> {
+fn main() {
+    let status = run();
+    if let Err(ref err) = status {
+        error!("{:?}", err);
+    }
+}
+
+fn run() -> anyhow::Result<()> {
     let args = Args::parse();
 
     log4rs::init_file("log4rs.yml", Default::default()).with_context(|| "failed to init logger")?;
