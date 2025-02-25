@@ -263,7 +263,7 @@ impl Runner {
             .with_context(|| "failed to save testcase")?;
         save_reason(&crash_dir, reason).with_context(|| "failed to save reason")?;
 
-        info!("panic saved at '{}'", crash_dir);
+        info!("crash saved at '{}'", crash_dir);
 
         Ok(())
     }
