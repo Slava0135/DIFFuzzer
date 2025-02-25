@@ -12,12 +12,13 @@ use log::info;
 
 use crate::{
     abstract_fs::workload::Workload,
-    command::{CommandInterface, LocalCommandInterface},
+    command::CommandInterface,
     config::Config,
     fuzzing::{harness::Harness, outcome::Outcome, runner::setup_dir},
     mount::FileSystemMount,
     path::{LocalPath, RemotePath},
     save::{save_completed, save_testcase},
+    supervisor::Supervisor,
 };
 
 pub fn run(
@@ -26,12 +27,12 @@ pub fn run(
     keep_fs: bool,
     mount: &'static dyn FileSystemMount,
     config: Config,
+    cmdi: Box<dyn CommandInterface>,
+    mut supervisor: Box<dyn Supervisor>,
 ) -> anyhow::Result<()> {
     info!("read testcase at '{}'", test_path);
     let input = read_to_string(test_path).with_context(|| "failed to read testcase")?;
     let input: Workload = serde_json::from_str(&input).with_context(|| "failed to parse json")?;
-
-    let cmdi = LocalCommandInterface::new();
 
     let remote_dir = cmdi
         .setup_remote_dir()
@@ -39,11 +40,11 @@ pub fn run(
     let test_dir = remote_dir.clone();
 
     let exec_dir = remote_dir.join("exec");
-    setup_dir(&cmdi, &exec_dir)?;
+    setup_dir(cmdi.as_ref(), &exec_dir)?;
 
     info!("compile test at '{}'", test_dir);
     let binary_path = input
-        .compile(&cmdi, &test_dir)
+        .compile(cmdi.as_ref(), &test_dir)
         .with_context(|| "failed to compile test")?;
 
     let fs_str = mount.to_string();
@@ -60,13 +61,19 @@ pub fn run(
 
     info!("run harness");
     match harness
-        .run(&cmdi, &binary_path, keep_fs, None, None)
+        .run(
+            cmdi.as_ref(),
+            &binary_path,
+            keep_fs,
+            None,
+            supervisor.as_mut(),
+        )
         .with_context(|| "failed to run harness")?
     {
         Outcome::Completed(completed) => {
             info!("save results");
             fs::create_dir_all(output_dir)?;
-            save_testcase(&cmdi, output_dir, Some(&binary_path), &input)
+            save_testcase(cmdi.as_ref(), output_dir, Some(&binary_path), &input)
                 .with_context(|| "failed to save testcase")?;
             save_completed(output_dir, &fs_str, &completed)
                 .with_context(|| "failed to save outcome")?;

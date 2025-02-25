@@ -5,10 +5,10 @@
 use anyhow::{Context, bail};
 
 use crate::command::{CommandInterface, CommandWrapper, ExecError};
-use crate::event::EventHandler;
 use crate::fuzzing::objective::hash::HashHolder;
 use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
+use crate::supervisor::Supervisor;
 
 use super::outcome::{Completed, Outcome};
 
@@ -42,11 +42,9 @@ impl Harness {
         binary_path: &RemotePath,
         keep_fs: bool,
         hash_holder: Option<&mut HashHolder>,
-        mut event_handler: Option<&mut EventHandler>,
+        supervisor: &mut dyn Supervisor,
     ) -> anyhow::Result<Outcome> {
-        if let Some(ref mut event_handler) = event_handler {
-            event_handler.clear().with_context(|| "failed to clear event handler")?;
-        }
+        supervisor.reset_events()?;
 
         self.fs_mount.setup(cmdi, &self.fs_dir).with_context(|| {
             format!(
@@ -84,24 +82,16 @@ impl Harness {
                     stderr,
                 }))
             }
-            Err(ExecError::TimedOut(_)) => match event_handler {
-                Some(event_handler) => {
-                    if event_handler.panicked()? {
-                        Ok(Outcome::Panicked)
-                    } else {
-                        if !keep_fs {
-                            self.teardown(cmdi)?;
-                        }
-                        Ok(Outcome::TimedOut)
-                    }
-                }
-                None => {
+            Err(ExecError::TimedOut(_)) => {
+                if supervisor.had_panic_event()? {
+                    Ok(Outcome::Panicked)
+                } else {
                     if !keep_fs {
                         self.teardown(cmdi)?;
                     }
                     Ok(Outcome::TimedOut)
                 }
-            },
+            }
             Err(ExecError::IoError(msg)) => {
                 bail!("failed to run test binary: {}", msg);
             }

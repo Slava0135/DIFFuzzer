@@ -7,16 +7,14 @@ use crate::abstract_fs::trace::{TRACE_FILENAME, Trace};
 use crate::abstract_fs::workload::Workload;
 use crate::command::CommandInterface;
 use crate::config::Config;
-use crate::event::EventHandler;
 use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
 use crate::save::{save_completed, save_diff, save_reason, save_testcase};
+use crate::supervisor::Supervisor;
 use anyhow::{Context, Ok};
 use hasher::FileDiff;
 use log::{debug, info, warn};
 use std::fs;
-use std::io::Write;
-use std::os::unix::net::UnixStream;
 use std::path::Path;
 use std::time::Instant;
 
@@ -25,16 +23,13 @@ use super::objective::hash::HashObjective;
 use super::objective::trace::TraceObjective;
 use super::outcome::{Completed, Outcome};
 
-const SNAPSHOT_TAG: &str = "fresh";
-
 pub struct Runner {
     pub config: Config,
 
     pub keep_fs: bool,
 
     pub cmdi: Box<dyn CommandInterface>,
-    pub event_handler: EventHandler,
-    pub monitor_socket_path: LocalPath,
+    pub supervisor: Box<dyn Supervisor>,
 
     pub test_dir: RemotePath,
     pub exec_dir: RemotePath,
@@ -62,6 +57,7 @@ impl Runner {
         config: Config,
         keep_fs: bool,
         cmdi: Box<dyn CommandInterface>,
+        supervisor: Box<dyn Supervisor>,
     ) -> anyhow::Result<Self> {
         let temp_dir = cmdi
             .setup_remote_dir()
@@ -113,18 +109,12 @@ impl Runner {
             config.timeout,
         );
 
-        let event_handler = EventHandler::create(config.qemu.qmp_socket_path.clone())
-            .with_context(|| "failed to create event handler")?;
-
-        let monitor_socket_path = LocalPath::new(Path::new(&config.qemu.monitor_socket_path));
-
         let runner = Self {
             config,
             keep_fs,
 
             cmdi,
-            event_handler,
-            monitor_socket_path,
+            supervisor,
 
             exec_dir,
 
@@ -144,6 +134,7 @@ impl Runner {
         };
 
         runner
+            .supervisor
             .save_snapshot()
             .with_context(|| "failed to save snapshot")?;
 
@@ -175,12 +166,13 @@ impl Runner {
                 binary_path,
                 self.keep_fs,
                 fst_hash,
-                Some(&mut self.event_handler),
+                self.supervisor.as_mut(),
             )
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
         match fst_outcome {
             Outcome::Panicked => {
-                self.load_snapshot()
+                self.supervisor
+                    .load_snapshot()
                     .with_context(|| "failed to load snapshot")?;
                 return Ok((fst_outcome, Outcome::Skipped));
             }
@@ -202,12 +194,13 @@ impl Runner {
                 binary_path,
                 self.keep_fs,
                 snd_hash,
-                Some(&mut self.event_handler),
+                self.supervisor.as_mut(),
             )
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
 
         if let Outcome::Panicked = snd_outcome {
-            self.load_snapshot()
+            self.supervisor
+                .load_snapshot()
                 .with_context(|| "failed to load snapshot")?;
         }
 
@@ -265,29 +258,6 @@ impl Runner {
 
         info!("crash saved at '{}'", crash_dir);
 
-        Ok(())
-    }
-
-    fn monitor_stream(&self) -> anyhow::Result<UnixStream> {
-        UnixStream::connect(&self.monitor_socket_path).with_context(|| {
-            format!(
-                "failed to connect to monitor at '{}'",
-                &self.monitor_socket_path
-            )
-        })
-    }
-
-    fn load_snapshot(&self) -> anyhow::Result<()> {
-        info!("load vm snapshot");
-        let mut stream = self.monitor_stream()?;
-        write!(stream, "loadvm {}\n", SNAPSHOT_TAG)?;
-        Ok(())
-    }
-
-    fn save_snapshot(&self) -> anyhow::Result<()> {
-        info!("save vm snapshot");
-        let mut stream = self.monitor_stream()?;
-        write!(stream, "savevm {}\n", SNAPSHOT_TAG)?;
         Ok(())
     }
 }

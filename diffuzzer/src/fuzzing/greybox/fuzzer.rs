@@ -16,6 +16,7 @@ use crate::fuzzing::outcome::{Completed, Outcome};
 use crate::fuzzing::runner::{Runner, parse_trace};
 use crate::path::{LocalPath, RemotePath};
 use crate::save::{save_completed, save_testcase};
+use crate::supervisor::Supervisor;
 use crate::{abstract_fs::workload::Workload, config::Config, mount::FileSystemMount};
 
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
@@ -41,6 +42,7 @@ impl GreyBoxFuzzer {
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
         cmdi: Box<dyn CommandInterface>,
+        supervisor: Box<dyn Supervisor>,
     ) -> anyhow::Result<Self> {
         let mutator = Mutator::new(
             StdRng::seed_from_u64(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64),
@@ -58,8 +60,16 @@ impl GreyBoxFuzzer {
             None
         };
 
-        let runner = Runner::create(fst_mount, snd_mount, crashes_path, config, false, cmdi)
-            .with_context(|| "failed to create runner")?;
+        let runner = Runner::create(
+            fst_mount,
+            snd_mount,
+            crashes_path,
+            config,
+            false,
+            cmdi,
+            supervisor,
+        )
+        .with_context(|| "failed to create runner")?;
 
         let fst_kcov_feedback = KCovFeedback::new();
         let snd_kcov_feedback = KCovFeedback::new();

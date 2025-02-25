@@ -10,11 +10,11 @@ use log::{info, warn};
 
 use crate::{
     abstract_fs::{mutator::remove, workload::Workload},
-    command::LocalCommandInterface,
+    command::CommandInterface,
     config::Config,
     fuzzing::{outcome::Outcome, runner::parse_trace},
     mount::FileSystemMount,
-    path::LocalPath,
+    path::LocalPath, supervisor::Supervisor,
 };
 
 use super::runner::Runner;
@@ -29,6 +29,8 @@ impl Reducer {
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
+        cmdi: Box<dyn CommandInterface>,
+        supervisor: Box<dyn Supervisor>,
     ) -> anyhow::Result<Self> {
         let runner = Runner::create(
             fst_mount,
@@ -36,7 +38,8 @@ impl Reducer {
             crashes_path,
             config,
             false,
-            Box::new(LocalCommandInterface::new()),
+            cmdi,
+            supervisor,
         )
         .with_context(|| "failed to create runner")?;
         Ok(Self { runner })

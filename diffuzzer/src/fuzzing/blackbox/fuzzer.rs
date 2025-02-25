@@ -17,6 +17,7 @@ use crate::fuzzing::outcome::Outcome;
 use crate::fuzzing::runner::{Runner, parse_trace};
 use crate::mount::FileSystemMount;
 use crate::path::LocalPath;
+use crate::supervisor::Supervisor;
 
 pub struct BlackBoxFuzzer {
     runner: Runner,
@@ -30,9 +31,18 @@ impl BlackBoxFuzzer {
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
         cmdi: Box<dyn CommandInterface>,
+        supervisor: Box<dyn Supervisor>,
     ) -> anyhow::Result<Self> {
-        let runner = Runner::create(fst_mount, snd_mount, crashes_path, config, false, cmdi)
-            .with_context(|| "failed to create runner")?;
+        let runner = Runner::create(
+            fst_mount,
+            snd_mount,
+            crashes_path,
+            config,
+            false,
+            cmdi,
+            supervisor,
+        )
+        .with_context(|| "failed to create runner")?;
         Ok(Self {
             runner,
             rng: StdRng::seed_from_u64(

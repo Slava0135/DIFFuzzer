@@ -7,7 +7,7 @@ use log::info;
 use std::fs::read_to_string;
 
 use crate::abstract_fs::workload::Workload;
-use crate::command::LocalCommandInterface;
+use crate::command::CommandInterface;
 use crate::config::Config;
 
 use crate::fuzzing::fuzzer::Fuzzer;
@@ -15,6 +15,7 @@ use crate::fuzzing::outcome::Outcome;
 use crate::fuzzing::runner::{Runner, parse_trace};
 use crate::mount::FileSystemMount;
 use crate::path::LocalPath;
+use crate::supervisor::Supervisor;
 
 pub struct DuoSingleFuzzer {
     runner: Runner,
@@ -29,6 +30,8 @@ impl DuoSingleFuzzer {
         crashes_path: LocalPath,
         test_path: LocalPath,
         keep_fs: bool,
+        cmdi: Box<dyn CommandInterface>,
+        supervisor: Box<dyn Supervisor>,
     ) -> anyhow::Result<Self> {
         let runner = Runner::create(
             fst_mount,
@@ -36,7 +39,8 @@ impl DuoSingleFuzzer {
             crashes_path,
             config,
             keep_fs,
-            Box::new(LocalCommandInterface::new()),
+            cmdi,
+            supervisor,
         )
         .with_context(|| "failed to create runner")?;
         Ok(Self { runner, test_path })

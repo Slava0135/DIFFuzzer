@@ -240,9 +240,9 @@ pub struct RemoteCommandInterface {
 }
 
 impl RemoteCommandInterface {
-    pub fn new(config: QemuConfig) -> Self {
+    pub fn new(config: &QemuConfig) -> Self {
         RemoteCommandInterface {
-            config,
+            config: config.clone(),
             tmp_file: LocalPath::new_tmp("ssh-tmp"),
         }
     }
