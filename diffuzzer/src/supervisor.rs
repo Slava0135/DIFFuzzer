@@ -130,14 +130,14 @@ impl Supervisor for QemuSupervisor {
     fn load_snapshot(&self) -> anyhow::Result<()> {
         info!("load vm snapshot");
         let mut stream = self.monitor_stream()?;
-        write!(stream, "loadvm {}\n", SNAPSHOT_TAG)?;
+        writeln!(stream, "loadvm {}", SNAPSHOT_TAG)?;
         Ok(())
     }
 
     fn save_snapshot(&self) -> anyhow::Result<()> {
         info!("save vm snapshot");
         let mut stream = self.monitor_stream()?;
-        write!(stream, "savevm {}\n", SNAPSHOT_TAG)?;
+        writeln!(stream, "savevm {}", SNAPSHOT_TAG)?;
         Ok(())
     }
     fn reset_events(&mut self) -> anyhow::Result<()> {
@@ -161,7 +161,7 @@ struct ReturnMessage {
 impl EventHandler {
     fn launch(socket_path: &str) -> anyhow::Result<Self> {
         debug!("create event handler");
-        let mut stream = UnixStream::connect(&socket_path)
+        let mut stream = UnixStream::connect(socket_path)
             .with_context(|| format!("failed to connect to unix socket at '{}'", &socket_path))?;
         let mut de = Deserializer::from_reader(stream.try_clone()?);
         debug!("read greeting message:");
@@ -182,13 +182,10 @@ impl EventHandler {
                     .with_context(|| "failed to deserialize response")
                     .unwrap();
                 debug!("received QMP message:\n{}", value);
-                match value {
-                    Value::Object(map) => {
-                        if map.contains_key("event") {
-                            tx.send(()).unwrap();
-                        }
+                if let Value::Object(map) = value {
+                    if map.contains_key("event") {
+                        tx.send(()).unwrap();
                     }
-                    _ => {}
                 }
             }
         });
