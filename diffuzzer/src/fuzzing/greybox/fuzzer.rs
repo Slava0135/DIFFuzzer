@@ -106,7 +106,12 @@ impl GreyBoxFuzzer {
         fs::create_dir_all(&corpus_dir)
             .with_context(|| format!("failed to create corpus directory at '{}'", corpus_dir))?;
 
-        save_testcase(self.runner.cmdi.as_ref(), &corpus_dir, binary_path, &input)?;
+        save_testcase(
+            self.runner.cmdi.as_ref(),
+            &corpus_dir,
+            Some(binary_path),
+            &input,
+        )?;
         save_completed(&corpus_dir, &self.runner.fst_fs_name, fst_outcome)
             .with_context(|| "failed to save outcome for first harness")?;
         save_completed(&corpus_dir, &self.runner.snd_fs_name, snd_outcome)
@@ -183,7 +188,65 @@ impl Fuzzer for GreyBoxFuzzer {
                     return Ok(());
                 }
             }
-            _ => todo!("handle all outcomes"),
+            (Outcome::Panicked, _) => {
+                let dir_name = input.generate_name();
+                self.runner
+                    .report_crash(
+                        &input,
+                        dir_name,
+                        self.runner.crashes_path.clone(),
+                        format!("Filesystem '{}' panicked", self.runner.fst_fs_name),
+                    )
+                    .with_context(|| "failed to report panic")?;
+                self.runner().stats.crashes += 1;
+                self.show_stats();
+            }
+            (_, Outcome::Panicked) => {
+                let dir_name = input.generate_name();
+                self.runner
+                    .report_crash(
+                        &input,
+                        dir_name,
+                        self.runner.crashes_path.clone(),
+                        format!("Filesystem '{}' panicked", self.runner.snd_fs_name),
+                    )
+                    .with_context(|| "failed to report panic")?;
+                self.runner().stats.crashes += 1;
+                self.show_stats();
+            }
+            (Outcome::TimedOut, _) => {
+                let dir_name = input.generate_name();
+                self.runner
+                    .report_crash(
+                        &input,
+                        dir_name,
+                        self.runner.crashes_path.clone(),
+                        format!(
+                            "Filesystem '{}' timed out after {}s",
+                            self.runner.fst_fs_name, self.runner.config.timeout
+                        ),
+                    )
+                    .with_context(|| "failed to report timeout")?;
+                self.runner().stats.crashes += 1;
+                self.show_stats();
+            }
+            (_, Outcome::TimedOut) => {
+                let dir_name = input.generate_name();
+                self.runner
+                    .report_crash(
+                        &input,
+                        dir_name,
+                        self.runner.crashes_path.clone(),
+                        format!(
+                            "Filesystem '{}' timed out after {}s",
+                            self.runner.snd_fs_name, self.runner.config.timeout
+                        ),
+                    )
+                    .with_context(|| "failed to report timeout")?;
+                self.runner().stats.crashes += 1;
+                self.show_stats();
+            }
+            _ => {}
         };
 
         Ok(())

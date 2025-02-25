@@ -105,7 +105,7 @@ impl Reducer {
                             if old_diff == new_diff {
                                 workload = reduced;
                                 info!("workload reduced (length = {})", workload.ops.len());
-                                self.runner.report_crash(
+                                self.runner.report_diff(
                                     &workload,
                                     index.to_string(),
                                     &binary_path,
@@ -113,6 +113,7 @@ impl Reducer {
                                     new_diff,
                                     &fst_outcome,
                                     &snd_outcome,
+                                    "".to_owned(),
                                 )?;
                             }
                         }

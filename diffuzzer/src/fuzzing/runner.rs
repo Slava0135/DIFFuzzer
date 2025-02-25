@@ -10,7 +10,7 @@ use crate::config::Config;
 use crate::event::EventHandler;
 use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
-use crate::save::{save_completed, save_diff, save_testcase};
+use crate::save::{save_completed, save_diff, save_reason, save_testcase};
 use anyhow::{Context, Ok};
 use hasher::FileDiff;
 use log::{debug, info, warn};
@@ -143,7 +143,9 @@ impl Runner {
             stats: Stats::new(),
         };
 
-        runner.save_snapshot().with_context(|| "failed to save snapshot")?;
+        runner
+            .save_snapshot()
+            .with_context(|| "failed to save snapshot")?;
 
         Ok(runner)
     }
@@ -212,7 +214,7 @@ impl Runner {
         Ok((fst_outcome, snd_outcome))
     }
 
-    pub fn report_crash(
+    pub fn report_diff(
         &mut self,
         input: &Workload,
         dir_name: String,
@@ -221,23 +223,49 @@ impl Runner {
         hash_diff: Vec<FileDiff>,
         fst_outcome: &Completed,
         snd_outcome: &Completed,
+        reason: String,
     ) -> anyhow::Result<()> {
-        debug!("report crash '{}'", dir_name);
+        debug!("report diff '{}'", dir_name);
 
         let crash_dir = crash_dir.join(dir_name);
         fs::create_dir_all(&crash_dir)
             .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
 
-        save_testcase(self.cmdi.as_ref(), &crash_dir, binary_path, input)?;
+        save_testcase(self.cmdi.as_ref(), &crash_dir, Some(binary_path), input)
+            .with_context(|| "failed to save testcase")?;
         save_completed(&crash_dir, &self.fst_fs_name, fst_outcome)
             .with_context(|| "failed to save first outcome")?;
         save_completed(&crash_dir, &self.snd_fs_name, snd_outcome)
             .with_context(|| "failed to save second outcome")?;
 
         save_diff(&crash_dir, hash_diff).with_context(|| "failed to save hash differences")?;
-        info!("crash saved at '{}'", crash_dir);
+        save_reason(&crash_dir, reason).with_context(|| "failed to save reason")?;
 
-        anyhow::Ok(())
+        info!("diff saved at '{}'", crash_dir);
+
+        Ok(())
+    }
+
+    pub fn report_crash(
+        &mut self,
+        input: &Workload,
+        dir_name: String,
+        crash_dir: LocalPath,
+        reason: String,
+    ) -> anyhow::Result<()> {
+        debug!("report panic '{}'", dir_name);
+
+        let crash_dir = crash_dir.join(dir_name);
+        fs::create_dir_all(&crash_dir)
+            .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
+
+        save_testcase(self.cmdi.as_ref(), &crash_dir, None, input)
+            .with_context(|| "failed to save testcase")?;
+        save_reason(&crash_dir, reason).with_context(|| "failed to save reason")?;
+
+        info!("panic saved at '{}'", crash_dir);
+
+        Ok(())
     }
 
     fn monitor_stream(&self) -> anyhow::Result<UnixStream> {
@@ -252,14 +280,14 @@ impl Runner {
     fn load_snapshot(&self) -> anyhow::Result<()> {
         info!("load vm snapshot");
         let mut stream = self.monitor_stream()?;
-        write!(stream, "loadvm {}", SNAPSHOT_TAG)?;
+        write!(stream, "loadvm {}\n", SNAPSHOT_TAG)?;
         Ok(())
     }
 
     fn save_snapshot(&self) -> anyhow::Result<()> {
         info!("save vm snapshot");
         let mut stream = self.monitor_stream()?;
-        write!(stream, "savevm {}", SNAPSHOT_TAG)?;
+        write!(stream, "savevm {}\n", SNAPSHOT_TAG)?;
         Ok(())
     }
 }

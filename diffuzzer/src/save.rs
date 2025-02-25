@@ -8,7 +8,7 @@ use std::io::Write;
 
 use anyhow::Context;
 use hasher::FileDiff::{DifferentHash, OneExists};
-use hasher::{FileDiff, DIFF_HASH_FILENAME};
+use hasher::{DIFF_HASH_FILENAME, FileDiff};
 
 use crate::command::CommandInterface;
 use crate::compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME};
@@ -22,7 +22,7 @@ use crate::{
 pub fn save_testcase(
     cmdi: &dyn CommandInterface,
     output_dir: &LocalPath,
-    binary_path: &RemotePath,
+    binary_path: Option<&RemotePath>,
     input: &Workload,
 ) -> anyhow::Result<()> {
     let source_path = output_dir.join(TEST_SOURCE_FILENAME);
@@ -30,13 +30,15 @@ pub fn save_testcase(
         .with_context(|| format!("failed to save source file to '{}'", source_path))?;
 
     let binary_copy_path = output_dir.join(TEST_EXE_FILENAME);
-    cmdi.copy_from_remote(binary_path, &binary_copy_path)
-        .with_context(|| {
-            format!(
-                "failed to copy binary test executable from '{}' to '{}'",
-                binary_path, binary_copy_path
-            )
-        })?;
+    if let Some(binary_path) = binary_path {
+        cmdi.copy_from_remote(binary_path, &binary_copy_path)
+            .with_context(|| {
+                format!(
+                    "failed to copy binary test executable from '{}' to '{}'",
+                    binary_path, binary_copy_path
+                )
+            })?;
+    }
 
     let json_path = output_dir.join("test").with_extension("json");
     let json = serde_json::to_string_pretty(&input)
@@ -90,4 +92,10 @@ pub fn save_diff(output_dir: &LocalPath, diff_hash: Vec<FileDiff>) -> anyhow::Re
             .with_context(|| format!("failed to save source file to '{}'", diff_hash_path))?;
     }
     Ok(())
+}
+
+pub fn save_reason(output_dir: &LocalPath, reason: String) -> anyhow::Result<()> {
+    let reason_path = output_dir.join("reason.md");
+    fs::write(&reason_path, reason)
+        .with_context(|| format!("failed to save source file to '{}'", reason_path))
 }

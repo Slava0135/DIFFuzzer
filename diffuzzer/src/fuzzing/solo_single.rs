@@ -66,7 +66,7 @@ pub fn run(
         Outcome::Completed(completed) => {
             info!("save results");
             fs::create_dir_all(output_dir)?;
-            save_testcase(&cmdi, output_dir, &binary_path, &input)
+            save_testcase(&cmdi, output_dir, Some(&binary_path), &input)
                 .with_context(|| "failed to save testcase")?;
             save_completed(output_dir, &fs_str, &completed)
                 .with_context(|| "failed to save outcome")?;
