@@ -26,7 +26,7 @@ impl Workload {
             .with_context(|| format!("failed to write test source at '{}'", test_path))?;
         let mut make = CommandWrapper::new("make");
         make.arg("-C").arg(dir.base.as_ref());
-        cmdi.exec(make).with_context(|| "failed to compile test")?;
+        cmdi.exec(make, None).with_context(|| "failed to compile test")?;
         Ok(test_exec)
     }
 }

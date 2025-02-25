@@ -9,8 +9,9 @@ use std::{
     process::{Command, Output},
 };
 
-use anyhow::{bail, Context, Ok};
+use anyhow::Context;
 use log::info;
+use thiserror::Error;
 
 use crate::{
     config::QemuConfig,
@@ -22,6 +23,14 @@ const MAKEFILE_NAME: &str = "makefile";
 const EXECUTOR_H_NAME: &str = "executor.h";
 const EXECUTOR_CPP_NAME: &str = "executor.cpp";
 const TEST_NAME: &str = "test.c";
+
+#[derive(Error, Debug)]
+pub enum ExecError {
+    #[error("execution error: {0}")]
+    IoError(String),
+    #[error("timed out: {0}")]
+    TimedOut(String),
+}
 
 pub trait CommandInterface {
     fn create_dir_all(&self, path: &RemotePath) -> anyhow::Result<()>;
@@ -44,8 +53,13 @@ pub trait CommandInterface {
     fn write(&self, path: &RemotePath, contents: &[u8]) -> anyhow::Result<()>;
     fn read_to_string(&self, path: &RemotePath) -> anyhow::Result<String>;
 
-    fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output>;
-    fn exec_in_dir(&self, cmd: CommandWrapper, dir: &RemotePath) -> anyhow::Result<Output>;
+    fn exec(&self, cmd: CommandWrapper, timeout: Option<u8>) -> Result<Output, ExecError>;
+    fn exec_in_dir(
+        &self,
+        cmd: CommandWrapper,
+        dir: &RemotePath,
+        timeout: Option<u8>,
+    ) -> Result<Output, ExecError>;
 
     fn setup_remote_dir(&self) -> anyhow::Result<RemotePath> {
         let remote_dir = RemotePath::new_tmp("remote");
@@ -82,7 +96,7 @@ pub trait CommandInterface {
         info!("make test binary");
         let mut make = CommandWrapper::new("make");
         make.arg("-C").arg(remote_dir.base.as_ref());
-        self.exec(make)
+        self.exec(make, None)
             .with_context(|| "failed to make test binary")?;
 
         Ok(remote_dir)
@@ -103,19 +117,39 @@ impl CommandWrapper {
         self.internal.arg(arg);
         self
     }
-    pub fn exec_local(mut self) -> anyhow::Result<Output> {
-        let output = self
-            .internal
-            .output()
-            .with_context(|| format!("failed to run local command: {:?}", self.internal))?;
-        if !output.status.success() {
-            bail!(
+    pub fn exec_local(mut self, timeout: Option<u8>) -> Result<Output, ExecError> {
+        let output = match timeout {
+            Some(secs) => {
+                let mut timeout = Command::new("timeout");
+                timeout.arg(secs.to_string());
+                timeout.arg(self.internal.get_program());
+                timeout.args(self.internal.get_args());
+                timeout.output()
+            }
+            None => self.internal.output(),
+        };
+        let output = output.map_err(|v| {
+            ExecError::IoError(format!(
+                "failed to run local command: {:?}\n{}",
+                self.internal, v
+            ))
+        })?;
+        match output.status.code() {
+            Some(0) => Ok(output),
+            Some(124) if timeout.is_some() => Err(ExecError::TimedOut(format!(
+                "local command {:?} timed out",
+                self.internal
+            ))),
+            Some(_) => Err(ExecError::IoError(format!(
                 "local command {:?} execution ended with error:\n{}",
                 self.internal,
                 String::from_utf8(output.stderr).unwrap_or("<invalid UTF-8 string>".into())
-            );
+            ))),
+            None => Err(ExecError::IoError(format!(
+                "local command {:?} execution terminated by signal",
+                self.internal
+            ))),
         }
-        Ok(output)
     }
 }
 
@@ -185,13 +219,18 @@ impl CommandInterface for LocalCommandInterface {
             .with_context(|| format!("failed to read local file '{}'", path))
     }
 
-    fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output> {
-        cmd.exec_local()
+    fn exec(&self, cmd: CommandWrapper, timeout: Option<u8>) -> Result<Output, ExecError> {
+        cmd.exec_local(timeout)
     }
-    fn exec_in_dir(&self, cmd: CommandWrapper, dir: &RemotePath) -> anyhow::Result<Output> {
+    fn exec_in_dir(
+        &self,
+        cmd: CommandWrapper,
+        dir: &RemotePath,
+        timeout: Option<u8>,
+    ) -> Result<Output, ExecError> {
         let mut cmd = cmd;
         cmd.internal.current_dir(dir.base.as_ref());
-        cmd.exec_local()
+        cmd.exec_local(timeout)
     }
 }
 
@@ -201,9 +240,9 @@ pub struct RemoteCommandInterface {
 }
 
 impl RemoteCommandInterface {
-    pub fn new(config: QemuConfig) -> Self {
+    pub fn new(config: &QemuConfig) -> Self {
         RemoteCommandInterface {
-            config,
+            config: config.clone(),
             tmp_file: LocalPath::new_tmp("ssh-tmp"),
         }
     }
@@ -214,7 +253,7 @@ impl CommandInterface for RemoteCommandInterface {
         let mut mkdir = CommandWrapper::new("mkdir");
         mkdir.arg("-p");
         mkdir.arg(path.base.as_ref());
-        self.exec(mkdir)
+        self.exec(mkdir, None)
             .with_context(|| format!("failed to create remote dir at '{}'", path))?;
         Ok(())
     }
@@ -222,7 +261,7 @@ impl CommandInterface for RemoteCommandInterface {
         let mut rm = CommandWrapper::new("rm");
         rm.arg("-rf");
         rm.arg(path.base.as_ref());
-        self.exec(rm)
+        self.exec(rm, None)
             .with_context(|| format!("failed to remove remote dir at '{}'", path))?;
         Ok(())
     }
@@ -234,7 +273,7 @@ impl CommandInterface for RemoteCommandInterface {
         let mut scp = self.copy_common();
         scp.arg(local_path.as_ref());
         scp.arg(format!("root@localhost:{}", remote_path));
-        scp.exec_local().with_context(|| {
+        scp.exec_local(None).with_context(|| {
             format!(
                 "failed to copy file from '{}' (local) to '{}' (remote)",
                 local_path, remote_path,
@@ -250,9 +289,9 @@ impl CommandInterface for RemoteCommandInterface {
         let mut scp = self.copy_common();
         scp.arg(format!("root@localhost:{}", remote_path));
         scp.arg(local_path.as_ref());
-        scp.exec_local().with_context(|| {
+        scp.exec_local(None).with_context(|| {
             format!(
-                "failed to copy file from '{}' (local) to '{}' (remote)",
+                "failed to copy file to '{}' (local) from '{}' (remote)",
                 remote_path, local_path,
             )
         })?;
@@ -269,7 +308,7 @@ impl CommandInterface for RemoteCommandInterface {
         scp.arg("-r");
         scp.arg(format!("root@localhost:{}", remote_path));
         scp.arg(local_path.as_ref());
-        scp.exec_local().with_context(|| {
+        scp.exec_local(None).with_context(|| {
             format!(
                 "failed to copy file from '{}' (local) to '{}' (remote)",
                 remote_path, local_path,
@@ -293,24 +332,37 @@ impl CommandInterface for RemoteCommandInterface {
         Ok(s)
     }
 
-    fn exec(&self, cmd: CommandWrapper) -> anyhow::Result<Output> {
+    fn exec(&self, cmd: CommandWrapper, timeout: Option<u8>) -> Result<Output, ExecError> {
         let mut ssh = self.exec_common();
         ssh.arg("-t").arg(format!("{:?}", cmd.internal));
-        ssh.exec_local()
-            .with_context(|| format!("failed to execute remote command: {:?}", cmd.internal))
+        ssh.exec_local(timeout).map_err(|v| match v {
+            ExecError::IoError(v) => {
+                ExecError::IoError(format!("remote command error: {:?}\n{}", cmd.internal, v))
+            }
+            ExecError::TimedOut(v) => {
+                ExecError::TimedOut(format!("remote command error: {:?}\n{}", cmd.internal, v))
+            }
+        })
     }
-    fn exec_in_dir(&self, cmd: CommandWrapper, dir: &RemotePath) -> anyhow::Result<Output> {
+    fn exec_in_dir(
+        &self,
+        cmd: CommandWrapper,
+        dir: &RemotePath,
+        timeout: Option<u8>,
+    ) -> Result<Output, ExecError> {
         let mut ssh = self.exec_common();
         ssh.arg("-t")
             .arg("cd")
             .arg(dir.base.as_ref())
             .arg("&&")
             .arg(format!("{:?}", cmd.internal));
-        ssh.exec_local().with_context(|| {
-            format!(
-                "failed to execute remote command in directory '{}': {:?}",
-                dir, cmd.internal
-            )
+        ssh.exec_local(timeout).map_err(|v| match v {
+            ExecError::IoError(v) => {
+                ExecError::IoError(format!("remote command error: {:?}\n{}", cmd.internal, v))
+            }
+            ExecError::TimedOut(v) => {
+                ExecError::TimedOut(format!("remote command error: {:?}\n{}", cmd.internal, v))
+            }
         })
     }
 }

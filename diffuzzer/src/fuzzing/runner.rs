@@ -2,14 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use crate::abstract_fs::trace::{Trace, TRACE_FILENAME};
+use crate::abstract_fs::trace::{TRACE_FILENAME, Trace};
 
 use crate::abstract_fs::workload::Workload;
 use crate::command::CommandInterface;
 use crate::config::Config;
 use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
-use crate::save::{save_diff, save_outcome, save_testcase};
+use crate::save::{save_completed, save_diff, save_reason, save_testcase};
+use crate::supervisor::Supervisor;
 use anyhow::{Context, Ok};
 use hasher::FileDiff;
 use log::{debug, info, warn};
@@ -20,7 +21,7 @@ use std::time::Instant;
 use super::harness::Harness;
 use super::objective::hash::HashObjective;
 use super::objective::trace::TraceObjective;
-use super::outcome::Outcome;
+use super::outcome::{Completed, Outcome};
 
 pub struct Runner {
     pub config: Config,
@@ -28,6 +29,7 @@ pub struct Runner {
     pub keep_fs: bool,
 
     pub cmdi: Box<dyn CommandInterface>,
+    pub supervisor: Box<dyn Supervisor>,
 
     pub test_dir: RemotePath,
     pub exec_dir: RemotePath,
@@ -55,6 +57,7 @@ impl Runner {
         config: Config,
         keep_fs: bool,
         cmdi: Box<dyn CommandInterface>,
+        supervisor: Box<dyn Supervisor>,
     ) -> anyhow::Result<Self> {
         let temp_dir = cmdi
             .setup_remote_dir()
@@ -96,19 +99,22 @@ impl Runner {
             fst_fs_dir.clone(),
             exec_dir.clone(),
             LocalPath::new_tmp("outcome-1"),
+            config.timeout,
         );
         let snd_harness = Harness::new(
             snd_mount,
             snd_fs_dir.clone(),
             exec_dir.clone(),
             LocalPath::new_tmp("outcome-2"),
+            config.timeout,
         );
 
-        Ok(Self {
+        let runner = Self {
             config,
             keep_fs,
 
             cmdi,
+            supervisor,
 
             exec_dir,
 
@@ -125,7 +131,14 @@ impl Runner {
             snd_harness,
 
             stats: Stats::new(),
-        })
+        };
+
+        runner
+            .supervisor
+            .save_snapshot()
+            .with_context(|| "failed to save snapshot")?;
+
+        Ok(runner)
     }
 
     pub fn compile_test(&mut self, input: &Workload) -> anyhow::Result<RemotePath> {
@@ -148,8 +161,24 @@ impl Runner {
         };
         let fst_outcome = self
             .fst_harness
-            .run(self.cmdi.as_ref(), binary_path, self.keep_fs, fst_hash)
+            .run(
+                self.cmdi.as_ref(),
+                binary_path,
+                self.keep_fs,
+                fst_hash,
+                self.supervisor.as_mut(),
+            )
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
+        match fst_outcome {
+            Outcome::Panicked => {
+                self.supervisor
+                    .load_snapshot()
+                    .with_context(|| "failed to load snapshot")?;
+                return Ok((fst_outcome, Outcome::Skipped));
+            }
+            Outcome::TimedOut => return Ok((fst_outcome, Outcome::Skipped)),
+            _ => {}
+        }
 
         setup_dir(self.cmdi.as_ref(), &self.exec_dir)
             .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;
@@ -160,37 +189,76 @@ impl Runner {
         };
         let snd_outcome = self
             .snd_harness
-            .run(self.cmdi.as_ref(), binary_path, self.keep_fs, snd_hash)
+            .run(
+                self.cmdi.as_ref(),
+                binary_path,
+                self.keep_fs,
+                snd_hash,
+                self.supervisor.as_mut(),
+            )
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
+
+        if let Outcome::Panicked = snd_outcome {
+            self.supervisor
+                .load_snapshot()
+                .with_context(|| "failed to load snapshot")?;
+        }
+
         Ok((fst_outcome, snd_outcome))
     }
 
-    pub fn report_crash(
+    pub fn report_diff(
         &mut self,
         input: &Workload,
         dir_name: String,
         binary_path: &RemotePath,
         crash_dir: LocalPath,
         hash_diff: Vec<FileDiff>,
-        fst_outcome: &Outcome,
-        snd_outcome: &Outcome,
+        fst_outcome: &Completed,
+        snd_outcome: &Completed,
+        reason: String,
     ) -> anyhow::Result<()> {
-        debug!("report crash '{}'", dir_name);
+        debug!("report diff '{}'", dir_name);
 
         let crash_dir = crash_dir.join(dir_name);
         fs::create_dir_all(&crash_dir)
             .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
 
-        save_testcase(self.cmdi.as_ref(), &crash_dir, binary_path, input)?;
-        save_outcome(&crash_dir, &self.fst_fs_name, fst_outcome)
+        save_testcase(self.cmdi.as_ref(), &crash_dir, Some(binary_path), input)
+            .with_context(|| "failed to save testcase")?;
+        save_completed(&crash_dir, &self.fst_fs_name, fst_outcome)
             .with_context(|| "failed to save first outcome")?;
-        save_outcome(&crash_dir, &self.snd_fs_name, snd_outcome)
+        save_completed(&crash_dir, &self.snd_fs_name, snd_outcome)
             .with_context(|| "failed to save second outcome")?;
 
         save_diff(&crash_dir, hash_diff).with_context(|| "failed to save hash differences")?;
+        save_reason(&crash_dir, reason).with_context(|| "failed to save reason")?;
+
+        info!("diff saved at '{}'", crash_dir);
+
+        Ok(())
+    }
+
+    pub fn report_crash(
+        &mut self,
+        input: &Workload,
+        dir_name: String,
+        crash_dir: LocalPath,
+        reason: String,
+    ) -> anyhow::Result<()> {
+        debug!("report panic '{}'", dir_name);
+
+        let crash_dir = crash_dir.join(dir_name);
+        fs::create_dir_all(&crash_dir)
+            .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
+
+        save_testcase(self.cmdi.as_ref(), &crash_dir, None, input)
+            .with_context(|| "failed to save testcase")?;
+        save_reason(&crash_dir, reason).with_context(|| "failed to save reason")?;
+
         info!("crash saved at '{}'", crash_dir);
 
-        anyhow::Ok(())
+        Ok(())
     }
 }
 
@@ -212,7 +280,7 @@ impl Stats {
     }
 }
 
-pub fn parse_trace(outcome: &Outcome) -> anyhow::Result<Trace> {
+pub fn parse_trace(outcome: &Completed) -> anyhow::Result<Trace> {
     let trace = fs::read_to_string(outcome.dir.join(TRACE_FILENAME))?;
     anyhow::Ok(Trace::try_parse(trace).with_context(|| "failed to parse trace")?)
 }

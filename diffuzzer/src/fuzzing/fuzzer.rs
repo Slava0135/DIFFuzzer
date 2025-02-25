@@ -8,12 +8,15 @@ use anyhow::Context;
 use log::{debug, error, info, warn};
 
 use crate::{
-    abstract_fs::{trace::Trace, workload::Workload},
+    abstract_fs::{
+        trace::Trace,
+        workload::Workload,
+    },
     path::RemotePath,
 };
 use hasher::FileDiff;
 
-use super::{outcome::Outcome, runner::Runner};
+use super::{outcome::Completed, runner::Runner};
 
 pub trait Fuzzer {
     fn run(&mut self, test_count: Option<u64>) {
@@ -61,8 +64,8 @@ pub trait Fuzzer {
         binary_path: &RemotePath,
         fst_trace: &Trace,
         snd_trace: &Trace,
-        fst_outcome: &Outcome,
-        snd_outcome: &Outcome,
+        fst_outcome: &Completed,
+        snd_outcome: &Completed,
     ) -> anyhow::Result<bool> {
         let runner = self.runner();
         debug!("do objectives");
@@ -75,17 +78,18 @@ pub trait Fuzzer {
             .is_interesting(fst_trace, snd_trace)
             .with_context(|| "failed to do trace objective")?;
         if trace_is_interesting || hash_diff_interesting {
-            debug!(
+            let reason = format!(
                 "error detected by: trace?: {}, hash?: {}",
                 trace_is_interesting, hash_diff_interesting
             );
+            debug!("{}", reason);
             let mut diff: Vec<FileDiff> = vec![];
             if hash_diff_interesting {
                 diff = runner.hash_objective.get_diff();
             }
             let dir_name = input.generate_name();
             runner
-                .report_crash(
+                .report_diff(
                     input,
                     dir_name,
                     binary_path,
@@ -93,6 +97,7 @@ pub trait Fuzzer {
                     diff,
                     fst_outcome,
                     snd_outcome,
+                    reason,
                 )
                 .with_context(|| "failed to report crash")?;
             self.runner().stats.crashes += 1;
@@ -109,16 +114,17 @@ pub trait Fuzzer {
         binary_path: &RemotePath,
         fst_trace: &Trace,
         snd_trace: &Trace,
-        fst_outcome: &Outcome,
-        snd_outcome: &Outcome,
+        fst_outcome: &Completed,
+        snd_outcome: &Completed,
     ) -> anyhow::Result<bool> {
         debug!("detect errors");
         if fst_trace.has_errors() && snd_trace.has_errors() {
-            warn!("both traces contain errors, potential bug in model");
+            let reason = "both traces contain errors, potential bug in model".to_owned();
+            warn!("{}", reason);
             let accidents_path = self.runner().accidents_path.clone();
             let dir_name = input.generate_name();
             self.runner()
-                .report_crash(
+                .report_diff(
                     input,
                     dir_name,
                     binary_path,
@@ -126,12 +132,24 @@ pub trait Fuzzer {
                     vec![],
                     fst_outcome,
                     snd_outcome,
+                    reason,
                 )
                 .with_context(|| "failed to report accident")?;
             Ok(true)
         } else {
             Ok(false)
         }
+    }
+
+    fn report_crash(&mut self, input: &Workload, reason: String) -> anyhow::Result<()> {
+        let dir_name = input.generate_name();
+        let crashes_dir = self.runner().crashes_path.clone();
+        self.runner()
+            .report_crash(&input, dir_name, crashes_dir, reason)
+            .with_context(|| "failed to report panic")?;
+        self.runner().stats.crashes += 1;
+        self.show_stats();
+        Ok(())
     }
 
     fn show_stats(&mut self);

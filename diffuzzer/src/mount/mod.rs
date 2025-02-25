@@ -33,7 +33,7 @@ pub trait FileSystemMount: Display {
             .arg("brd")
             .arg("rd_nr=1")
             .arg(format!("rd_size={RAM_DISK_SIZE}"));
-        cmdi.exec(modprobe)
+        cmdi.exec(modprobe, None)
             .with_context(|| "failed to load module 'brd'")?;
 
         let mut mkfs = CommandWrapper::new(self.mkfs_cmd());
@@ -42,7 +42,7 @@ pub trait FileSystemMount: Display {
             mkfs.arg(opts);
         }
         mkfs.arg(DEVICE);
-        cmdi.exec(mkfs)
+        cmdi.exec(mkfs, None)
             .with_context(|| "failed to make filesystem")?;
 
         let mut mount = CommandWrapper::new("mount");
@@ -52,7 +52,7 @@ pub trait FileSystemMount: Display {
             mount.arg(opts);
         }
         mount.arg(DEVICE).arg(path.base.as_ref());
-        cmdi.exec(mount)
+        cmdi.exec(mount, None)
             .with_context(|| format!("failed to mount filesystem at '{}'", path))?;
 
         Ok(())
@@ -63,12 +63,12 @@ pub trait FileSystemMount: Display {
 
         let mut umount = CommandWrapper::new("umount");
         umount.arg("-fl").arg(path.base.as_ref());
-        cmdi.exec(umount)
+        cmdi.exec(umount, None)
             .with_context(|| format!("failed to unmount filesystem at '{}'", path))?;
 
         let mut rmmod = CommandWrapper::new("rmmod");
         rmmod.arg("brd");
-        cmdi.exec(rmmod)
+        cmdi.exec(rmmod, None)
             .with_context(|| "failed to remove module 'brd'")?;
 
         cmdi.remove_dir_all(path)

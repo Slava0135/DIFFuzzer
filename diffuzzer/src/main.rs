@@ -8,7 +8,7 @@ use crate::fuzzing::duo_single::DuoSingleFuzzer;
 use anyhow::{Context, Ok};
 use args::Args;
 use clap::Parser;
-use command::{LocalCommandInterface, RemoteCommandInterface};
+use command::{CommandInterface, LocalCommandInterface, RemoteCommandInterface};
 use config::Config;
 use fuzzing::{
     blackbox::fuzzer::BlackBoxFuzzer, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
@@ -16,6 +16,7 @@ use fuzzing::{
 };
 use log::info;
 use path::LocalPath;
+use supervisor::{NativeSupervisor, QemuSupervisor, Supervisor};
 
 mod abstract_fs;
 mod args;
@@ -26,8 +27,8 @@ mod filesystems;
 mod fuzzing;
 mod mount;
 mod path;
-mod qemu;
 mod save;
+mod supervisor;
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
@@ -41,6 +42,18 @@ fn main() -> anyhow::Result<()> {
     let config: Config =
         toml::from_str(&config).with_context(|| "failed to parse configuration")?;
 
+    let supervisor: Box<dyn Supervisor> = if args.no_qemu {
+        Box::new(NativeSupervisor::new())
+    } else {
+        Box::new(QemuSupervisor::launch(&config.qemu).unwrap())
+    };
+
+    let cmdi: Box<dyn CommandInterface> = if args.no_qemu {
+        Box::new(LocalCommandInterface::new())
+    } else {
+        Box::new(RemoteCommandInterface::new(&config.qemu))
+    };
+
     match args.mode {
         args::Mode::Greybox {
             first_filesystem,
@@ -51,26 +64,15 @@ fn main() -> anyhow::Result<()> {
                 "start greybox fuzzing ('{}' + '{}')",
                 first_filesystem, second_filesystem
             );
-            if args.no_qemu {
-                GreyBoxFuzzer::create(
-                    config,
-                    first_filesystem.into(),
-                    second_filesystem.into(),
-                    LocalPath::new(Path::new("./crashes")),
-                    Box::new(LocalCommandInterface::new()),
-                )?
-                .run(test_count);
-            } else {
-                qemu::launch(&config.qemu)?;
-                GreyBoxFuzzer::create(
-                    config.clone(),
-                    first_filesystem.into(),
-                    second_filesystem.into(),
-                    LocalPath::new(Path::new("./crashes")),
-                    Box::new(RemoteCommandInterface::new(config.qemu)),
-                )?
-                .run(test_count);
-            }
+            GreyBoxFuzzer::create(
+                config,
+                first_filesystem.into(),
+                second_filesystem.into(),
+                LocalPath::new(Path::new("./crashes")),
+                cmdi,
+                supervisor,
+            )?
+            .run(test_count);
         }
         args::Mode::Blackbox {
             first_filesystem,
@@ -81,26 +83,15 @@ fn main() -> anyhow::Result<()> {
                 "start blackbox fuzzing ('{}' + '{}')",
                 first_filesystem, second_filesystem
             );
-            if args.no_qemu {
-                BlackBoxFuzzer::create(
-                    config,
-                    first_filesystem.into(),
-                    second_filesystem.into(),
-                    LocalPath::new(Path::new("./crashes")),
-                    Box::new(LocalCommandInterface::new()),
-                )?
-                .run(test_count);
-            } else {
-                qemu::launch(&config.qemu)?;
-                BlackBoxFuzzer::create(
-                    config.clone(),
-                    first_filesystem.into(),
-                    second_filesystem.into(),
-                    LocalPath::new(Path::new("./crashes")),
-                    Box::new(RemoteCommandInterface::new(config.qemu)),
-                )?
-                .run(test_count);
-            }
+            BlackBoxFuzzer::create(
+                config,
+                first_filesystem.into(),
+                second_filesystem.into(),
+                LocalPath::new(Path::new("./crashes")),
+                cmdi,
+                supervisor,
+            )?
+            .run(test_count);
         }
         args::Mode::SoloSingle {
             output_dir,
@@ -109,17 +100,15 @@ fn main() -> anyhow::Result<()> {
             filesystem,
         } => {
             info!("run single test ('{}')", filesystem);
-            if args.no_qemu {
-                solo_single::run(
-                    &LocalPath::new(Path::new(&path_to_test)),
-                    &LocalPath::new(Path::new(&output_dir)),
-                    keep_fs,
-                    filesystem.into(),
-                    config.fs_name,
-                )?
-            } else {
-                todo!("QEMU not supported");
-            }
+            solo_single::run(
+                &LocalPath::new(Path::new(&path_to_test)),
+                &LocalPath::new(Path::new(&output_dir)),
+                keep_fs,
+                filesystem.into(),
+                config,
+                cmdi,
+                supervisor,
+            )?
         }
         args::Mode::DuoSingle {
             first_filesystem,
@@ -132,19 +121,17 @@ fn main() -> anyhow::Result<()> {
                 "run single test ('{}' + '{}')",
                 first_filesystem, second_filesystem
             );
-            if args.no_qemu {
-                DuoSingleFuzzer::create(
-                    config,
-                    first_filesystem.into(),
-                    second_filesystem.into(),
-                    LocalPath::new(Path::new(&output_dir)),
-                    LocalPath::new(Path::new(&path_to_test)),
-                    keep_fs,
-                )?
-                .run(Some(1u64));
-            } else {
-                todo!("QEMU not supported");
-            }
+            DuoSingleFuzzer::create(
+                config,
+                first_filesystem.into(),
+                second_filesystem.into(),
+                LocalPath::new(Path::new(&output_dir)),
+                LocalPath::new(Path::new(&path_to_test)),
+                keep_fs,
+                cmdi,
+                supervisor,
+            )?
+            .run(Some(1u64));
         }
         args::Mode::Reduce {
             output_dir,
@@ -156,20 +143,18 @@ fn main() -> anyhow::Result<()> {
                 "reduce test ('{}' + '{}')",
                 first_filesystem, second_filesystem
             );
-            if args.no_qemu {
-                Reducer::create(
-                    config,
-                    first_filesystem.into(),
-                    second_filesystem.into(),
-                    LocalPath::new(Path::new(&output_dir)),
-                )?
-                .run(
-                    &LocalPath::new(Path::new(&path_to_test)),
-                    &LocalPath::new(Path::new(&output_dir)),
-                )?;
-            } else {
-                todo!("QEMU not supported");
-            }
+            Reducer::create(
+                config,
+                first_filesystem.into(),
+                second_filesystem.into(),
+                LocalPath::new(Path::new(&output_dir)),
+                cmdi,
+                supervisor,
+            )?
+            .run(
+                &LocalPath::new(Path::new(&path_to_test)),
+                &LocalPath::new(Path::new(&output_dir)),
+            )?;
         }
     }
     Ok(())

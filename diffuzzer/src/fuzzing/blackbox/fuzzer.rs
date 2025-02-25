@@ -4,8 +4,8 @@
 
 use anyhow::{Context, Ok};
 use log::{debug, info};
-use rand::prelude::StdRng;
 use rand::SeedableRng;
+use rand::prelude::StdRng;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
@@ -13,9 +13,11 @@ use crate::command::CommandInterface;
 use crate::config::Config;
 
 use crate::fuzzing::fuzzer::Fuzzer;
-use crate::fuzzing::runner::{parse_trace, Runner};
+use crate::fuzzing::outcome::Outcome;
+use crate::fuzzing::runner::{Runner, parse_trace};
 use crate::mount::FileSystemMount;
 use crate::path::LocalPath;
+use crate::supervisor::Supervisor;
 
 pub struct BlackBoxFuzzer {
     runner: Runner,
@@ -29,9 +31,18 @@ impl BlackBoxFuzzer {
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
         cmdi: Box<dyn CommandInterface>,
+        supervisor: Box<dyn Supervisor>,
     ) -> anyhow::Result<Self> {
-        let runner = Runner::create(fst_mount, snd_mount, crashes_path, config, false, cmdi)
-            .with_context(|| "failed to create runner")?;
+        let runner = Runner::create(
+            fst_mount,
+            snd_mount,
+            crashes_path,
+            config,
+            false,
+            cmdi,
+            supervisor,
+        )
+        .with_context(|| "failed to create runner")?;
         Ok(Self {
             runner,
             rng: StdRng::seed_from_u64(
@@ -52,31 +63,66 @@ impl Fuzzer for BlackBoxFuzzer {
 
         let binary_path = self.runner().compile_test(&input)?;
 
-        let (fst_outcome, snd_outcome) = self.runner().run_harness(&binary_path)?;
+        match self.runner().run_harness(&binary_path)? {
+            (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
+                let fst_trace =
+                    parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
+                let snd_trace =
+                    parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
 
-        let fst_trace = parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
-        let snd_trace =
-            parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
+                if self.detect_errors(
+                    &input,
+                    &binary_path,
+                    &fst_trace,
+                    &snd_trace,
+                    &fst_outcome,
+                    &snd_outcome,
+                )? {
+                    return Ok(());
+                }
 
-        if self.detect_errors(
-            &input,
-            &binary_path,
-            &fst_trace,
-            &snd_trace,
-            &fst_outcome,
-            &snd_outcome,
-        )? {
-            return Ok(());
-        }
-
-        self.do_objective(
-            &input,
-            &binary_path,
-            &fst_trace,
-            &snd_trace,
-            &fst_outcome,
-            &snd_outcome,
-        )?;
+                self.do_objective(
+                    &input,
+                    &binary_path,
+                    &fst_trace,
+                    &snd_trace,
+                    &fst_outcome,
+                    &snd_outcome,
+                )?;
+            }
+            (Outcome::Panicked, _) => {
+                self.report_crash(
+                    &input,
+                    format!("Filesystem '{}' panicked", self.runner.fst_fs_name),
+                )?;
+            }
+            (_, Outcome::Panicked) => {
+                self.report_crash(
+                    &input,
+                    format!("Filesystem '{}' panicked", self.runner.snd_fs_name),
+                )?;
+            }
+            (Outcome::TimedOut, _) => {
+                self.report_crash(
+                    &input,
+                    format!(
+                        "Filesystem '{}' timed out after {}s",
+                        self.runner.fst_fs_name, self.runner.config.timeout
+                    ),
+                )?;
+            }
+            (_, Outcome::TimedOut) => {
+                self.report_crash(
+                    &input,
+                    format!(
+                        "Filesystem '{}' timed out after {}s",
+                        self.runner.snd_fs_name, self.runner.config.timeout
+                    ),
+                )?;
+            }
+            (Outcome::Skipped, _) => {}
+            (_, Outcome::Skipped) => {}
+        };
 
         Ok(())
     }

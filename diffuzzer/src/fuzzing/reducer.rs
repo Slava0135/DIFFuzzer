@@ -10,11 +10,11 @@ use log::{info, warn};
 
 use crate::{
     abstract_fs::{mutator::remove, workload::Workload},
-    command::LocalCommandInterface,
+    command::CommandInterface,
     config::Config,
-    fuzzing::runner::parse_trace,
+    fuzzing::{outcome::Outcome, runner::parse_trace},
     mount::FileSystemMount,
-    path::LocalPath,
+    path::LocalPath, supervisor::Supervisor,
 };
 
 use super::runner::Runner;
@@ -29,6 +29,8 @@ impl Reducer {
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
+        cmdi: Box<dyn CommandInterface>,
+        supervisor: Box<dyn Supervisor>,
     ) -> anyhow::Result<Self> {
         let runner = Runner::create(
             fst_mount,
@@ -36,7 +38,8 @@ impl Reducer {
             crashes_path,
             config,
             false,
-            Box::new(LocalCommandInterface::new()),
+            cmdi,
+            supervisor,
         )
         .with_context(|| "failed to create runner")?;
         Ok(Self { runner })
@@ -50,29 +53,33 @@ impl Reducer {
 
         let binary_path = self.runner.compile_test(&input)?;
 
-        let (fst_outcome, snd_outcome) = self.runner.run_harness(&binary_path)?;
+        match self.runner.run_harness(&binary_path)? {
+            (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
+                let fst_trace =
+                    parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
+                let snd_trace =
+                    parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
 
-        let fst_trace = parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
-        let snd_trace =
-            parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
+                let hash_diff_interesting = self
+                    .runner
+                    .hash_objective
+                    .is_interesting()
+                    .with_context(|| "failed to do hash objective")?;
+                let _trace_is_interesting = self
+                    .runner
+                    .trace_objective
+                    .is_interesting(&fst_trace, &snd_trace)
+                    .with_context(|| "failed to do trace objective")?;
 
-        let hash_diff_interesting = self
-            .runner
-            .hash_objective
-            .is_interesting()
-            .with_context(|| "failed to do hash objective")?;
-        let _trace_is_interesting = self
-            .runner
-            .trace_objective
-            .is_interesting(&fst_trace, &snd_trace)
-            .with_context(|| "failed to do trace objective")?;
-
-        if hash_diff_interesting {
-            let old_diff = self.runner.hash_objective.get_diff();
-            self.reduce_by_hash(input, old_diff, save_to_dir)?;
-        } else {
-            warn!("crash not detected");
-        }
+                if hash_diff_interesting {
+                    let old_diff = self.runner.hash_objective.get_diff();
+                    self.reduce_by_hash(input, old_diff, save_to_dir)?;
+                } else {
+                    warn!("crash not detected");
+                }
+            }
+            _ => todo!("handle all outcomes"),
+        };
 
         Ok(())
     }
@@ -89,28 +96,33 @@ impl Reducer {
         loop {
             if let Some(reduced) = remove(&workload, index) {
                 let binary_path = self.runner.compile_test(&reduced)?;
-                let (fst_outcome, snd_outcome) = self.runner.run_harness(&binary_path)?;
-                let hash_diff_interesting = self
-                    .runner
-                    .hash_objective
-                    .is_interesting()
-                    .with_context(|| "failed to do hash objective")?;
-                if hash_diff_interesting {
-                    let new_diff = self.runner.hash_objective.get_diff();
-                    if old_diff == new_diff {
-                        workload = reduced;
-                        info!("workload reduced (length = {})", workload.ops.len());
-                        self.runner.report_crash(
-                            &workload,
-                            index.to_string(),
-                            &binary_path,
-                            output_dir.clone(),
-                            new_diff,
-                            &fst_outcome,
-                            &snd_outcome,
-                        )?;
+                match self.runner.run_harness(&binary_path)? {
+                    (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
+                        let hash_diff_interesting = self
+                            .runner
+                            .hash_objective
+                            .is_interesting()
+                            .with_context(|| "failed to do hash objective")?;
+                        if hash_diff_interesting {
+                            let new_diff = self.runner.hash_objective.get_diff();
+                            if old_diff == new_diff {
+                                workload = reduced;
+                                info!("workload reduced (length = {})", workload.ops.len());
+                                self.runner.report_diff(
+                                    &workload,
+                                    index.to_string(),
+                                    &binary_path,
+                                    output_dir.clone(),
+                                    new_diff,
+                                    &fst_outcome,
+                                    &snd_outcome,
+                                    "".to_owned(),
+                                )?;
+                            }
+                        }
                     }
-                }
+                    _ => {}
+                };
             }
             if index == 0 {
                 break;
