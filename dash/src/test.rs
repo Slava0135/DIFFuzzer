@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use std::fs;
-use std::fs::{remove_dir_all, File};
+use std::fs::{File, remove_dir_all};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 

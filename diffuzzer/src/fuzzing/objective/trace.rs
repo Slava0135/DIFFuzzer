@@ -2,9 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use hasher::{FileDiff, get_diff};
 use log::debug;
 
-use crate::abstract_fs::trace::Trace;
+use crate::abstract_fs::trace::{Trace, TraceRow};
 
 pub struct TraceObjective {}
 

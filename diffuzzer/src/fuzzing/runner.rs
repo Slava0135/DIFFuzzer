@@ -269,8 +269,8 @@ impl Stats {
     }
 }
 
-pub fn parse_trace(outcome: &Completed) -> anyhow::Result<Trace> {
-    let trace = fs::read_to_string(outcome.dir.join(TRACE_FILENAME))?;
+pub fn parse_trace(dir: &LocalPath) -> anyhow::Result<Trace> {
+    let trace = fs::read_to_string(dir.join(TRACE_FILENAME))?;
     anyhow::Ok(Trace::try_parse(trace).with_context(|| "failed to parse trace")?)
 }
 

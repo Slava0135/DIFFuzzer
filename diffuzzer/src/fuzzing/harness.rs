@@ -5,6 +5,7 @@
 use anyhow::{Context, bail};
 
 use crate::command::{CommandInterface, CommandWrapper, ExecError};
+use crate::fuzzing::objective::Dash::{DashHolder, DashProducer};
 use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
 use crate::supervisor::Supervisor;
@@ -59,7 +60,9 @@ impl Harness {
 
         match output {
             Ok(output) => {
-                completion_callback(cmdi).with_context(|| "completion callback failed")?;
+                let dash_holder = completion_callback(cmdi)
+                    .with_context(|| "completion callback failed")?;
+
                 if !keep_fs {
                     self.teardown(cmdi)?;
                 }
@@ -72,11 +75,12 @@ impl Harness {
                 cmdi.copy_dir_from_remote(&self.exec_dir, &self.outcome_dir)
                     .with_context(|| "failed to copy test output files")?;
 
-                Ok(Outcome::Completed(Completed {
-                    dir: self.outcome_dir.clone(),
+                Ok(Outcome::Completed(Completed::new(
                     stdout,
                     stderr,
-                }))
+                    self.outcome_dir.clone(),
+                    dash_holder,
+                )))
             }
             Err(ExecError::TimedOut(_)) => {
                 if supervisor.had_panic_event()? {

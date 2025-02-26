@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use crate::filesystems::filesystems_available;
-use clap::{builder::PossibleValuesParser, Parser, Subcommand};
+use clap::{Parser, Subcommand, builder::PossibleValuesParser};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]

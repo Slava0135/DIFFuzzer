@@ -8,7 +8,7 @@ use std::hash::Hasher;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
-use FileDiff::{FileIsDifferent, OnlyOneExists};
+use FileDiff::{DifferentHash, OneExists};
 use anyhow::{Context, Ok};
 use regex::RegexSet;
 use serde::{Deserialize, Serialize};
