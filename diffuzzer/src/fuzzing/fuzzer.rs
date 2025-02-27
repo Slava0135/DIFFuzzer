@@ -7,7 +7,6 @@ use std::time::Instant;
 use anyhow::Context;
 use log::{debug, error, info, warn};
 
-use crate::fuzzing::objective::dash::DashHolder;
 use crate::{
     abstract_fs::{trace::Trace, workload::Workload},
     path::RemotePath,
@@ -67,7 +66,7 @@ pub trait Fuzzer {
         debug!("do objectives");
         let hash_diff_interesting = runner
             .dash_objective
-            .is_interesting(&fst_outcome.dash_holder, &snd_outcome.dash_holder)
+            .is_interesting(&fst_outcome.dash_state, &snd_outcome.dash_state)
             .with_context(|| "failed to do hash objective")?;
         let trace_is_interesting = runner
             .trace_objective
@@ -83,7 +82,7 @@ pub trait Fuzzer {
             if hash_diff_interesting {
                 diff = runner
                     .dash_objective
-                    .get_diff(&fst_outcome.dash_holder, &snd_outcome.dash_holder);
+                    .get_diff(&fst_outcome.dash_state, &snd_outcome.dash_state);
             }
             let dir_name = input.generate_name();
             runner

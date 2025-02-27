@@ -8,12 +8,12 @@ use std::hash::Hasher;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
-use FileDiff::{DifferentHash, OneExists};
 use anyhow::{Context, Ok};
 use regex::RegexSet;
 use serde::{Deserialize, Serialize};
 use twox_hash::XxHash64;
 use walkdir::WalkDir;
+use crate::FileDiff::{FileIsDifferent, OnlyOneExists};
 
 pub const DIFF_FILENAME: &str = "dash-diff.txt";
 

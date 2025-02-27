@@ -5,7 +5,7 @@
 use anyhow::{Context, bail};
 
 use crate::command::{CommandInterface, CommandWrapper, ExecError};
-use crate::fuzzing::objective::Dash::{DashHolder, DashProducer};
+use crate::fuzzing::objective::dash::DashState;
 use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
 use crate::supervisor::Supervisor;
@@ -36,7 +36,7 @@ impl Harness {
             timeout,
         }
     }
-    pub fn run<C: FnMut(&dyn CommandInterface) -> anyhow::Result<()>>(
+    pub fn run<C: FnMut(&dyn CommandInterface) -> DashState>(
         &self,
         cmdi: &dyn CommandInterface,
         binary_path: &RemotePath,
@@ -60,8 +60,7 @@ impl Harness {
 
         match output {
             Ok(output) => {
-                let dash_holder = completion_callback(cmdi)
-                    .with_context(|| "completion callback failed")?;
+                let dash_state: DashState = completion_callback(cmdi);
 
                 if !keep_fs {
                     self.teardown(cmdi)?;
@@ -79,7 +78,7 @@ impl Harness {
                     stdout,
                     stderr,
                     self.outcome_dir.clone(),
-                    dash_holder,
+                    dash_state,
                 )))
             }
             Err(ExecError::TimedOut(_)) => {

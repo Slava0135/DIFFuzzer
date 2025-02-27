@@ -64,7 +64,7 @@ impl Reducer {
                 let hash_diff_interesting = self
                     .runner
                     .dash_objective
-                    .is_interesting(&fst_outcome.hash_holder, &snd_outcome.hash_holder)
+                    .is_interesting(&fst_outcome.dash_state, &snd_outcome.dash_state)
                     .with_context(|| "failed to do hash objective")?;
                 let _trace_is_interesting = self
                     .runner
@@ -76,7 +76,7 @@ impl Reducer {
                     let old_diff = self
                         .runner
                         .dash_objective
-                        .get_diff(&fst_outcome.hash_holder, &snd_outcome.hash_holder);
+                        .get_diff(&fst_outcome.dash_state, &snd_outcome.dash_state);
                     self.reduce_by_hash(input, old_diff, save_to_dir)?;
                 } else {
                     warn!("crash not detected");
@@ -114,13 +114,13 @@ impl Reducer {
                         let hash_diff_interesting = self
                             .runner
                             .dash_objective
-                            .is_interesting(&fst_outcome.hash_holder, &snd_outcome.hash_holder)
+                            .is_interesting(&fst_outcome.dash_state, &snd_outcome.dash_state)
                             .with_context(|| "failed to do hash objective")?;
                         if hash_diff_interesting {
                             let new_diff = self
                                 .runner
                                 .dash_objective
-                                .get_diff(&fst_outcome.hash_holder, &snd_outcome.hash_holder);
+                                .get_diff(&fst_outcome.dash_state, &snd_outcome.dash_state);
                             if old_diff == new_diff {
                                 workload = reduced;
                                 info!("workload reduced (length = {})", workload.ops.len());
