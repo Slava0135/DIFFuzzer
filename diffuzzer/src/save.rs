@@ -7,8 +7,8 @@ use std::fs::OpenOptions;
 use std::io::Write;
 
 use anyhow::Context;
-use hasher::FileDiff::{DifferentHash, OneExists};
-use hasher::{DIFF_HASH_FILENAME, FileDiff};
+use dash::FileDiff::{DifferentHash, OneExists};
+use dash::{DIFF_HASH_FILENAME, FileDiff};
 
 use crate::command::CommandInterface;
 use crate::compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME};

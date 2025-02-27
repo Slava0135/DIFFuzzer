@@ -12,7 +12,7 @@ use crate::path::{LocalPath, RemotePath};
 use crate::save::{save_completed, save_diff, save_reason, save_testcase};
 use crate::supervisor::Supervisor;
 use anyhow::{Context, Ok};
-use hasher::FileDiff;
+use dash::FileDiff;
 use log::{debug, info, warn};
 use std::fs;
 use std::path::Path;

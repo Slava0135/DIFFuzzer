@@ -14,7 +14,7 @@ use crate::{
     },
     path::RemotePath,
 };
-use hasher::FileDiff;
+use dash::FileDiff;
 
 use super::{outcome::Completed, runner::Runner};
 
