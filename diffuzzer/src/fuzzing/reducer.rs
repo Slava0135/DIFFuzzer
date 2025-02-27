@@ -8,6 +8,7 @@ use anyhow::{Context, Ok};
 use dash::FileDiff;
 use log::{info, warn};
 
+use crate::fuzzing::objective::trace::TraceDiff;
 use crate::{
     abstract_fs::{mutator::remove, workload::Workload},
     command::CommandInterface,
@@ -21,6 +22,11 @@ use super::runner::Runner;
 
 pub struct Reducer {
     runner: Runner,
+}
+
+pub enum BugHolder {
+    HashBug { name: String, bug: FileDiff },
+    TraceBug { name: String, bug: TraceDiff },
 }
 
 impl Reducer {
@@ -80,6 +86,15 @@ impl Reducer {
         };
 
         Ok(())
+    }
+
+    fn reduce(
+        &mut self,
+        input: Workload,
+        revealed_errors: Vec<BugHolder>,
+        output_dir: &LocalPath,
+    ) -> anyhow::Result<()> {
+        return Ok(());
     }
 
     fn reduce_by_hash(

@@ -9,6 +9,8 @@ use crate::abstract_fs::trace::{Trace, TraceRow};
 
 pub struct TraceObjective {}
 
+pub struct TraceDiff {}
+
 impl TraceObjective {
     pub fn new() -> Self {
         Self {}
