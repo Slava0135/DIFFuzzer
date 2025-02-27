@@ -49,7 +49,7 @@ impl DashState {
             .read_to_string(output_path)
             .with_context(|| format!("failed to read Dash output file at '{}'", output_path))?;
         let fs_state = serde_json::from_str(&fs_state)
-            .with_context(|| format!("failed to parse Dash output file"))?;
+            .with_context(|| "failed to parse Dash output file")?;
         self.fs_state = fs_state;
         self.hash = hash;
         Ok(())
@@ -135,7 +135,7 @@ impl DashObjective {
         if self.enabled {
             Ok(self.fst.hash != self.snd.hash)
         } else {
-            return Ok(false);
+            Ok(false)
         }
     }
 
