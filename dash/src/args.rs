@@ -27,8 +27,7 @@ pub struct Args {
     pub mode: bool,
     /// Regex patterns of directories and files to exclude from state and hash
     /// Note: patterns are applied to full paths, relative to mount point
-    /// 
-    /// Example: `-e "*.log" -e "\w*.rs"`
-    #[arg(short, long)]
+    /// Example: -e "output.log" -e "\w*.rs"
+    #[arg(short, long, verbatim_doc_comment)]
     pub exclude: Option<Vec<String>>,
 }
