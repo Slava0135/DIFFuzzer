@@ -8,21 +8,24 @@ use clap::Parser;
 #[command(version, about, long_about = None)]
 #[command(propagate_version = true)]
 pub struct Args {
-    /// Path to mount
+    /// Path to mount point
     #[arg(short, long)]
     pub target_path: String,
 
     /// Output file
-    #[arg(short, long, default_value = "./files.json")]
+    #[arg(short, long, default_value = "./fs-state.json")]
     pub output_path: String,
 
+    /// Include total size of files in bytes
     #[arg(short, long, default_value_t = false)]
     pub size: bool,
+    /// Include number of hard links pointing to files
     #[arg(short, long, default_value_t = false)]
     pub nlink: bool,
+    /// Include rights applied to files
     #[arg(short, long, default_value_t = false)]
     pub mode: bool,
-    /// Regex pattern for skip dirs and files
+    /// List of regex patterns of dirs and files to skip
     #[arg(short, long)]
     pub exclude: Option<Vec<String>>,
 }
