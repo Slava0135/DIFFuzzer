@@ -90,7 +90,7 @@ impl Runner {
             snd_mount.get_internal_dirs(),
             &config,
         )
-        .with_context(|| "failed to create Dash objective")?;
+            .with_context(|| "failed to create Dash objective")?;
         let trace_objective = TraceObjective::new();
 
         let fst_harness = Harness::new(
@@ -160,7 +160,9 @@ impl Runner {
                 binary_path,
                 self.keep_fs,
                 self.supervisor.as_mut(),
-                |cmdi| self.dash_objective.update_first(cmdi),
+                |cmdi| self.dash_objective.calculate_fst(
+                    cmdi,
+                ),
             )
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
         match fst_outcome {
@@ -183,7 +185,9 @@ impl Runner {
                 binary_path,
                 self.keep_fs,
                 self.supervisor.as_mut(),
-                |cmdi| self.dash_objective.update_second(cmdi),
+                |cmdi| self.dash_objective.calculate_snd(
+                    cmdi
+                ),
             )
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
 
@@ -269,8 +273,8 @@ impl Stats {
     }
 }
 
-pub fn parse_trace(outcome: &Completed) -> anyhow::Result<Trace> {
-    let trace = fs::read_to_string(outcome.dir.join(TRACE_FILENAME))?;
+pub fn parse_trace(dir: &LocalPath) -> anyhow::Result<Trace> {
+    let trace = fs::read_to_string(dir.join(TRACE_FILENAME))?;
     anyhow::Ok(Trace::try_parse(trace).with_context(|| "failed to parse trace")?)
 }
 
