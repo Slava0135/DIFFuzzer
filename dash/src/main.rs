@@ -32,6 +32,6 @@ fn main() {
     println!("{}", hash);
     let serialized_file = to_string(&files).unwrap();
     fs::write(Path::new(&args.output_path), serialized_file)
-        .with_context(|| "failed write diff to file")
+        .with_context(|| "failed write output to file")
         .unwrap();
 }
