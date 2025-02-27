@@ -7,11 +7,11 @@ use std::path::Path;
 
 use anyhow::Context;
 use clap::Parser;
+use dash::{calc_dir_hash, HasherOptions};
 use regex::RegexSet;
 use serde_json::to_string;
 
 use args::Args;
-use hasher::{calc_dir_hash, HasherOptions};
 
 mod args;
 #[cfg(test)]

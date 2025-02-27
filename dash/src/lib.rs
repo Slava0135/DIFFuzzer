@@ -8,24 +8,30 @@ use std::hash::Hasher;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
+use FileDiff::{FileIsDifferent, OnlyOneExists};
 use anyhow::{Context, Ok};
 use regex::RegexSet;
 use serde::{Deserialize, Serialize};
 use twox_hash::XxHash64;
 use walkdir::WalkDir;
-use FileDiff::{DifferentHash, OneExists};
 
-pub const DIFF_HASH_FILENAME: &str = "diff_hash.txt";
+pub const DIFF_FILENAME: &str = "dash-diff.txt";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileInfo {
+    /// Absolute file path (with mount `/mnt/...` prefix)
     abs_path: String,
+    /// Path relative to file system root
     rel_path: String,
-
+    /// Group ID of the owner
     gid: u32,
+    /// User ID of the owner
     uid: u32,
+    /// Total size of file in bytes
     size: u64,
+    /// Number of hard links pointing to file
     nlink: u64,
+    /// Rights applied to file
     mode: u32,
 }
 
@@ -48,10 +54,11 @@ impl FileInfo {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FileDiff {
-    DifferentHash { fst: FileInfo, snd: FileInfo },
-    OneExists(FileInfo),
+    FileIsDifferent { fst: FileInfo, snd: FileInfo },
+    OnlyOneExists(FileInfo),
 }
 
+/// Options that enable fields in [FileInfo]
 #[derive(Default)]
 pub struct HasherOptions {
     pub size: bool,
@@ -155,7 +162,7 @@ pub fn get_diff(
                 let hash_snd =
                     calc_fileinfo_hash(vec_snd, &vec_snd[i_snd].rel_path, hasher_options);
                 if hash_fst != hash_snd {
-                    res.push(DifferentHash {
+                    res.push(FileIsDifferent {
                         fst: vec_fst[i_fst].clone(),
                         snd: vec_snd[i_snd].clone(),
                     });
@@ -167,14 +174,14 @@ pub fn get_diff(
                 i_snd -= 1;
             }
             Ordering::Greater => {
-                res.push(OneExists(vec_fst[i_fst].clone()));
+                res.push(OnlyOneExists(vec_fst[i_fst].clone()));
                 if i_fst == 0 {
                     break;
                 }
                 i_fst -= 1;
             }
             Ordering::Less => {
-                res.push(OneExists(vec_snd[i_snd].clone()));
+                res.push(OnlyOneExists(vec_snd[i_snd].clone()));
                 if i_snd == 0 {
                     break;
                 }
@@ -192,7 +199,7 @@ pub fn get_diff(
 fn handle_last_diff(mut i: usize, vec_data: &[FileInfo], res: &mut Vec<FileDiff>) {
     if i > 0 {
         loop {
-            res.push(OneExists(vec_data[i].clone()));
+            res.push(OnlyOneExists(vec_data[i].clone()));
             if i == 0 {
                 break;
             }

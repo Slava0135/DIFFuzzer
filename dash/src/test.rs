@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 use regex::RegexSet;
 
-use hasher::{calc_dir_hash, get_diff};
+use dash::{calc_dir_hash, get_diff};
 
 #[ignore]
 #[test]

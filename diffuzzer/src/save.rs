@@ -7,8 +7,8 @@ use std::fs::OpenOptions;
 use std::io::Write;
 
 use anyhow::Context;
-use hasher::FileDiff::{DifferentHash, OneExists};
-use hasher::{DIFF_HASH_FILENAME, FileDiff};
+use dash::FileDiff::{FileIsDifferent, OnlyOneExists};
+use dash::{DIFF_FILENAME, FileDiff};
 
 use crate::command::CommandInterface;
 use crate::compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME};
@@ -74,7 +74,7 @@ pub fn save_completed(
 }
 
 pub fn save_diff(output_dir: &LocalPath, diff_hash: Vec<FileDiff>) -> anyhow::Result<()> {
-    let diff_hash_path = output_dir.join(DIFF_HASH_FILENAME);
+    let diff_hash_path = output_dir.join(DIFF_FILENAME);
     let mut file = OpenOptions::new()
         .append(true)
         .create(true)
@@ -83,10 +83,10 @@ pub fn save_diff(output_dir: &LocalPath, diff_hash: Vec<FileDiff>) -> anyhow::Re
 
     for diff in diff_hash {
         let txt = match diff {
-            DifferentHash { fst, snd } => {
+            FileIsDifferent { fst, snd } => {
                 format!("File with different hash:\n {}\n\n {}\n\n", fst, snd)
             }
-            OneExists(f) => format!("File exists only in one FS:\n {}\n\n", f),
+            OnlyOneExists(f) => format!("File exists only in one FS:\n {}\n\n", f),
         };
         file.write(txt.as_bytes())
             .with_context(|| format!("failed to save source file to '{}'", diff_hash_path))?;

@@ -5,7 +5,7 @@
 use std::fs::read_to_string;
 
 use anyhow::{Context, Ok};
-use hasher::FileDiff;
+use dash::FileDiff;
 use log::{info, warn};
 
 use crate::{

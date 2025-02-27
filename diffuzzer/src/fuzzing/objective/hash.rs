@@ -8,7 +8,7 @@ use regex::RegexSet;
 
 use crate::path::RemotePath;
 
-use hasher::{calc_dir_hash, get_diff, FileDiff, FileInfo, HasherOptions};
+use dash::{calc_dir_hash, get_diff, FileDiff, FileInfo, HasherOptions};
 
 pub struct HashHolder {
     fs_dir: RemotePath,

@@ -20,4 +20,4 @@ thiserror = "2.0.9"
 toml = "0.8.19"
 walkdir = "2.5.0"
 twox-hash = "2.1.0"
-hasher = { path = "../hasher" }
+dash = { path = "../dash" }
