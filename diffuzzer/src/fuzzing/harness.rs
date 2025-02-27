@@ -5,7 +5,6 @@
 use anyhow::{Context, bail};
 
 use crate::command::{CommandInterface, CommandWrapper, ExecError};
-use crate::fuzzing::objective::hash::HashHolder;
 use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
 use crate::supervisor::Supervisor;
@@ -36,13 +35,13 @@ impl Harness {
             timeout,
         }
     }
-    pub fn run(
+    pub fn run<C: FnMut() -> anyhow::Result<()>>(
         &self,
         cmdi: &dyn CommandInterface,
         binary_path: &RemotePath,
         keep_fs: bool,
-        hash_holder: Option<&mut HashHolder>,
         supervisor: &mut dyn Supervisor,
+        mut completion_callback: C,
     ) -> anyhow::Result<Outcome> {
         supervisor.reset_events()?;
 
@@ -60,10 +59,7 @@ impl Harness {
 
         match output {
             Ok(output) => {
-                if let Some(holder) = hash_holder {
-                    holder.calc_and_save_hash()?;
-                }
-
+                completion_callback().with_context(|| "completion callback failed")?;
                 if !keep_fs {
                     self.teardown(cmdi)?;
                 }

@@ -8,23 +8,21 @@ use regex::RegexSet;
 
 use crate::path::RemotePath;
 
-use dash::{calc_dir_hash, get_diff, FileDiff, FileInfo, HasherOptions};
+use dash::{FileDiff, FileInfo, HasherOptions, calc_dir_hash, get_diff};
 
-pub struct HashHolder {
+struct DashState {
     fs_dir: RemotePath,
     fs_internal: RegexSet,
     fs_content: Vec<FileInfo>,
     hash: u64,
-    hasher_options: HasherOptions,
 }
 
-impl HashHolder {
-    pub fn calc_and_save_hash(&mut self) -> anyhow::Result<()> {
+impl DashState {
+    pub fn update(&mut self, hasher_options: &HasherOptions) -> anyhow::Result<()> {
         let (hash, fs_content) =
-            calc_dir_hash(&self.fs_dir.base, &self.fs_internal, &self.hasher_options)
-                .with_context(|| {
-                    format!("failed to calculate directory hash at '{}'", self.fs_dir)
-                })?;
+            calc_dir_hash(&self.fs_dir.base, &self.fs_internal, hasher_options).with_context(
+                || format!("failed to calculate directory hash at '{}'", self.fs_dir),
+            )?;
         self.fs_content = fs_content;
         self.hash = hash;
         Ok(())
@@ -32,13 +30,14 @@ impl HashHolder {
 }
 
 pub struct DashObjective {
-    pub fst_fs: HashHolder,
-    pub snd_fs: HashHolder,
-    pub enabled: bool,
+    fst: DashState,
+    snd: DashState,
+    enabled: bool,
+    hasher_options: HasherOptions,
 }
 
 impl DashObjective {
-    pub fn new(
+    pub fn create(
         fst_fs_dir: RemotePath,
         snd_fs_dir: RemotePath,
         fst_fs_internal: RegexSet,
@@ -46,40 +45,55 @@ impl DashObjective {
         enabled: bool,
     ) -> Self {
         Self {
-            fst_fs: HashHolder {
+            fst: DashState {
                 fs_dir: fst_fs_dir,
                 fs_internal: fst_fs_internal,
                 fs_content: vec![],
                 hash: 0,
-                hasher_options: Default::default(),
             },
-            snd_fs: HashHolder {
+            snd: DashState {
                 fs_dir: snd_fs_dir,
                 fs_internal: snd_fs_internal,
                 fs_content: vec![],
                 hash: 0,
-                hasher_options: Default::default(),
             },
             enabled,
+            hasher_options: Default::default(),
+        }
+    }
+
+    pub fn update_first(&mut self) -> anyhow::Result<()> {
+        if self.enabled {
+            self.fst.update(&self.hasher_options)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn update_second(&mut self) -> anyhow::Result<()> {
+        if self.enabled {
+            self.snd.update(&self.hasher_options)
+        } else {
+            Ok(())
         }
     }
 
     pub fn is_interesting(&self) -> anyhow::Result<bool> {
         debug!("do hash objective");
-        if !self.enabled {
+        if self.enabled {
+            Ok(self.fst.hash != self.snd.hash)
+        } else {
             return Ok(false);
         }
-
-        Ok(self.fst_fs.hash != self.snd_fs.hash)
     }
 
     pub fn get_diff(&mut self) -> Vec<FileDiff> {
         get_diff(
-            &self.fst_fs.fs_content,
-            &self.snd_fs.fs_content,
-            &self.fst_fs.fs_internal,
-            &self.snd_fs.fs_internal,
-            &self.fst_fs.hasher_options,
+            &self.fst.fs_content,
+            &self.snd.fs_content,
+            &self.fst.fs_internal,
+            &self.snd.fs_internal,
+            &self.hasher_options,
         )
     }
 }

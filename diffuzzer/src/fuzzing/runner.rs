@@ -19,7 +19,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use super::harness::Harness;
-use super::objective::hash::DashObjective;
+use super::objective::dash::DashObjective;
 use super::objective::trace::TraceObjective;
 use super::outcome::{Completed, Outcome};
 
@@ -85,7 +85,7 @@ impl Runner {
         if !config.dash_enabled {
             warn!("dash (differential abstract state hash) objective is disabled")
         }
-        let hash_objective = DashObjective::new(
+        let dash_objective = DashObjective::create(
             fst_fs_dir.clone(),
             snd_fs_dir.clone(),
             fst_mount.get_internal_dirs(),
@@ -122,7 +122,7 @@ impl Runner {
             crashes_path,
             accidents_path,
 
-            dash_objective: hash_objective,
+            dash_objective,
             trace_objective,
 
             fst_fs_name,
@@ -154,19 +154,14 @@ impl Runner {
 
         setup_dir(self.cmdi.as_ref(), &self.exec_dir)
             .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;
-        let fst_hash = if self.dash_objective.enabled {
-            Some(&mut self.dash_objective.fst_fs)
-        } else {
-            None
-        };
         let fst_outcome = self
             .fst_harness
             .run(
                 self.cmdi.as_ref(),
                 binary_path,
                 self.keep_fs,
-                fst_hash,
                 self.supervisor.as_mut(),
+                || self.dash_objective.update_first(),
             )
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
         match fst_outcome {
@@ -182,19 +177,14 @@ impl Runner {
 
         setup_dir(self.cmdi.as_ref(), &self.exec_dir)
             .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;
-        let snd_hash = if self.dash_objective.enabled {
-            Some(&mut self.dash_objective.snd_fs)
-        } else {
-            None
-        };
         let snd_outcome = self
             .snd_harness
             .run(
                 self.cmdi.as_ref(),
                 binary_path,
                 self.keep_fs,
-                snd_hash,
                 self.supervisor.as_mut(),
+                || self.dash_objective.update_second(),
             )
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
 
