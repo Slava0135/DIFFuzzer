@@ -1,5 +1,5 @@
 fs_name = "fstest" 
-hashing_enabled = false 
+dash_enabled = false 
 heartbeat_interval = 30 # in seconds
 max_workload_length = 100 
 timeout = 10 # in seconds

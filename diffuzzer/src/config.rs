@@ -13,7 +13,7 @@ pub struct Config {
     pub mutation_weights: MutationWeights,
     pub max_workload_length: u16,
     pub fs_name: String,
-    pub hashing_enabled: bool,
+    pub dash_enabled: bool,
     pub heartbeat_interval: u16,
     pub timeout: u8,
     pub qemu: QemuConfig,

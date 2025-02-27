@@ -19,7 +19,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use super::harness::Harness;
-use super::objective::hash::HashObjective;
+use super::objective::hash::DashObjective;
 use super::objective::trace::TraceObjective;
 use super::outcome::{Completed, Outcome};
 
@@ -38,7 +38,7 @@ pub struct Runner {
     pub accidents_path: LocalPath,
 
     pub trace_objective: TraceObjective,
-    pub hash_objective: HashObjective,
+    pub dash_objective: DashObjective,
 
     pub fst_fs_name: String,
     pub snd_fs_name: String,
@@ -82,15 +82,15 @@ impl Runner {
             .join(snd_fs_name.to_lowercase())
             .join(&config.fs_name);
 
-        if !config.hashing_enabled {
-            warn!("hashing objective is disabled")
+        if !config.dash_enabled {
+            warn!("dash (differential abstract state hash) objective is disabled")
         }
-        let hash_objective = HashObjective::new(
+        let hash_objective = DashObjective::new(
             fst_fs_dir.clone(),
             snd_fs_dir.clone(),
             fst_mount.get_internal_dirs(),
             snd_mount.get_internal_dirs(),
-            config.hashing_enabled,
+            config.dash_enabled,
         );
         let trace_objective = TraceObjective::new();
 
@@ -122,7 +122,7 @@ impl Runner {
             crashes_path,
             accidents_path,
 
-            hash_objective,
+            dash_objective: hash_objective,
             trace_objective,
 
             fst_fs_name,
@@ -154,8 +154,8 @@ impl Runner {
 
         setup_dir(self.cmdi.as_ref(), &self.exec_dir)
             .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;
-        let fst_hash = if self.hash_objective.enabled {
-            Some(&mut self.hash_objective.fst_fs)
+        let fst_hash = if self.dash_objective.enabled {
+            Some(&mut self.dash_objective.fst_fs)
         } else {
             None
         };
@@ -182,8 +182,8 @@ impl Runner {
 
         setup_dir(self.cmdi.as_ref(), &self.exec_dir)
             .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;
-        let snd_hash = if self.hash_objective.enabled {
-            Some(&mut self.hash_objective.snd_fs)
+        let snd_hash = if self.dash_objective.enabled {
+            Some(&mut self.dash_objective.snd_fs)
         } else {
             None
         };

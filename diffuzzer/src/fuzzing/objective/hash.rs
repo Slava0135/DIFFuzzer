@@ -31,13 +31,13 @@ impl HashHolder {
     }
 }
 
-pub struct HashObjective {
+pub struct DashObjective {
     pub fst_fs: HashHolder,
     pub snd_fs: HashHolder,
     pub enabled: bool,
 }
 
-impl HashObjective {
+impl DashObjective {
     pub fn new(
         fst_fs_dir: RemotePath,
         snd_fs_dir: RemotePath,

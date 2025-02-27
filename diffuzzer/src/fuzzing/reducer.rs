@@ -62,7 +62,7 @@ impl Reducer {
 
                 let hash_diff_interesting = self
                     .runner
-                    .hash_objective
+                    .dash_objective
                     .is_interesting()
                     .with_context(|| "failed to do hash objective")?;
                 let _trace_is_interesting = self
@@ -72,7 +72,7 @@ impl Reducer {
                     .with_context(|| "failed to do trace objective")?;
 
                 if hash_diff_interesting {
-                    let old_diff = self.runner.hash_objective.get_diff();
+                    let old_diff = self.runner.dash_objective.get_diff();
                     self.reduce_by_hash(input, old_diff, save_to_dir)?;
                 } else {
                     warn!("crash not detected");
@@ -100,11 +100,11 @@ impl Reducer {
                     (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
                         let hash_diff_interesting = self
                             .runner
-                            .hash_objective
+                            .dash_objective
                             .is_interesting()
                             .with_context(|| "failed to do hash objective")?;
                         if hash_diff_interesting {
-                            let new_diff = self.runner.hash_objective.get_diff();
+                            let new_diff = self.runner.dash_objective.get_diff();
                             if old_diff == new_diff {
                                 workload = reduced;
                                 info!("workload reduced (length = {})", workload.ops.len());
