@@ -20,7 +20,7 @@ save_corpus = false
 
 [dash]
 enabled = false
-output_path = "/tmp/diffuzzer-dash-output"
+output_path = "/tmp/diffuzzer-dash-output.json"
 debug_binary_path = "./target/debug/dash"
 release_binary_path = "./target/release/dash"
 
