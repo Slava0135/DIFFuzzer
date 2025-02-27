@@ -19,7 +19,7 @@ max_mutations = 10
 save_corpus = false
 
 [dash]
-enabled = false
+enabled = true
 output_path = "/tmp/diffuzzer-dash-output.json"
 debug_binary_path = "./target/debug/dash"
 release_binary_path = "./target/release/dash"

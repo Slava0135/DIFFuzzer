@@ -42,6 +42,7 @@ impl DashState {
         let hash = String::from_utf8(output.stdout)
             .with_context(|| "failed to convert Dash stdout to string")?;
         let hash: u64 = hash
+            .trim()
             .parse()
             .with_context(|| format!("failed to parse hash '{}'", hash))?;
         let fs_state = cmdi
