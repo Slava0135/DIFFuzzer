@@ -13,7 +13,7 @@ use crate::save::{save_completed, save_diff, save_reason, save_testcase};
 use crate::supervisor::Supervisor;
 use anyhow::{Context, Ok};
 use dash::FileDiff;
-use log::{debug, info, warn};
+use log::{debug, info};
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
@@ -82,16 +82,15 @@ impl Runner {
             .join(snd_fs_name.to_lowercase())
             .join(&config.fs_name);
 
-        if !config.dash_enabled {
-            warn!("dash (differential abstract state hash) objective is disabled")
-        }
         let dash_objective = DashObjective::create(
+            cmdi.as_ref(),
             fst_fs_dir.clone(),
             snd_fs_dir.clone(),
             fst_mount.get_internal_dirs(),
             snd_mount.get_internal_dirs(),
-            config.dash_enabled,
-        );
+            &config,
+        )
+        .with_context(|| "failed to create Dash objective")?;
         let trace_objective = TraceObjective::new();
 
         let fst_harness = Harness::new(
@@ -161,7 +160,7 @@ impl Runner {
                 binary_path,
                 self.keep_fs,
                 self.supervisor.as_mut(),
-                || self.dash_objective.update_first(),
+                |cmdi| self.dash_objective.update_first(cmdi),
             )
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
         match fst_outcome {
@@ -184,7 +183,7 @@ impl Runner {
                 binary_path,
                 self.keep_fs,
                 self.supervisor.as_mut(),
-                || self.dash_objective.update_second(),
+                |cmdi| self.dash_objective.update_second(cmdi),
             )
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
 

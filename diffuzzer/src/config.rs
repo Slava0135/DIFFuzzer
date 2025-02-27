@@ -13,10 +13,10 @@ pub struct Config {
     pub mutation_weights: MutationWeights,
     pub max_workload_length: u16,
     pub fs_name: String,
-    pub dash_enabled: bool,
     pub heartbeat_interval: u16,
     pub timeout: u8,
     pub qemu: QemuConfig,
+    pub dash: DashConfig,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -46,4 +46,12 @@ pub struct QemuConfig {
     pub monitor_socket_path: String,
     /// Path to QMP unix socket
     pub qmp_socket_path: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DashConfig {
+    pub enabled: bool,
+    pub output_path: String,
+    pub debug_binary_path: String,
+    pub release_binary_path: String,
 }

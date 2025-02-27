@@ -67,7 +67,7 @@ pub fn run(
             &binary_path,
             keep_fs,
             supervisor.as_mut(),
-            || Ok(()),
+            |_| Ok(()),
         )
         .with_context(|| "failed to run harness")?;
 

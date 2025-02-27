@@ -35,7 +35,7 @@ impl Harness {
             timeout,
         }
     }
-    pub fn run<C: FnMut() -> anyhow::Result<()>>(
+    pub fn run<C: FnMut(&dyn CommandInterface) -> anyhow::Result<()>>(
         &self,
         cmdi: &dyn CommandInterface,
         binary_path: &RemotePath,
@@ -59,7 +59,7 @@ impl Harness {
 
         match output {
             Ok(output) => {
-                completion_callback().with_context(|| "completion callback failed")?;
+                completion_callback(cmdi).with_context(|| "completion callback failed")?;
                 if !keep_fs {
                     self.teardown(cmdi)?;
                 }

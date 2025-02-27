@@ -1,5 +1,4 @@
 fs_name = "fstest" 
-dash_enabled = false 
 heartbeat_interval = 30 # in seconds
 max_workload_length = 100 
 timeout = 10 # in seconds
@@ -18,6 +17,12 @@ qmp_socket_path = "/tmp/diffuzzer-qemu-qmp.sock"
 [greybox]
 max_mutations = 10
 save_corpus = false
+
+[dash]
+enabled = false
+output_path = "/tmp/diffuzzer-dash-output"
+debug_binary_path = "./target/debug/dash"
+release_binary_path = "./target/release/dash"
 
 [operation_weights]
 weights = [
