@@ -58,7 +58,7 @@ pub enum FileDiff {
     OnlyOneExists(FileInfo),
 }
 
-/// Options that enable fields in [FileInfo]
+/// Options to include fields from [FileInfo] when calculating hash
 #[derive(Default)]
 pub struct HasherOptions {
     pub size: bool,

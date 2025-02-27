@@ -70,7 +70,7 @@ pub trait Fuzzer {
         let runner = self.runner();
         debug!("do objectives");
         let hash_diff_interesting = runner
-            .hash_objective
+            .dash_objective
             .is_interesting()
             .with_context(|| "failed to do hash objective")?;
         let trace_is_interesting = runner
@@ -85,7 +85,7 @@ pub trait Fuzzer {
             debug!("{}", reason);
             let mut diff: Vec<FileDiff> = vec![];
             if hash_diff_interesting {
-                diff = runner.hash_objective.get_diff();
+                diff = runner.dash_objective.get_diff();
             }
             let dir_name = input.generate_name();
             runner

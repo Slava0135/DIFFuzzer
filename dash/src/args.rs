@@ -16,16 +16,18 @@ pub struct Args {
     #[arg(short, long, default_value = "./fs-state.json")]
     pub output_path: String,
 
-    /// Include total size of files in bytes
+    /// Include total size of files in bytes when calculating hash
     #[arg(short, long, default_value_t = false)]
     pub size: bool,
-    /// Include number of hard links pointing to files
+    /// Include number of hard links pointing to files when calculating hash
     #[arg(short, long, default_value_t = false)]
     pub nlink: bool,
-    /// Include rights applied to files
+    /// Include rights applied to files when calculating hash
     #[arg(short, long, default_value_t = false)]
     pub mode: bool,
-    /// List of regex patterns of dirs and files to skip
-    #[arg(short, long)]
+    /// Regex patterns of directories and files to exclude from state and hash
+    /// Note: patterns are applied to full paths, relative to mount point
+    /// Example: -e "output.log" -e "\w*.rs"
+    #[arg(short, long, verbatim_doc_comment)]
     pub exclude: Option<Vec<String>>,
 }

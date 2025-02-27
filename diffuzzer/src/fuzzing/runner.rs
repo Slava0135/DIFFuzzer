@@ -13,13 +13,13 @@ use crate::save::{save_completed, save_diff, save_reason, save_testcase};
 use crate::supervisor::Supervisor;
 use anyhow::{Context, Ok};
 use dash::FileDiff;
-use log::{debug, info, warn};
+use log::{debug, info};
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
 
 use super::harness::Harness;
-use super::objective::hash::HashObjective;
+use super::objective::dash::DashObjective;
 use super::objective::trace::TraceObjective;
 use super::outcome::{Completed, Outcome};
 
@@ -38,7 +38,7 @@ pub struct Runner {
     pub accidents_path: LocalPath,
 
     pub trace_objective: TraceObjective,
-    pub hash_objective: HashObjective,
+    pub dash_objective: DashObjective,
 
     pub fst_fs_name: String,
     pub snd_fs_name: String,
@@ -82,16 +82,15 @@ impl Runner {
             .join(snd_fs_name.to_lowercase())
             .join(&config.fs_name);
 
-        if !config.hashing_enabled {
-            warn!("hashing objective is disabled")
-        }
-        let hash_objective = HashObjective::new(
+        let dash_objective = DashObjective::create(
+            cmdi.as_ref(),
             fst_fs_dir.clone(),
             snd_fs_dir.clone(),
             fst_mount.get_internal_dirs(),
             snd_mount.get_internal_dirs(),
-            config.hashing_enabled,
-        );
+            &config,
+        )
+        .with_context(|| "failed to create Dash objective")?;
         let trace_objective = TraceObjective::new();
 
         let fst_harness = Harness::new(
@@ -122,7 +121,7 @@ impl Runner {
             crashes_path,
             accidents_path,
 
-            hash_objective,
+            dash_objective,
             trace_objective,
 
             fst_fs_name,
@@ -154,19 +153,14 @@ impl Runner {
 
         setup_dir(self.cmdi.as_ref(), &self.exec_dir)
             .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;
-        let fst_hash = if self.hash_objective.enabled {
-            Some(&mut self.hash_objective.fst_fs)
-        } else {
-            None
-        };
         let fst_outcome = self
             .fst_harness
             .run(
                 self.cmdi.as_ref(),
                 binary_path,
                 self.keep_fs,
-                fst_hash,
                 self.supervisor.as_mut(),
+                |cmdi| self.dash_objective.update_first(cmdi),
             )
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
         match fst_outcome {
@@ -182,19 +176,14 @@ impl Runner {
 
         setup_dir(self.cmdi.as_ref(), &self.exec_dir)
             .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;
-        let snd_hash = if self.hash_objective.enabled {
-            Some(&mut self.hash_objective.snd_fs)
-        } else {
-            None
-        };
         let snd_outcome = self
             .snd_harness
             .run(
                 self.cmdi.as_ref(),
                 binary_path,
                 self.keep_fs,
-                snd_hash,
                 self.supervisor.as_mut(),
+                |cmdi| self.dash_objective.update_second(cmdi),
             )
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
 

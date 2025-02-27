@@ -66,8 +66,8 @@ pub fn run(
             cmdi.as_ref(),
             &binary_path,
             keep_fs,
-            None,
             supervisor.as_mut(),
+            |_| Ok(()),
         )
         .with_context(|| "failed to run harness")?;
 
