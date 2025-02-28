@@ -142,30 +142,11 @@ impl Fuzzer for GreyBoxFuzzer {
 
         match self.runner().run_harness(&binary_path)? {
             (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
-                let fst_trace =
-                    parse_trace(&fst_outcome).with_context(|| "failed to parse first trace")?;
-                let snd_trace =
-                    parse_trace(&snd_outcome).with_context(|| "failed to parse second trace")?;
-
-                if self.detect_errors(
-                    &input,
-                    &binary_path,
-                    &fst_trace,
-                    &snd_trace,
-                    &fst_outcome,
-                    &snd_outcome,
-                )? {
+                if self.detect_errors(&input, &binary_path, &fst_outcome, &snd_outcome)? {
                     return Ok(());
                 }
 
-                if self.do_objective(
-                    &input,
-                    &binary_path,
-                    &fst_trace,
-                    &snd_trace,
-                    &fst_outcome,
-                    &snd_outcome,
-                )? {
+                if self.do_objective(&input, &binary_path, &fst_outcome, &snd_outcome)? {
                     return Ok(());
                 }
 

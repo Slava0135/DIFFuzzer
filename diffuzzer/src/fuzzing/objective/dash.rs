@@ -16,20 +16,24 @@ use crate::{
 
 use dash::{FileDiff, FileInfo, HasherOptions, get_diff};
 
-struct DashState {
-    fs_dir: RemotePath,
-    fs_internal: RegexSet,
-    fs_state: Vec<FileInfo>,
-    hash: u64,
+#[derive(Default)]
+pub(crate) struct DashState {
+    pub fs_state: Vec<FileInfo>,
+    pub hash: u64,
 }
 
-impl DashState {
-    pub fn update(
+struct DashProducer {
+    fs_dir: RemotePath,
+    fs_internal: RegexSet,
+}
+
+impl DashProducer {
+    pub fn calculate(
         &mut self,
         cmdi: &dyn CommandInterface,
         dash_path: &RemotePath,
         output_path: &RemotePath,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<DashState> {
         let mut dash = CommandWrapper::new(dash_path.base.as_ref());
         dash.arg("-t").arg(self.fs_dir.base.as_ref());
         dash.arg("-o").arg(output_path.base.as_ref());
@@ -48,17 +52,16 @@ impl DashState {
         let fs_state = cmdi
             .read_to_string(output_path)
             .with_context(|| format!("failed to read Dash output file at '{}'", output_path))?;
-        let fs_state = serde_json::from_str(&fs_state)
-            .with_context(|| "failed to parse Dash output file")?;
-        self.fs_state = fs_state;
-        self.hash = hash;
-        Ok(())
+        let fs_state =
+            serde_json::from_str(&fs_state).with_context(|| "failed to parse Dash output file")?;
+
+        Ok(DashState { fs_state, hash })
     }
 }
 
 pub struct DashObjective {
-    fst: DashState,
-    snd: DashState,
+    pub fst: DashProducer,
+    pub snd: DashProducer,
     enabled: bool,
     hasher_options: HasherOptions,
     dash_path: RemotePath,
@@ -91,17 +94,13 @@ impl DashObjective {
         };
         let output_path = RemotePath::new(Path::new(&config.dash.output_path));
         Ok(Self {
-            fst: DashState {
+            fst: DashProducer {
                 fs_dir: fst_fs_dir,
                 fs_internal: fst_fs_internal,
-                fs_state: vec![],
-                hash: 0,
             },
-            snd: DashState {
+            snd: DashProducer {
                 fs_dir: snd_fs_dir,
                 fs_internal: snd_fs_internal,
-                fs_state: vec![],
-                hash: 0,
             },
             enabled: config.dash.enabled,
             hasher_options: Default::default(),
@@ -110,39 +109,35 @@ impl DashObjective {
         })
     }
 
-    pub fn update_first(&mut self, cmdi: &dyn CommandInterface) -> anyhow::Result<()> {
+    pub fn calculate_fst(&mut self, cmdi: &dyn CommandInterface) -> anyhow::Result<DashState> {
         if self.enabled {
-            self.fst
-                .update(cmdi, &self.dash_path, &self.output_path)
-                .with_context(|| "failed to update first dash state")
+            self.fst.calculate(cmdi, &self.dash_path, &self.output_path)
         } else {
-            Ok(())
+            Ok(DashState::default())
         }
     }
 
-    pub fn update_second(&mut self, cmdi: &dyn CommandInterface) -> anyhow::Result<()> {
+    pub fn calculate_snd(&mut self, cmdi: &dyn CommandInterface) -> anyhow::Result<DashState> {
         if self.enabled {
-            self.snd
-                .update(cmdi, &self.dash_path, &self.output_path)
-                .with_context(|| "failed to update second dash state")
+            self.snd.calculate(cmdi, &self.dash_path, &self.output_path)
         } else {
-            Ok(())
+            Ok(DashState::default())
         }
     }
 
-    pub fn is_interesting(&self) -> anyhow::Result<bool> {
+    pub fn is_interesting(&self, fst: &DashState, snd: &DashState) -> anyhow::Result<bool> {
         debug!("do hash objective");
-        if self.enabled {
-            Ok(self.fst.hash != self.snd.hash)
-        } else {
-            Ok(false)
+        if !self.enabled {
+            return Ok(false);
         }
+
+        Ok(fst.hash != snd.hash)
     }
 
-    pub fn get_diff(&mut self) -> Vec<FileDiff> {
+    pub fn get_diff(&mut self, fst: &DashState, snd: &DashState) -> Vec<FileDiff> {
         get_diff(
-            &self.fst.fs_state,
-            &self.snd.fs_state,
+            &fst.fs_state,
+            &snd.fs_state,
             &self.fst.fs_internal,
             &self.snd.fs_internal,
             &self.hasher_options,

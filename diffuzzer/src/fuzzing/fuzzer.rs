@@ -8,10 +8,7 @@ use anyhow::Context;
 use log::{debug, error, info, warn};
 
 use crate::{
-    abstract_fs::{
-        trace::Trace,
-        workload::Workload,
-    },
+    abstract_fs::{trace::Trace, workload::Workload},
     path::RemotePath,
 };
 use dash::FileDiff;
@@ -62,8 +59,6 @@ pub trait Fuzzer {
         &mut self,
         input: &Workload,
         binary_path: &RemotePath,
-        fst_trace: &Trace,
-        snd_trace: &Trace,
         fst_outcome: &Completed,
         snd_outcome: &Completed,
     ) -> anyhow::Result<bool> {
@@ -71,11 +66,11 @@ pub trait Fuzzer {
         debug!("do objectives");
         let hash_diff_interesting = runner
             .dash_objective
-            .is_interesting()
+            .is_interesting(&fst_outcome.dash_state, &snd_outcome.dash_state)
             .with_context(|| "failed to do hash objective")?;
         let trace_is_interesting = runner
             .trace_objective
-            .is_interesting(fst_trace, snd_trace)
+            .is_interesting(&fst_outcome.trace, &snd_outcome.trace)
             .with_context(|| "failed to do trace objective")?;
         if trace_is_interesting || hash_diff_interesting {
             let reason = format!(
@@ -85,7 +80,9 @@ pub trait Fuzzer {
             debug!("{}", reason);
             let mut diff: Vec<FileDiff> = vec![];
             if hash_diff_interesting {
-                diff = runner.dash_objective.get_diff();
+                diff = runner
+                    .dash_objective
+                    .get_diff(&fst_outcome.dash_state, &snd_outcome.dash_state);
             }
             let dir_name = input.generate_name();
             runner
@@ -112,13 +109,11 @@ pub trait Fuzzer {
         &mut self,
         input: &Workload,
         binary_path: &RemotePath,
-        fst_trace: &Trace,
-        snd_trace: &Trace,
         fst_outcome: &Completed,
         snd_outcome: &Completed,
     ) -> anyhow::Result<bool> {
         debug!("detect errors");
-        if fst_trace.has_errors() && snd_trace.has_errors() {
+        if fst_outcome.trace.has_errors() && snd_outcome.trace.has_errors() {
             let reason = "both traces contain errors, potential bug in model".to_owned();
             warn!("{}", reason);
             let accidents_path = self.runner().accidents_path.clone();
