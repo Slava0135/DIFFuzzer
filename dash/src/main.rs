@@ -7,7 +7,7 @@ use std::path::Path;
 
 use anyhow::Context;
 use clap::Parser;
-use dash::{calc_dir_hash, HasherOptions};
+use dash::{HasherOptions, calc_dir_hash};
 use regex::RegexSet;
 use serde_json::to_string;
 

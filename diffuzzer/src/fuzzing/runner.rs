@@ -90,7 +90,7 @@ impl Runner {
             snd_mount.get_internal_dirs(),
             &config,
         )
-            .with_context(|| "failed to create Dash objective")?;
+        .with_context(|| "failed to create Dash objective")?;
         let trace_objective = TraceObjective::new();
 
         let fst_harness = Harness::new(
@@ -160,9 +160,12 @@ impl Runner {
                 binary_path,
                 self.keep_fs,
                 self.supervisor.as_mut(),
-                |cmdi| self.dash_objective.calculate_fst(
-                    cmdi,
-                ),
+                |cmdi| {
+                    self.dash_objective
+                        .calculate_fst(cmdi)
+                        .with_context(|| "Failed on Dash calculating")
+                        .unwrap()
+                },
             )
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
         match fst_outcome {
@@ -185,9 +188,12 @@ impl Runner {
                 binary_path,
                 self.keep_fs,
                 self.supervisor.as_mut(),
-                |cmdi| self.dash_objective.calculate_snd(
-                    cmdi
-                ),
+                |cmdi| {
+                    self.dash_objective
+                        .calculate_snd(cmdi)
+                        .with_context(|| "Failed on Dash calculating")
+                        .unwrap()
+                },
             )
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
 

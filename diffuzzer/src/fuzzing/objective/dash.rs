@@ -16,9 +16,10 @@ use crate::{
 
 use dash::{FileDiff, FileInfo, HasherOptions, get_diff};
 
-pub struct DashState {
-    pub(crate) fs_state: Vec<FileInfo>,
-    pub(crate) hash: u64,
+#[derive(Default)]
+pub(crate) struct DashState {
+    pub fs_state: Vec<FileInfo>,
+    pub hash: u64,
 }
 
 struct DashProducer {
@@ -32,7 +33,7 @@ impl DashProducer {
         cmdi: &dyn CommandInterface,
         dash_path: &RemotePath,
         output_path: &RemotePath,
-    ) -> DashState {
+    ) -> anyhow::Result<DashState> {
         let mut dash = CommandWrapper::new(dash_path.base.as_ref());
         dash.arg("-t").arg(self.fs_dir.base.as_ref());
         dash.arg("-o").arg(output_path.base.as_ref());
@@ -41,25 +42,20 @@ impl DashProducer {
         }
         let output = cmdi
             .exec(dash, None)
-            .with_context(|| "failed to execute Dash")
-            .unwrap();
+            .with_context(|| "failed to execute Dash")?;
         let hash = String::from_utf8(output.stdout)
-            .with_context(|| "failed to convert Dash stdout to string")
-            .unwrap();
+            .with_context(|| "failed to convert Dash stdout to string")?;
         let hash: u64 = hash
             .trim()
             .parse()
-            .with_context(|| format!("failed to parse hash '{}'", hash))
-            .unwrap();
+            .with_context(|| format!("failed to parse hash '{}'", hash))?;
         let fs_state = cmdi
             .read_to_string(output_path)
-            .with_context(|| format!("failed to read Dash output file at '{}'", output_path))
-            .unwrap();
-        let fs_state = serde_json::from_str(&fs_state)
-            .with_context(|| "failed to parse Dash output file")
-            .unwrap();
+            .with_context(|| format!("failed to read Dash output file at '{}'", output_path))?;
+        let fs_state =
+            serde_json::from_str(&fs_state).with_context(|| "failed to parse Dash output file")?;
 
-        DashState { fs_state, hash }
+        Ok(DashState { fs_state, hash })
     }
 }
 
@@ -113,21 +109,19 @@ impl DashObjective {
         })
     }
 
-    pub fn calculate_fst(&mut self, cmdi: &dyn CommandInterface) -> DashState {
+    pub fn calculate_fst(&mut self, cmdi: &dyn CommandInterface) -> anyhow::Result<DashState> {
         if self.enabled {
-            self.fst
-                .calculate(cmdi, &self.dash_path, &self.output_path)
+            self.fst.calculate(cmdi, &self.dash_path, &self.output_path)
         } else {
-            DashState { fs_state: vec![], hash: 0 }
+            Ok(DashState::default())
         }
     }
 
-    pub fn calculate_snd(&mut self, cmdi: &dyn CommandInterface) -> DashState {
+    pub fn calculate_snd(&mut self, cmdi: &dyn CommandInterface) -> anyhow::Result<DashState> {
         if self.enabled {
-            self.snd
-                .calculate(cmdi, &self.dash_path, &self.output_path)
+            self.snd.calculate(cmdi, &self.dash_path, &self.output_path)
         } else {
-            DashState { fs_state: vec![], hash: 0 }
+            Ok(DashState::default())
         }
     }
 
@@ -150,5 +144,3 @@ impl DashObjective {
         )
     }
 }
-
-

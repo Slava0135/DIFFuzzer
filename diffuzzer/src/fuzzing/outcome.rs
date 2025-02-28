@@ -3,10 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use crate::abstract_fs::trace::Trace;
+use crate::fuzzing::objective::dash::DashState;
 use crate::fuzzing::runner::parse_trace;
 use crate::path::LocalPath;
 use anyhow::Context;
-use crate::fuzzing::objective::dash::DashState;
 
 pub struct Completed {
     pub stdout: String,
@@ -17,12 +17,7 @@ pub struct Completed {
 }
 
 impl Completed {
-    pub(crate) fn new(
-        stdout: String,
-        stderr: String,
-        dir: LocalPath,
-        dash_state: DashState,
-    ) -> Completed {
+    pub fn new(stdout: String, stderr: String, dir: LocalPath, dash_state: DashState) -> Completed {
         let trace = parse_trace(&dir)
             .with_context(|| "failed to parse trace")
             .unwrap();
