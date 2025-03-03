@@ -31,7 +31,9 @@ pub struct Runner {
     pub cmdi: Box<dyn CommandInterface>,
     pub supervisor: Box<dyn Supervisor>,
 
+    /// Directory with executor and test source.
     pub test_dir: RemotePath,
+    /// Directory where test will be executed and test output files saved.
     pub exec_dir: RemotePath,
 
     pub crashes_path: LocalPath,

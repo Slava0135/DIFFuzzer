@@ -21,6 +21,7 @@ use crate::config::QemuConfig;
 
 const SNAPSHOT_TAG: &str = "fresh";
 
+/// Controls environment (system) in which tests are executed.
 pub trait Supervisor {
     fn load_snapshot(&self) -> anyhow::Result<()>;
     fn save_snapshot(&self) -> anyhow::Result<()>;
@@ -28,6 +29,7 @@ pub trait Supervisor {
     fn had_panic_event(&mut self) -> anyhow::Result<bool>;
 }
 
+/// Stub implementation that does nothing
 pub struct NativeSupervisor {}
 
 impl NativeSupervisor {
@@ -116,6 +118,7 @@ impl QemuSupervisor {
         })
     }
 
+    /// Connect to QEMU monitor using QMP protocol
     fn monitor_stream(&self) -> anyhow::Result<UnixStream> {
         UnixStream::connect(&self.config.monitor_socket_path).with_context(|| {
             format!(
@@ -148,6 +151,7 @@ impl Supervisor for QemuSupervisor {
     }
 }
 
+/// Handles events from VM, such as resets, shutdowns and panics.
 struct EventHandler {
     rx: Receiver<()>,
 }

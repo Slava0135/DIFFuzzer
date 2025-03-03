@@ -12,8 +12,11 @@ pub struct Config {
     pub operation_weights: OperationWeights,
     pub mutation_weights: MutationWeights,
     pub max_workload_length: u16,
+    /// Filesystem name that used for mountpoint path
     pub fs_name: String,
+    /// Interval after which, if nothing happens, log is updated
     pub heartbeat_interval: u16,
+    /// Timeout for executing a single test
     pub timeout: u8,
     pub qemu: QemuConfig,
     pub dash: DashConfig,
@@ -22,6 +25,7 @@ pub struct Config {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct GreyboxConfig {
     pub max_mutations: u16,
+    /// If enabled corpus testcases will be also saved in separate directory
     pub save_corpus: bool,
 }
 

@@ -4,8 +4,10 @@
 
 use std::{ffi::OsStr, fmt::Display, path::Path};
 
+/// Prefix for temporary files to use
 const TMP_DIR_PREFIX: &str = "diffuzzer";
 
+/// Local paths always locate files on host (local) machine
 #[derive(Clone)]
 pub struct LocalPath {
     pub base: Box<Path>,
@@ -17,6 +19,7 @@ impl LocalPath {
             base: path.to_path_buf().into_boxed_path(),
         }
     }
+    /// Create new temporary path with prefix added
     pub fn new_tmp(name: &str) -> Self {
         let base = Path::new("/tmp")
             .join(format!("{}-{}", TMP_DIR_PREFIX, name))
@@ -47,6 +50,8 @@ impl AsRef<Path> for LocalPath {
     }
 }
 
+/// Remote paths locate files on guest (remote) machine where tests are compiled and executed
+/// or files on host (local) machine when QEMU is disabled.
 #[derive(Clone)]
 pub struct RemotePath {
     pub base: Box<Path>,
@@ -64,6 +69,7 @@ impl RemotePath {
             base: path.to_path_buf().into_boxed_path(),
         }
     }
+    /// Create new temporary path with prefix added
     pub fn new_tmp(name: &str) -> Self {
         let base = Path::new("/tmp")
             .join(format!("{}-{}", TMP_DIR_PREFIX, name))

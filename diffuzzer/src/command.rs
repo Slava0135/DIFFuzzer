@@ -32,6 +32,7 @@ pub enum ExecError {
     TimedOut(String),
 }
 
+/// Send commands and transfer files to guest (remote) machine where tests are executed.
 pub trait CommandInterface {
     fn create_dir_all(&self, path: &RemotePath) -> anyhow::Result<()>;
     fn remove_dir_all(&self, path: &RemotePath) -> anyhow::Result<()>;
@@ -54,13 +55,14 @@ pub trait CommandInterface {
     fn read_to_string(&self, path: &RemotePath) -> anyhow::Result<String>;
 
     fn exec(&self, cmd: CommandWrapper, timeout: Option<u8>) -> Result<Output, ExecError>;
+    /// Execute command with current working directory changed.
     fn exec_in_dir(
         &self,
         cmd: CommandWrapper,
         dir: &RemotePath,
         timeout: Option<u8>,
     ) -> Result<Output, ExecError>;
-
+    /// Setup directory on remote where tests are compiled and executed.
     fn setup_remote_dir(&self) -> anyhow::Result<RemotePath> {
         let remote_dir = RemotePath::new_tmp("remote");
 
@@ -117,6 +119,7 @@ impl CommandWrapper {
         self.internal.arg(arg);
         self
     }
+    /// Execute command on host (local) machine.
     pub fn exec_local(mut self, timeout: Option<u8>) -> Result<Output, ExecError> {
         let output = match timeout {
             Some(secs) => {
@@ -153,6 +156,7 @@ impl CommandWrapper {
     }
 }
 
+/// Used when running with QEMU disabled.
 pub struct LocalCommandInterface {}
 
 impl LocalCommandInterface {
@@ -234,6 +238,8 @@ impl CommandInterface for LocalCommandInterface {
     }
 }
 
+/// Uses SSH to execute command on guest (remote) machine
+/// and SCP to copy files between host and guest
 pub struct RemoteCommandInterface {
     config: QemuConfig,
     tmp_file: LocalPath,
@@ -373,6 +379,7 @@ impl RemoteCommandInterface {
         scp.arg("-q");
         scp.arg("-i").arg(self.config.ssh_private_key_path.clone());
         scp.arg("-o").arg("StrictHostKeyChecking no");
+        // reuse connection
         scp.arg("-o").arg("ControlMaster auto");
         scp.arg("-o").arg("ControlPath /tmp/diffuzzer-ssh-%r@%h:%p");
         scp.arg("-o").arg("ControlPersist 1m");
@@ -385,6 +392,7 @@ impl RemoteCommandInterface {
         ssh.arg("-q");
         ssh.arg("-i").arg(self.config.ssh_private_key_path.clone());
         ssh.arg("-o").arg("StrictHostKeyChecking no");
+        // reuse connection
         ssh.arg("-o").arg("ControlMaster auto");
         ssh.arg("-o").arg("ControlPath /tmp/diffuzzer-ssh-%r@%h:%p");
         ssh.arg("-o").arg("ControlPersist 1m");
