@@ -79,13 +79,11 @@ const char *READ = "READ";
 const char *FSYNC = "FSYNC";
 
 enum ExitCode : int {
-  /// Test finished with no failures.
+  /// Test finished.
   OK = 0,
-  /// Test finished with at least 1 failure.
-  FAIL = 1,
   /// Serious problem when executing test.
   /// Can be caused by system/program issues, or the workload.
-  ERROR = 2,
+  ERROR = 1,
 };
 
 struct Trace {
@@ -253,13 +251,11 @@ int main(int argc, char *argv[]) {
 
   GOAL("summary");
   printf("#SUCCESS: %d | #FAILURE: %d\n", success_n, failure_n);
-  if (failure_n > 0) {
-    return FAIL;
-  }
+
   return OK;
 }
 
-/// All paths in operations must be prefixed with workspace path. 
+/// All paths in operations must be prefixed with workspace path.
 static std::string patch_path(const std::string &path) {
   if (path[0] != '/') {
     DPRINTF("[ERROR] when patching path '%s', expected path to start with '/'",
@@ -453,7 +449,8 @@ int do_write(int fd, size_t src_offset, size_t size) {
   idx++;
   if (src_offset + size > BUFFER_SIZE) {
     DPRINTF(
-        "[ERROR] offset %ld + %ld is too big to write from (buffer size is %ld)",
+        "[ERROR] offset %ld + %ld is too big to write from (buffer size is "
+        "%ld)",
         src_offset, size, BUFFER_SIZE);
     exit(ERROR);
   }
