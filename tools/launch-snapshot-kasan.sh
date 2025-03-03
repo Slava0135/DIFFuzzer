@@ -41,7 +41,7 @@ cmd_args=(
   "panic_on_warn=1"
 )
 
-qemu-system-x86_64  \
+exec qemu-system-x86_64  \
   -append "${cmd_args[*]}" \
   -kernel "$KERNEL_IMAGE_PATH" \
   -machine accel=kvm,type=q35 \

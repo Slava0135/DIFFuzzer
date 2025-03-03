@@ -8,7 +8,7 @@
 # Launch VM in snapshot mode (no changes are saved to disk).
 # Use for fuzzing to avoid any image modifications.
 
-qemu-system-x86_64  \
+exec qemu-system-x86_64  \
   -machine accel=kvm,type=q35 \
   -cpu host \
   -smp cores=2 \

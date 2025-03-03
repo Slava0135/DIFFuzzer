@@ -9,7 +9,7 @@
 # Launch VM with changes being saved to disk.
 # Use to setup cloud image OS with seed image, generated from cloud config file. 
 
-qemu-system-x86_64  \
+exec qemu-system-x86_64  \
   -machine accel=kvm,type=q35 \
   -cpu host \
   -smp cores=2 \
