@@ -137,6 +137,12 @@ Instead, enable KCov on per-module basis (in each Makefile inside `fs` directory
 root@ubuntu:/linux-5.15.178# find fs -name Makefile | xargs -L1 -I {} bash -c 'echo "KCOV_INSTRUMENT := y" >> {}'
 ```
 
+Disable `KASLR` for more deterministic behavior:
+
+```sh
+root@ubuntu:/linux-5.15.178# ./scripts/config -d RANDOMIZE_BASE
+```
+
 Don't forget to enable modules for file systems (search for section `File systems` inside `.config` file):
 
 ```sh
@@ -149,6 +155,18 @@ Disable kernel signing, otherwise you will (likely) get build error:
 
 ```sh
 root@ubuntu:/linux-5.15.178# ./scripts/config -d SYSTEM_TRUSTED_KEYS -d SYSTEM_REVOCATION_KEYS --set-str CONFIG_SYSTEM_TRUSTED_KEYS "" --set-str CONFIG_SYSTEM_REVOCATION_KEYS ""
+```
+
+#### Enabling KASAN
+
+Kernel Address Sanitizer (KASAN) is a dynamic memory safety error detector designed to find out-of-bounds and use-after-free bugs.
+
+> Documentation: <https://docs.kernel.org/dev-tools/kasan.html>
+
+You should only enable it when fuzzing kernel file systems in order to detect memory bugs, because __it adds a significant performance overhead__.
+
+```sh
+root@ubuntu:/linux-5.15.178# ./scripts/config -e KASAN -e KASAN_INLINE -e CONFIG_KASAN_GENERIC
 ```
 
 ### Build
