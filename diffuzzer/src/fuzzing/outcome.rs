@@ -11,7 +11,7 @@ use anyhow::Context;
 pub struct Completed {
     pub stdout: String,
     pub stderr: String,
-    /// Directory with output files produced by test 
+    /// Directory with output files produced by test
     pub dir: LocalPath,
     pub dash_state: DashState,
     pub trace: Trace,

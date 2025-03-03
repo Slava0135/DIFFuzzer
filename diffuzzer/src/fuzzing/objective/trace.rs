@@ -4,7 +4,7 @@
 
 use log::debug;
 
-use crate::abstract_fs::trace::{Trace, TraceRow};
+use crate::abstract_fs::trace::Trace;
 
 pub struct TraceObjective {}
 

@@ -13,7 +13,7 @@ use rand::{SeedableRng, rngs::StdRng};
 use crate::command::CommandInterface;
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::outcome::{Completed, Outcome};
-use crate::fuzzing::runner::{Runner, parse_trace};
+use crate::fuzzing::runner::Runner;
 use crate::path::{LocalPath, RemotePath};
 use crate::save::{save_completed, save_testcase};
 use crate::supervisor::Supervisor;

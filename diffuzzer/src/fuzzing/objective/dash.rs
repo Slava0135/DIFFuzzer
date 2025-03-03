@@ -17,7 +17,7 @@ use crate::{
 use dash::{FileDiff, FileInfo, HasherOptions, get_diff};
 
 #[derive(Default)]
-pub(crate) struct DashState {
+pub struct DashState {
     pub fs_state: Vec<FileInfo>,
     pub hash: u64,
 }
@@ -60,8 +60,8 @@ impl DashProducer {
 }
 
 pub struct DashObjective {
-    pub fst: DashProducer,
-    pub snd: DashProducer,
+    fst: DashProducer,
+    snd: DashProducer,
     enabled: bool,
     hasher_options: HasherOptions,
     dash_path: RemotePath,

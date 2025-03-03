@@ -8,7 +8,7 @@ use anyhow::Context;
 use log::{debug, error, info, warn};
 
 use crate::{
-    abstract_fs::{trace::Trace, workload::Workload},
+    abstract_fs::workload::Workload,
     path::RemotePath,
 };
 use dash::FileDiff;

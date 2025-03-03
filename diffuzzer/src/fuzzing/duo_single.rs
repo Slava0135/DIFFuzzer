@@ -12,7 +12,7 @@ use crate::config::Config;
 
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::outcome::Outcome;
-use crate::fuzzing::runner::{Runner, parse_trace};
+use crate::fuzzing::runner::Runner;
 use crate::mount::FileSystemMount;
 use crate::path::LocalPath;
 use crate::supervisor::Supervisor;
