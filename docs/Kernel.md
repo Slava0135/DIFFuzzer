@@ -166,7 +166,7 @@ Kernel Address Sanitizer (KASAN) is a dynamic memory safety error detector desig
 You should only enable it when fuzzing kernel file systems in order to detect memory bugs, because __it adds a significant performance overhead__.
 
 ```sh
-root@ubuntu:/linux-5.15.178# ./scripts/config -e KASAN -e KASAN_INLINE -e CONFIG_KASAN_GENERIC
+root@ubuntu:/linux-5.15.178# ./scripts/config -e KASAN -e KASAN_INLINE -e KASAN_GENERIC
 ```
 
 ### Build
