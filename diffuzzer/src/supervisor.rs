@@ -2,6 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use std::sync::Arc;
+use std::sync::atomic::AtomicU32;
+use std::sync::atomic::Ordering::Relaxed;
 use std::{
     fs::OpenOptions,
     io::Write,
@@ -57,6 +60,7 @@ pub struct QemuSupervisor {
     config: QemuConfig,
     _qemu_thread: JoinHandle<()>,
     event_handler: EventHandler,
+    id: Arc<AtomicU32>,
 }
 
 impl QemuSupervisor {
@@ -80,6 +84,9 @@ impl QemuSupervisor {
             .stdout(Stdio::null())
             .stderr(console_stdio);
 
+        let id = 0;
+        let id_ptr = Arc::new(AtomicU32::new(id));
+        let id_thread = Arc::clone(&id_ptr);
         let script = config.launch_script.clone();
         let log_path = config.log_path.clone();
         let _qemu_thread = thread::spawn(move || {
@@ -87,20 +94,23 @@ impl QemuSupervisor {
                 .spawn()
                 .with_context(|| format!("failed to run qemu vm from script '{}'", script))
             {
-                Ok(mut child) => match child.wait() {
-                    Ok(status) => {
-                        error!(
-                            "qemu finished unexpectedly ({}), check log at '{}'",
-                            status, log_path
-                        );
-                    }
-                    Err(err) => {
-                        error!(
-                            "qemu finished with error, check log at '{}':\n{}",
-                            log_path, err
-                        )
-                    }
-                },
+                Ok(mut child) => {
+                    id_thread.store(child.id(), Relaxed);
+                    match child.wait() {
+                        Ok(status) => {
+                            error!(
+                                "qemu finished unexpectedly ({}), check log at '{}'",
+                                status, log_path
+                            );
+                        }
+                        Err(err) => {
+                            error!(
+                                "qemu finished with error, check log at '{}':\n{}",
+                                log_path, err
+                            )
+                        }
+                    };
+                }
                 Err(err) => error!("{:?}", err),
             };
         });
@@ -115,6 +125,7 @@ impl QemuSupervisor {
             config: config.clone(),
             _qemu_thread,
             event_handler,
+            id: id_ptr,
         })
     }
 
@@ -148,6 +159,18 @@ impl Supervisor for QemuSupervisor {
     }
     fn had_panic_event(&mut self) -> anyhow::Result<bool> {
         self.event_handler.had_panic_event()
+    }
+}
+
+impl Drop for QemuSupervisor {
+    fn drop(&mut self) {
+        let id = self.id.load(Relaxed);
+        if id != 0 {
+            Command::new("kill")
+                .arg(format!("{:?}", self.id))
+                .spawn()
+                .expect("QEMU not killed");
+        }
     }
 }
 
