@@ -28,6 +28,8 @@ pub struct GreyboxConfig {
     /// If enabled corpus testcases will be also saved in separate directory
     pub save_corpus: bool,
     pub scheduler: Scheduler,
+    /// Constant used for some schedulers
+    pub m_constant: u64,
 }
 
 /// See [`crate::fuzzing::greybox::schedule`]

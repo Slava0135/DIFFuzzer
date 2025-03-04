@@ -102,7 +102,9 @@ impl GreyBoxFuzzer {
 
         let scheduler: Box<dyn Scheduler> = match config.greybox.scheduler {
             crate::config::Scheduler::Queue => Box::new(QueueScheduler::new()),
-            crate::config::Scheduler::Fast => Box::new(FastPowerScheduler::new()),
+            crate::config::Scheduler::Fast => {
+                Box::new(FastPowerScheduler::new(config.greybox.m_constant))
+            }
         };
 
         let runner = Runner::create(

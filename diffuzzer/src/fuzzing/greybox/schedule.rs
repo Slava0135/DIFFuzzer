@@ -58,12 +58,14 @@ impl Scheduler for QueueScheduler {
 ///
 pub struct FastPowerScheduler {
     rng: StdRng,
+    m: f64,
 }
 
 impl FastPowerScheduler {
-    pub fn new() -> Self {
+    pub fn new(m: u64) -> Self {
         Self {
             rng: StdRng::from_entropy(),
+            m: m as f64,
         }
     }
 }
@@ -80,7 +82,9 @@ impl Scheduler for FastPowerScheduler {
         let base: f64 = 2.0;
         let next = corpus
             .choose_weighted_mut(&mut self.rng, |seed| {
-                base.powf(seed.times_choosen as f64) / path_frequency(&seed.coverage, &freq)
+                let p =
+                    base.powf(seed.times_choosen as f64) / path_frequency(&seed.coverage, &freq);
+                if p < self.m { p } else { self.m }
             })
             .with_context(|| "failed to choose seed")?;
         next.times_choosen += 1;
@@ -89,7 +93,7 @@ impl Scheduler for FastPowerScheduler {
 }
 
 /// In original paper paths are considered equal only if coverage is exactly the same.
-/// 
+///
 /// Its (probably) not true in our case.
 fn path_frequency(coverage: &HashSet<u64>, freq: &HashMap<u64, u64>) -> f64 {
     let mut f: f64 = 1.0;
