@@ -37,6 +37,9 @@ pub enum Mode {
         /// Test count
         #[arg(short, long)]
         test_count: Option<u64>,
+        /// Load corpus from directory
+        #[arg(short, long)]
+        corpus_path: Option<String>,
     },
     /// Run blackbox fuzzing
     Blackbox {

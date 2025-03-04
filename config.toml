@@ -16,7 +16,7 @@ qmp_socket_path = "/tmp/diffuzzer-qemu-qmp.sock"
 
 [greybox]
 max_mutations = 10
-save_corpus = false
+save_corpus = true
 
 [dash]
 enabled = true

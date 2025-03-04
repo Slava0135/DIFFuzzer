@@ -6,16 +6,17 @@ use std::fs;
 use std::path::Path;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-use anyhow::{Context, Ok};
-use log::{debug, info};
+use anyhow::Context;
+use log::{debug, info, warn};
 use rand::{SeedableRng, rngs::StdRng};
+use walkdir::WalkDir;
 
 use crate::command::CommandInterface;
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::outcome::{Completed, Outcome};
 use crate::fuzzing::runner::Runner;
 use crate::path::{LocalPath, RemotePath};
-use crate::save::{save_completed, save_testcase};
+use crate::save::{TEST_FILE_NAME, save_completed, save_testcase};
 use crate::supervisor::Supervisor;
 use crate::{abstract_fs::workload::Workload, config::Config, mount::FileSystemMount};
 
@@ -23,6 +24,9 @@ use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 
 pub struct GreyBoxFuzzer {
     runner: Runner,
+
+    initial_corpus: Vec<Workload>,
+    next_initial: usize,
 
     corpus: Vec<Workload>,
     next_seed: usize,
@@ -41,6 +45,7 @@ impl GreyBoxFuzzer {
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
+        corpus_path: Option<String>,
         cmdi: Box<dyn CommandInterface>,
         supervisor: Box<dyn Supervisor>,
     ) -> anyhow::Result<Self> {
@@ -51,6 +56,38 @@ impl GreyBoxFuzzer {
             config.max_workload_length,
             config.greybox.max_mutations,
         );
+
+        let mut initial_corpus = Vec::new();
+        if let Some(corpus_path) = corpus_path {
+            for entry in WalkDir::new(&corpus_path)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .filter(|e| e.file_name() == TEST_FILE_NAME)
+            {
+                match fs::read_to_string(entry.path()) {
+                    Ok(data) => match serde_json::from_str(&data) {
+                        Ok(workload) => initial_corpus.push(workload),
+                        Err(err) => {
+                            warn!(
+                                "failed to parse seed at '{}':\n{}",
+                                entry.path().display(),
+                                err
+                            )
+                        }
+                    },
+                    Err(err) => warn!(
+                        "failed to read seed data at '{}':\n{}",
+                        entry.path().display(),
+                        err
+                    ),
+                }
+            }
+            info!(
+                "added {} seeds from '{}'",
+                initial_corpus.len(),
+                &corpus_path
+            )
+        };
 
         let corpus_path = if config.greybox.save_corpus {
             let path = Path::new("./corpus");
@@ -76,6 +113,10 @@ impl GreyBoxFuzzer {
 
         Ok(Self {
             runner,
+
+            initial_corpus,
+            next_initial: 0,
+
             corpus: vec![Workload::new()],
             next_seed: 0,
 
@@ -89,12 +130,18 @@ impl GreyBoxFuzzer {
     }
 
     fn pick_input(&mut self) -> Workload {
-        if self.next_seed >= self.corpus.len() {
-            self.next_seed = 0
+        if self.next_initial < self.initial_corpus.len() {
+            let workload = self.initial_corpus.get(self.next_initial).unwrap().clone();
+            self.next_initial += 1;
+            workload
+        } else {
+            if self.next_seed >= self.corpus.len() {
+                self.next_seed = 0
+            }
+            let workload = self.corpus.get(self.next_seed).unwrap().clone();
+            self.next_seed += 1;
+            self.mutator.mutate(workload)
         }
-        let workload = self.corpus.get(self.next_seed).unwrap().clone();
-        self.next_seed += 1;
-        workload
     }
 
     fn add_to_corpus(&mut self, input: Workload) {
@@ -134,9 +181,6 @@ impl Fuzzer for GreyBoxFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
         debug!("pick input");
         let input = self.pick_input();
-
-        debug!("mutate input");
-        let input = self.mutator.mutate(input);
 
         let binary_path = self.runner().compile_test(&input)?;
 

@@ -66,6 +66,7 @@ fn run() -> anyhow::Result<()> {
             first_filesystem,
             second_filesystem,
             test_count,
+            corpus_path,
         } => {
             info!(
                 "start greybox fuzzing ('{}' + '{}')",
@@ -76,6 +77,7 @@ fn run() -> anyhow::Result<()> {
                 first_filesystem.into(),
                 second_filesystem.into(),
                 LocalPath::new(Path::new("./crashes")),
+                corpus_path,
                 cmdi,
                 supervisor,
             )?
