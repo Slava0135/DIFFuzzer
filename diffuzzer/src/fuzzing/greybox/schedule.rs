@@ -88,7 +88,9 @@ impl Scheduler for FastPowerScheduler {
     }
 }
 
-/// In original paper paths are equal only if
+/// In original paper paths are considered equal only if coverage is exactly the same.
+/// 
+/// Its (probably) not true in our case.
 fn path_frequency(coverage: &HashSet<u64>, freq: &HashMap<u64, u64>) -> f64 {
     let mut f: f64 = 1.0;
     for k in coverage {
