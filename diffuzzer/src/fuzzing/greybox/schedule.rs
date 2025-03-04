@@ -57,6 +57,9 @@ impl Scheduler for QueueScheduler {
 ///   - the number of times s(i) that ti has previously been choosen from the queue
 ///   - the number of generated inputs f(i) that exercise i. In fact, f(i) serves as approximation of the distribution’s density.
 ///
+/// A more efficient coverage-based greybox fuzzer discovers an undiscovered state
+/// in a low-density region while assigning the __least amount of total energy__.
+/// 
 /// Exponential schedule (FAST) was proven to be the most effective:
 /// `p(i) = min((α(i) / β) * (2^s(i) / f(i)), M)`, where
 ///   - α(i) can depend on the execution time, block transition coverage, and creation time of ti. (AFL)
@@ -89,7 +92,8 @@ impl Scheduler for FastPowerScheduler {
             .choose_weighted_mut(&mut self.rng, |seed| {
                 let p = base.powf(seed.times_choosen as f64)
                     / path_frequency(&seed.coverage, &coverage_map) as f64;
-                if p < self.m { p } else { self.m }
+                let p = if p < self.m { p } else { self.m };
+                1.0 / p
             })
             .with_context(|| "failed to choose seed")?;
         next.times_choosen += 1;
