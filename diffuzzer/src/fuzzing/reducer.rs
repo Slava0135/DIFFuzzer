@@ -3,11 +3,16 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use std::fs::read_to_string;
+use std::ops::Index;
+use std::rc::Rc;
+use std::borrow::Borrow;
+use std::thread::yield_now;
 
 use anyhow::{Context, Ok};
 use dash::FileDiff;
 use log::{info, warn};
 
+use crate::abstract_fs::trace::TraceRow;
 use crate::{
     abstract_fs::{mutator::remove, workload::Workload},
     command::CommandInterface,
@@ -17,11 +22,26 @@ use crate::{
     path::LocalPath,
     supervisor::Supervisor,
 };
+use crate::fuzzing::objective::trace::TraceDiff;
 
 use super::runner::Runner;
 
 pub struct Reducer {
     runner: Runner,
+}
+
+pub struct Bug {
+    name: String,
+    workload: Workload,
+    dash_bug: Vec<FileDiff>,
+    trace_bug: Vec<TraceDiff>,
+    index: usize,
+}
+
+impl Bug {
+    pub fn decr_index(&mut self) {
+        self.index -= 1;
+    }
 }
 
 impl Reducer {
@@ -61,20 +81,45 @@ impl Reducer {
                     parse_trace(&fst_outcome.dir).with_context(|| "failed to parse first trace")?;
                 let snd_trace = parse_trace(&snd_outcome.dir)
                     .with_context(|| "failed to parse second trace")?;
-                let hash_diff_interesting = self
+                let dash_diff_interesting = self
                     .runner
                     .dash_objective
                     .is_interesting()
                     .with_context(|| "failed to do hash objective")?;
-                let _trace_is_interesting = self
+                let trace_interesting = self
                     .runner
                     .trace_objective
                     .is_interesting(&fst_trace, &snd_trace)
                     .with_context(|| "failed to do trace objective")?;
 
-                if hash_diff_interesting {
-                    let old_diff = self.runner.dash_objective.get_diff();
-                    self.reduce_by_hash(input, old_diff, save_to_dir)?;
+                let new_dash_diff = if dash_diff_interesting {
+                    self
+                        .runner
+                        .dash_objective
+                        .get_diff()
+                } else {
+                    vec![]
+                };
+
+                let new_trace_diff = if trace_interesting {
+                    self
+                        .runner
+                        .trace_objective
+                        .get_diff(&fst_trace, &snd_trace)
+                } else { vec![] };
+
+                if dash_diff_interesting || trace_interesting {
+                    let index = input.ops.len() - 1;
+                    self.reduce(
+                        &mut vec![Bug {
+                            name: "original".to_string(),
+                            dash_bug: new_dash_diff,
+                            trace_bug: new_trace_diff,
+                            workload: input,
+                            index,
+                        }],
+                        save_to_dir,
+                    )?;
                 } else {
                     warn!("crash not detected");
                 }
@@ -85,51 +130,101 @@ impl Reducer {
         Ok(())
     }
 
-    fn reduce_by_hash(
+    fn reduce(
         &mut self,
-        input: Workload,
-        old_diff: Vec<FileDiff>,
+        mut bugs: &mut Vec<Bug>,
         output_dir: &LocalPath,
     ) -> anyhow::Result<()> {
         info!("reduce using hash difference");
-        let mut index = input.ops.len() - 1;
-        let mut workload = input;
-        loop {
-            if let Some(reduced) = remove(&workload, index) {
-                let binary_path = self.runner.compile_test(&reduced)?;
-                match self.runner.run_harness(&binary_path)? {
-                    (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
-                        let hash_diff_interesting = self
-                            .runner
-                            .dash_objective
-                            .is_interesting()
-                            .with_context(|| "failed to do hash objective")?;
-                        if hash_diff_interesting {
-                            let new_diff = self.runner.dash_objective.get_diff();
-                            if old_diff == new_diff {
-                                workload = reduced;
-                                info!("workload reduced (length = {})", workload.ops.len());
-                                self.runner.report_diff(
-                                    &workload,
-                                    index.to_string(),
-                                    &binary_path,
-                                    output_dir.clone(),
-                                    new_diff,
-                                    &fst_outcome,
-                                    &snd_outcome,
-                                    "".to_owned(),
-                                )?;
+        let mut bugs_reduced = false;
+
+        while !bugs_reduced {
+            bugs_reduced = true;
+            let mut new_bugs: Vec<Bug> = vec![];
+            for bug_index in 0..bugs.len() {
+                let bug = bugs.get_mut(bug_index).unwrap();
+                if bug.index < 0 { continue; }
+                bugs_reduced = false;
+                if let Some(reduced) = remove(&bug.workload, bug.index) {
+                    let binary_path = self.runner.compile_test(&reduced)?;
+                    match self.runner.run_harness(&binary_path)? {
+                        (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
+                            let fst_trace =
+                                parse_trace(&fst_outcome.dir).with_context(|| "failed to parse first trace")?;
+                            let snd_trace = parse_trace(&snd_outcome.dir)
+                                .with_context(|| "failed to parse second trace")?;
+
+                            let hash_diff_interesting = self
+                                .runner
+                                .dash_objective
+                                .is_interesting()
+                                .with_context(|| "failed to do dash objective")?;
+                            let trace_interesting = self
+                                .runner
+                                .trace_objective
+                                .is_interesting(&fst_trace, &snd_trace)
+                                .with_context(|| "failed to do trace objective")?;
+
+                            let new_dash_diff = if hash_diff_interesting {
+                                self
+                                    .runner
+                                    .dash_objective
+                                    .get_diff()
+                            } else {
+                                vec![]
+                            };
+
+                            let new_trace_diff = if trace_interesting {
+                                self
+                                    .runner
+                                    .trace_objective
+                                    .get_diff(&fst_trace, &snd_trace)
+                            } else { vec![] };
+
+                            let mut option_bug = None;
+
+                            for b_i in 0..bugs.len(){
+                                let matched_bug = bugs.get_mut(b_i).unwrap();
+                                if matched_bug.trace_bug == new_trace_diff && matched_bug.dash_bug == new_dash_diff {
+                                    option_bug = Some(matched_bug);
+                                    break;
+                                }
+                            }
+
+                            match option_bug {
+                                None => {
+                                    new_bugs.push(Bug {
+                                        name: format!("{}-{}", bug.name.clone(), bug.index.clone()),
+                                        workload: reduced,
+                                        dash_bug: new_dash_diff,
+                                        trace_bug: new_trace_diff,
+                                        index: bug.index - 1,
+                                    })
+                                }
+                                Some(b) => {
+                                    b.workload = reduced;
+                                }
                             }
                         }
-                    }
-                    _ => {}
-                };
+
+                        _ => {}
+                    };
+                }
+                if bug.index >= 0 {
+                    bug.decr_index();
+                }
             }
-            if index == 0 {
-                break;
-            }
-            index -= 1
+            bugs.append(&mut new_bugs);
         }
         Ok(())
+    }
+
+    fn find_bug_by_diff<'a>(dash_diff: &Vec<FileDiff>, trace_diff: &Vec<TraceDiff>, bugs: &mut Vec<Bug>) -> Option<usize> {
+        for (i, bug) in bugs.iter().enumerate() {
+            if bug.trace_bug == *trace_diff && bug.dash_bug == *dash_diff {
+                return Some(i);
+            }
+        }
+        return None;
     }
 }

@@ -13,16 +13,16 @@ pub struct Trace {
     pub rows: Vec<TraceRow>,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone)]
 pub struct TraceRow {
-    index: u32,
+    pub index: u32,
     command: String,
     return_code: i32,
     errno: Errno,
     extra: String,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone)]
 pub struct Errno {
     name: String,
     code: i32,
