@@ -8,7 +8,7 @@
 # Launch VM with changes being saved to disk.
 # Use for OS configuration (set up tools and etc.)
 
-qemu-system-x86_64  \
+exec qemu-system-x86_64  \
   -machine accel=kvm,type=q35 \
   -cpu host \
   -smp cores=4 \
