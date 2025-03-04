@@ -17,7 +17,7 @@ qmp_socket_path = "/tmp/diffuzzer-qemu-qmp.sock"
 [greybox]
 max_mutations = 10
 save_corpus = true
-scheduler = "QUEUE"
+scheduler = "FAST"
 
 [dash]
 enabled = true

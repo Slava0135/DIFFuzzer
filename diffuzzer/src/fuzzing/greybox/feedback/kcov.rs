@@ -7,7 +7,7 @@ use std::{collections::HashSet, fs};
 use anyhow::Context;
 use log::debug;
 
-use crate::fuzzing::outcome::Completed;
+use crate::path::LocalPath;
 
 pub const KCOV_FILENAME: &str = "kcov.dat";
 
@@ -21,28 +21,32 @@ impl KCovFeedback {
             all_coverage: HashSet::new(),
         }
     }
-    pub fn is_interesting(&mut self, outcome: &Completed) -> anyhow::Result<bool> {
+    pub fn is_interesting(&mut self, coverage: &HashSet<u64>) -> bool {
         debug!("do kcov feedback");
-        let path = outcome.dir.join(KCOV_FILENAME);
-        let kcov = fs::read_to_string(&path)
-            .with_context(|| format!("failed to read kcov file at {}", path))?;
-        let mut new_coverage = HashSet::new();
-        for line in kcov.lines() {
-            let addr = parse_addr(line)
-                .with_context(|| format!("failed to parse addr from kcov line '{}'", line))?;
-            new_coverage.insert(addr);
-        }
         let c = self.all_coverage.clone();
-        let diff: Vec<&u64> = new_coverage.difference(&c).collect();
+        let diff: Vec<&u64> = coverage.difference(&c).collect();
         if diff.is_empty() {
-            Ok(false)
+            false
         } else {
             for v in diff {
                 self.all_coverage.insert(*v);
             }
-            Ok(true)
+            true
         }
     }
+}
+
+pub fn parse_kcov(dir: &LocalPath) -> anyhow::Result<HashSet<u64>> {
+    let path = dir.join(KCOV_FILENAME);
+    let kcov = fs::read_to_string(&path)
+        .with_context(|| format!("failed to read kcov file at {}", path))?;
+    let mut new_coverage = HashSet::new();
+    for line in kcov.lines() {
+        let addr = parse_addr(line)
+            .with_context(|| format!("failed to parse addr from kcov line '{}'", line))?;
+        new_coverage.insert(addr);
+    }
+    Ok(new_coverage)
 }
 
 fn parse_addr(addr: &str) -> Result<u64, std::num::ParseIntError> {

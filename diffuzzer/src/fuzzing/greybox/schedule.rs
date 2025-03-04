@@ -1,22 +1,41 @@
+use std::collections::{HashMap, HashSet};
+
+use anyhow::Context;
+use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
+
+use crate::abstract_fs::workload::Workload;
+
 use super::seed::Seed;
 
 pub trait Scheduler {
-    fn choose(&self, corpus: &[Seed]) -> Seed {
-        todo!()
-    }
+    fn choose(&mut self, corpus: &mut [Seed]) -> anyhow::Result<Workload>;
 }
 
 /// Implemented by most greybox fuzzers.
 /// Next seed is being chosen from the circular queue.
-pub struct QueueScheduler {}
+pub struct QueueScheduler {
+    next_index: usize,
+}
 
 impl QueueScheduler {
     pub fn new() -> Self {
-        Self {}
+        Self { next_index: 0 }
     }
 }
 
-impl Scheduler for QueueScheduler {}
+impl Scheduler for QueueScheduler {
+    fn choose(&mut self, corpus: &mut [Seed]) -> anyhow::Result<Workload> {
+        if self.next_index >= corpus.len() {
+            self.next_index = 0
+        }
+        let next = corpus
+            .get_mut(self.next_index)
+            .with_context(|| "failed to choose seed")?;
+        next.times_choosen += 1;
+        self.next_index += 1;
+        Ok(next.workload.clone())
+    }
+}
 
 /// Based on paper "Coverage-based Greybox Fuzzing as Markov Chain"
 ///
@@ -37,12 +56,45 @@ impl Scheduler for QueueScheduler {}
 ///   - f(i) is the amount of fuzz that exercises path i
 ///   - s(i) is the number of times that ti has previously been choosen from the queue
 ///
-pub struct FastPowerScheduler {}
+pub struct FastPowerScheduler {
+    rng: StdRng,
+}
 
 impl FastPowerScheduler {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            rng: StdRng::from_entropy(),
+        }
     }
 }
 
-impl Scheduler for FastPowerScheduler {}
+impl Scheduler for FastPowerScheduler {
+    fn choose(&mut self, corpus: &mut [Seed]) -> anyhow::Result<Workload> {
+        let mut freq = HashMap::<u64, u64>::new();
+        for seed in corpus.iter() {
+            for k in &seed.coverage {
+                let v = freq.get(k).unwrap_or(&0);
+                freq.insert(*k, v + 1);
+            }
+        }
+        let base: f64 = 2.0;
+        let next = corpus
+            .choose_weighted_mut(&mut self.rng, |seed| {
+                base.powf(seed.times_choosen as f64) / path_frequency(&seed.coverage, &freq)
+            })
+            .with_context(|| "failed to choose seed")?;
+        next.times_choosen += 1;
+        Ok(next.workload.clone())
+    }
+}
+
+/// In original paper paths are equal only if
+fn path_frequency(coverage: &HashSet<u64>, freq: &HashMap<u64, u64>) -> f64 {
+    let mut f: f64 = 1.0;
+    for k in coverage {
+        let v = freq.get(k).unwrap_or(&1);
+        let v = *v as f64;
+        f += v.log2();
+    }
+    f
+}
