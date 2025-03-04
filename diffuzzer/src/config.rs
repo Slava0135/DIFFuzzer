@@ -27,6 +27,15 @@ pub struct GreyboxConfig {
     pub max_mutations: u16,
     /// If enabled corpus testcases will be also saved in separate directory
     pub save_corpus: bool,
+    pub scheduler: Scheduler,
+}
+
+/// See [`crate::fuzzing::greybox::schedule`]
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum Scheduler {
+    Queue,
+    Fast,
 }
 
 /// [QEMU documentation](https://www.qemu.org/docs/master/system/invocation.html)

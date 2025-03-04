@@ -20,6 +20,8 @@ use crate::save::{TEST_FILE_NAME, save_completed, save_testcase};
 use crate::supervisor::Supervisor;
 use crate::{abstract_fs::workload::Workload, config::Config, mount::FileSystemMount};
 
+use super::schedule::{FastPowerScheduler, QueueScheduler, Scheduler};
+use super::seed::Seed;
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 
 pub struct GreyBoxFuzzer {
@@ -28,8 +30,8 @@ pub struct GreyBoxFuzzer {
     initial_corpus: Vec<Workload>,
     next_initial: usize,
 
-    corpus: Vec<Workload>,
-    next_seed: usize,
+    corpus: Vec<Seed>,
+    scheduler: Box<dyn Scheduler>,
 
     fst_kcov_feedback: KCovFeedback,
     snd_kcov_feedback: KCovFeedback,
@@ -97,6 +99,11 @@ impl GreyBoxFuzzer {
             None
         };
 
+        let scheduler: Box<dyn Scheduler> = match config.greybox.scheduler {
+            crate::config::Scheduler::Queue => Box::new(QueueScheduler::new()),
+            crate::config::Scheduler::Fast => Box::new(FastPowerScheduler::new()),
+        };
+
         let runner = Runner::create(
             fst_mount,
             snd_mount,
@@ -117,8 +124,8 @@ impl GreyBoxFuzzer {
             initial_corpus,
             next_initial: 0,
 
-            corpus: vec![Workload::new()],
-            next_seed: 0,
+            corpus: vec![Seed::new(Workload::new())],
+            scheduler,
 
             fst_kcov_feedback,
             snd_kcov_feedback,
@@ -135,18 +142,14 @@ impl GreyBoxFuzzer {
             self.next_initial += 1;
             workload
         } else {
-            if self.next_seed >= self.corpus.len() {
-                self.next_seed = 0
-            }
-            let workload = self.corpus.get(self.next_seed).unwrap().clone();
-            self.next_seed += 1;
-            self.mutator.mutate(workload)
+            let next = self.scheduler.choose(self.corpus.as_slice());
+            self.mutator.mutate(next.workload)
         }
     }
 
     fn add_to_corpus(&mut self, input: Workload) {
         debug!("add new input to corpus");
-        self.corpus.push(input);
+        self.corpus.push(Seed::new(input));
     }
 
     fn save_input(
