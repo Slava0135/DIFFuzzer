@@ -275,7 +275,7 @@ impl Fuzzer for GreyBoxFuzzer {
         let since_start = Instant::now().duration_since(self.runner.stats.start);
         let secs = since_start.as_secs();
         info!(
-            "corpus: {}, coverage: {}, crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
+            "corpus: {}, coverage: {} (points), crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
             self.corpus.len(),
             self.kcov_feedback.map().len(),
             self.runner.stats.crashes,
