@@ -2,7 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::{collections::HashSet, fs};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+};
 
 use anyhow::Context;
 use log::debug;
@@ -12,27 +15,29 @@ use crate::path::LocalPath;
 pub const KCOV_FILENAME: &str = "kcov.dat";
 
 pub struct KCovFeedback {
-    all_coverage: HashSet<u64>,
+    coverage_map: HashMap<u64, u64>,
 }
 
 impl KCovFeedback {
     pub fn new() -> Self {
         Self {
-            all_coverage: HashSet::new(),
+            coverage_map: HashMap::new(),
         }
     }
     pub fn is_interesting(&mut self, coverage: &HashSet<u64>) -> bool {
         debug!("do kcov feedback");
-        let c = self.all_coverage.clone();
-        let diff: Vec<&u64> = coverage.difference(&c).collect();
-        if diff.is_empty() {
-            false
-        } else {
-            for v in diff {
-                self.all_coverage.insert(*v);
-            }
-            true
+        let old = self.coverage_map.keys().copied().collect();
+        let diff: Vec<&u64> = coverage.difference(&old).collect();
+        !diff.is_empty()
+    }
+    pub fn update_map(&mut self, coverage: &HashSet<u64>) {
+        for addr in coverage {
+            let count = self.coverage_map.get(addr).unwrap_or(&0);
+            self.coverage_map.insert(*addr, *count + 1);
         }
+    }
+    pub fn map(&self) -> &HashMap<u64, u64> {
+        &self.coverage_map
     }
 }
 
@@ -40,13 +45,13 @@ pub fn parse_kcov(dir: &LocalPath) -> anyhow::Result<HashSet<u64>> {
     let path = dir.join(KCOV_FILENAME);
     let kcov = fs::read_to_string(&path)
         .with_context(|| format!("failed to read kcov file at {}", path))?;
-    let mut new_coverage = HashSet::new();
+    let mut coverage = HashSet::new();
     for line in kcov.lines() {
         let addr = parse_addr(line)
             .with_context(|| format!("failed to parse addr from kcov line '{}'", line))?;
-        new_coverage.insert(addr);
+        coverage.insert(addr);
     }
-    Ok(new_coverage)
+    Ok(coverage)
 }
 
 fn parse_addr(addr: &str) -> Result<u64, std::num::ParseIntError> {

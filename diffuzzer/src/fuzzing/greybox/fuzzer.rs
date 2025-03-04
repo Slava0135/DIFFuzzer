@@ -147,7 +147,9 @@ impl GreyBoxFuzzer {
             self.next_initial += 1;
             Ok(workload)
         } else {
-            let next = self.scheduler.choose(self.corpus.as_mut_slice())?;
+            let next = self
+                .scheduler
+                .choose(self.corpus.as_mut_slice(), self.kcov_feedback.map())?;
             Ok(self.mutator.mutate(next))
         }
     }
@@ -219,6 +221,7 @@ impl Fuzzer for GreyBoxFuzzer {
                 let kcov: HashSet<u64> = fst_kcov.union(&snd_kcov).copied().collect();
 
                 let kcov_is_interesting = self.kcov_feedback.is_interesting(&kcov);
+                self.kcov_feedback.update_map(&kcov);
 
                 if kcov_is_interesting {
                     self.add_to_corpus(input.clone(), kcov);
@@ -272,8 +275,9 @@ impl Fuzzer for GreyBoxFuzzer {
         let since_start = Instant::now().duration_since(self.runner.stats.start);
         let secs = since_start.as_secs();
         info!(
-            "corpus: {}, crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
+            "corpus: {}, coverage: {}, crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
             self.corpus.len(),
+            self.kcov_feedback.map().len(),
             self.runner.stats.crashes,
             self.runner.stats.executions,
             (self.runner.stats.executions as f64) / (secs as f64),

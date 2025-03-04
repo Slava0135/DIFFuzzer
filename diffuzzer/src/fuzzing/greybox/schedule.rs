@@ -8,7 +8,11 @@ use crate::abstract_fs::workload::Workload;
 use super::seed::Seed;
 
 pub trait Scheduler {
-    fn choose(&mut self, corpus: &mut [Seed]) -> anyhow::Result<Workload>;
+    fn choose(
+        &mut self,
+        corpus: &mut [Seed],
+        coverage_map: &HashMap<u64, u64>,
+    ) -> anyhow::Result<Workload>;
 }
 
 /// Implemented by most greybox fuzzers.
@@ -24,7 +28,11 @@ impl QueueScheduler {
 }
 
 impl Scheduler for QueueScheduler {
-    fn choose(&mut self, corpus: &mut [Seed]) -> anyhow::Result<Workload> {
+    fn choose(
+        &mut self,
+        corpus: &mut [Seed],
+        _coverage_map: &HashMap<u64, u64>,
+    ) -> anyhow::Result<Workload> {
         if self.next_index >= corpus.len() {
             self.next_index = 0
         }
@@ -71,19 +79,16 @@ impl FastPowerScheduler {
 }
 
 impl Scheduler for FastPowerScheduler {
-    fn choose(&mut self, corpus: &mut [Seed]) -> anyhow::Result<Workload> {
-        let mut freq = HashMap::<u64, u64>::new();
-        for seed in corpus.iter() {
-            for k in &seed.coverage {
-                let v = freq.get(k).unwrap_or(&0);
-                freq.insert(*k, v + 1);
-            }
-        }
+    fn choose(
+        &mut self,
+        corpus: &mut [Seed],
+        coverage_map: &HashMap<u64, u64>,
+    ) -> anyhow::Result<Workload> {
         let base: f64 = 2.0;
         let next = corpus
             .choose_weighted_mut(&mut self.rng, |seed| {
-                let p =
-                    base.powf(seed.times_choosen as f64) / path_frequency(&seed.coverage, &freq);
+                let p = base.powf(seed.times_choosen as f64)
+                    / path_frequency(&seed.coverage, &coverage_map) as f64;
                 if p < self.m { p } else { self.m }
             })
             .with_context(|| "failed to choose seed")?;
@@ -94,13 +99,13 @@ impl Scheduler for FastPowerScheduler {
 
 /// In original paper paths are considered equal only if coverage is exactly the same.
 ///
-/// Its (probably) not true in our case.
-fn path_frequency(coverage: &HashSet<u64>, freq: &HashMap<u64, u64>) -> f64 {
-    let mut f: f64 = 1.0;
-    for k in coverage {
-        let v = freq.get(k).unwrap_or(&1);
-        let v = *v as f64;
-        f += v.log2();
-    }
-    f
+/// Instead of finding path frequency, try to find least frequent address of the path.
+///
+/// TODO: does this actually work?
+fn path_frequency(coverage: &HashSet<u64>, coverage_map: &HashMap<u64, u64>) -> u64 {
+    *coverage
+        .iter()
+        .map(|addr| coverage_map.get(addr).unwrap_or(&1))
+        .min()
+        .unwrap_or(&1)
 }
