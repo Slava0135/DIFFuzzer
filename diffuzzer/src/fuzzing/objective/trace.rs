@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use log::debug;
 use dash::FileInfo;
+use log::debug;
 
 use crate::abstract_fs::trace::{Trace, TraceRow};
 use crate::fuzzing::objective::trace::TraceDiff::{DifferentLength, ExitCodeIsDifferent};
@@ -42,7 +42,10 @@ impl TraceObjective {
             if fst_row != snd_row {
                 fst_row.index = 0;
                 snd_row.index = 0;
-                trace_diff.push(ExitCodeIsDifferent {fst: fst_row, snd: snd_row})
+                trace_diff.push(ExitCodeIsDifferent {
+                    fst: fst_row,
+                    snd: snd_row,
+                })
             }
         }
         return trace_diff;
