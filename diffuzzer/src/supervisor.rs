@@ -2,9 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::sync::Arc;
-use std::sync::atomic::AtomicU32;
-use std::sync::atomic::Ordering::Relaxed;
 use std::{
     fs::OpenOptions,
     io::Write,
@@ -61,7 +58,7 @@ pub struct QemuSupervisor {
     config: QemuConfig,
     _qemu_thread: JoinHandle<()>,
     event_handler: EventHandler,
-    id: Arc<AtomicU32>,
+    id_receiver: Receiver<u32>,
 }
 
 impl QemuSupervisor {
@@ -85,9 +82,8 @@ impl QemuSupervisor {
             .stdout(Stdio::null())
             .stderr(console_stdio);
 
-        let id = 0;
-        let id_ptr = Arc::new(AtomicU32::new(id));
-        let id_thread = Arc::clone(&id_ptr);
+        let (tx, rx) = mpsc::channel();
+
         let script = config.launch_script.clone();
         let log_path = config.log_path.clone();
         let _qemu_thread = thread::spawn(move || {
@@ -96,7 +92,7 @@ impl QemuSupervisor {
                 .with_context(|| format!("failed to run qemu vm from script '{}'", script))
             {
                 Ok(mut child) => {
-                    id_thread.store(child.id(), Relaxed);
+                    tx.send(child.id()).unwrap();
                     match child.wait() {
                         Ok(status) => {
                             error!(
@@ -126,7 +122,7 @@ impl QemuSupervisor {
             config: config.clone(),
             _qemu_thread,
             event_handler,
-            id: id_ptr,
+            id_receiver: rx,
         })
     }
 
@@ -165,10 +161,10 @@ impl Supervisor for QemuSupervisor {
 
 impl Drop for QemuSupervisor {
     fn drop(&mut self) {
-        let id = self.id.load(Relaxed);
+        let id = self.id_receiver.recv().unwrap();
         if id != 0 {
             let mut cmd = CommandWrapper::new("kill");
-            cmd.arg(self.id.load(Relaxed).to_string());
+            cmd.arg(id.to_string());
             cmd.exec_local(None).expect("QEMU not killed");
         }
     }
