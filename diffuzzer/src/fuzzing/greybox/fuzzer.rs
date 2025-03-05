@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -13,6 +14,7 @@ use walkdir::WalkDir;
 
 use crate::command::CommandInterface;
 use crate::fuzzing::fuzzer::Fuzzer;
+use crate::fuzzing::greybox::feedback::kcov::parse_kcov;
 use crate::fuzzing::outcome::{Completed, Outcome};
 use crate::fuzzing::runner::Runner;
 use crate::path::{LocalPath, RemotePath};
@@ -20,6 +22,8 @@ use crate::save::{TEST_FILE_NAME, save_completed, save_testcase};
 use crate::supervisor::Supervisor;
 use crate::{abstract_fs::workload::Workload, config::Config, mount::FileSystemMount};
 
+use super::schedule::{FastPowerScheduler, QueueScheduler, Scheduler};
+use super::seed::Seed;
 use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 
 pub struct GreyBoxFuzzer {
@@ -28,11 +32,10 @@ pub struct GreyBoxFuzzer {
     initial_corpus: Vec<Workload>,
     next_initial: usize,
 
-    corpus: Vec<Workload>,
-    next_seed: usize,
+    corpus: Vec<Seed>,
+    scheduler: Box<dyn Scheduler>,
 
-    fst_kcov_feedback: KCovFeedback,
-    snd_kcov_feedback: KCovFeedback,
+    kcov_feedback: KCovFeedback,
 
     mutator: Mutator,
 
@@ -97,6 +100,13 @@ impl GreyBoxFuzzer {
             None
         };
 
+        let scheduler: Box<dyn Scheduler> = match config.greybox.scheduler {
+            crate::config::Scheduler::Queue => Box::new(QueueScheduler::new()),
+            crate::config::Scheduler::Fast => {
+                Box::new(FastPowerScheduler::new(config.greybox.m_constant))
+            }
+        };
+
         let runner = Runner::create(
             fst_mount,
             snd_mount,
@@ -108,8 +118,7 @@ impl GreyBoxFuzzer {
         )
         .with_context(|| "failed to create runner")?;
 
-        let fst_kcov_feedback = KCovFeedback::new();
-        let snd_kcov_feedback = KCovFeedback::new();
+        let kcov_feedback = KCovFeedback::new();
 
         Ok(Self {
             runner,
@@ -117,11 +126,10 @@ impl GreyBoxFuzzer {
             initial_corpus,
             next_initial: 0,
 
-            corpus: vec![Workload::new()],
-            next_seed: 0,
+            corpus: vec![Seed::new(Workload::new(), HashSet::new())],
+            scheduler,
 
-            fst_kcov_feedback,
-            snd_kcov_feedback,
+            kcov_feedback,
 
             mutator,
 
@@ -129,24 +137,27 @@ impl GreyBoxFuzzer {
         })
     }
 
-    fn pick_input(&mut self) -> Workload {
+    fn pick_input(&mut self) -> anyhow::Result<Workload> {
         if self.next_initial < self.initial_corpus.len() {
-            let workload = self.initial_corpus.get(self.next_initial).unwrap().clone();
+            let workload = self
+                .initial_corpus
+                .get(self.next_initial)
+                .with_context(|| "failed to get seed from initial corpus")?
+                .clone();
             self.next_initial += 1;
-            workload
+            Ok(workload)
         } else {
-            if self.next_seed >= self.corpus.len() {
-                self.next_seed = 0
-            }
-            let workload = self.corpus.get(self.next_seed).unwrap().clone();
-            self.next_seed += 1;
-            self.mutator.mutate(workload)
+            let next = self
+                .scheduler
+                .choose(self.corpus.as_mut_slice(), self.kcov_feedback.map())?;
+            Ok(self.mutator.mutate(next))
         }
     }
 
-    fn add_to_corpus(&mut self, input: Workload) {
+    fn add_to_corpus(&mut self, input: Workload, coverage: HashSet<u64>) {
         debug!("add new input to corpus");
-        self.corpus.push(input);
+        let seed = Seed::new(input, coverage);
+        self.corpus.push(seed);
     }
 
     fn save_input(
@@ -180,7 +191,7 @@ impl GreyBoxFuzzer {
 impl Fuzzer for GreyBoxFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
         debug!("pick input");
-        let input = self.pick_input();
+        let input = self.pick_input()?;
 
         let binary_path = self.runner().compile_test(&input)?;
 
@@ -195,26 +206,25 @@ impl Fuzzer for GreyBoxFuzzer {
                 }
 
                 debug!("get feedback");
-                let fst_kcov_is_interesting = self
-                    .fst_kcov_feedback
-                    .is_interesting(&fst_outcome)
-                    .with_context(|| {
+                let fst_kcov = parse_kcov(&fst_outcome.dir).with_context(|| {
                     format!(
-                        "failed to get first kcov feedback for '{}'",
+                        "failed to get kcov feedback for '{}'",
                         self.runner.fst_fs_name
                     )
                 })?;
-                let snd_kcov_is_interesting = self
-                    .snd_kcov_feedback
-                    .is_interesting(&snd_outcome)
-                    .with_context(|| {
+                let snd_kcov = parse_kcov(&snd_outcome.dir).with_context(|| {
                     format!(
-                        "failed to get second kcov feedback for '{}'",
+                        "failed to get kcov feedback for '{}'",
                         self.runner.snd_fs_name
                     )
                 })?;
-                if fst_kcov_is_interesting || snd_kcov_is_interesting {
-                    self.add_to_corpus(input.clone());
+                let kcov: HashSet<u64> = fst_kcov.union(&snd_kcov).copied().collect();
+
+                let kcov_is_interesting = self.kcov_feedback.is_interesting(&kcov);
+                self.kcov_feedback.update_map(&kcov);
+
+                if kcov_is_interesting {
+                    self.add_to_corpus(input.clone(), kcov);
                     self.show_stats();
                     if self.corpus_path.is_some() {
                         self.save_input(input, &binary_path, &fst_outcome, &snd_outcome)
@@ -265,8 +275,9 @@ impl Fuzzer for GreyBoxFuzzer {
         let since_start = Instant::now().duration_since(self.runner.stats.start);
         let secs = since_start.as_secs();
         info!(
-            "corpus: {}, crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
+            "corpus: {}, coverage: {} (points), crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
             self.corpus.len(),
+            self.kcov_feedback.map().len(),
             self.runner.stats.crashes,
             self.runner.stats.executions,
             (self.runner.stats.executions as f64) / (secs as f64),
