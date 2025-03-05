@@ -42,7 +42,7 @@ pub fn save_testcase(
             })?;
     }
 
-    let json_path = output_dir.join(TEST_EXE_FILENAME);
+    let json_path = output_dir.join(TEST_FILE_NAME);
     let json = serde_json::to_string_pretty(&input)
         .with_context(|| format!("failed to copy workload as json at '{}'", json_path))?;
     fs::write(json_path, json)?;
