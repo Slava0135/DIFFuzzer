@@ -71,7 +71,6 @@ impl QemuSupervisor {
         let mut launch = Command::new(&config.launch_script);
         launch
             .env("OS_IMAGE", config.os_image.clone())
-            .env("MONITOR_PORT", config.monitor_port.to_string())
             .env("SSH_PORT", config.ssh_port.to_string())
             .env("QMP_SOCKET_PATH", config.qmp_socket_path.clone())
             .env("MONITOR_SOCKET_PATH", config.monitor_socket_path.clone());

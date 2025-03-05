@@ -47,8 +47,6 @@ pub struct QemuConfig {
     pub launch_script: String,
     /// Private key used to connect to VM instance using SSH
     pub ssh_private_key_path: String,
-    /// Port for monitor connection
-    pub monitor_port: u16,
     /// Port for SSH connection
     pub ssh_port: u16,
     /// Path to OS image
