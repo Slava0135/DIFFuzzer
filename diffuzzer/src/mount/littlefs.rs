@@ -2,27 +2,28 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-pub mod btrfs;
-pub mod ext4;
-pub mod f2fs;
-pub mod xfs;
-pub mod littlefs;
-
 use std::fmt::Display;
 
 use anyhow::Context;
 use log::debug;
-use regex::RegexSet;
 
 use crate::{
     command::{CommandInterface, CommandWrapper},
+    mount::{DEVICE, RAM_DISK_SIZE},
     path::RemotePath,
 };
 
-const RAM_DISK_SIZE: usize = 1_000_000;
-const DEVICE: &str = "/dev/ram0";
+use super::FileSystemMount;
 
-pub trait FileSystemMount: Display {
+pub struct LittleFS;
+
+impl Display for LittleFS {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LittleFS")
+    }
+}
+
+impl FileSystemMount for LittleFS {
     fn setup(&self, cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<()> {
         debug!("setup '{}' filesystem at '{}'", self, path);
 
@@ -33,32 +34,22 @@ pub trait FileSystemMount: Display {
         modprobe
             .arg("brd")
             .arg("rd_nr=1")
-            .arg(format!("rd_size={RAM_DISK_SIZE}"));
+            .arg(format!("rd_size={}", RAM_DISK_SIZE));
         cmdi.exec(modprobe, None)
             .with_context(|| "failed to load module 'brd'")?;
 
-        let mut mkfs = CommandWrapper::new(self.mkfs_cmd());
-        if let Some(opts) = self.mkfs_opts() {
-            mkfs.arg("-O");
-            mkfs.arg(opts);
-        }
-        mkfs.arg(DEVICE);
-        cmdi.exec(mkfs, None)
-            .with_context(|| "failed to make filesystem")?;
+        let mut format = CommandWrapper::new("/lfs");
+        format.arg("--format").arg(DEVICE);
+        cmdi.exec(format, None)
+            .with_context(|| format!("failed to format device '{}'", DEVICE))?;
 
-        let mut mount = CommandWrapper::new("mount");
-        mount.arg("-t").arg(self.mount_t());
-        if let Some(opts) = self.mount_opts() {
-            mount.arg("-o");
-            mount.arg(opts);
-        }
+        let mut mount = CommandWrapper::new("/lfs");
         mount.arg(DEVICE).arg(path.base.as_ref());
         cmdi.exec(mount, None)
             .with_context(|| format!("failed to mount filesystem at '{}'", path))?;
 
         Ok(())
     }
-
     fn teardown(&self, cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<()> {
         debug!("teardown '{}' filesystem at '{}'", self, path);
 
@@ -77,32 +68,10 @@ pub trait FileSystemMount: Display {
 
         Ok(())
     }
+}
 
-    /// Used in default implementation: `mkfs` command to make new FS.
-    /// Example: `"mkfs.ext4"` or `"mkfs.btrfs"`
-    fn mkfs_cmd(&self) -> String {
-        todo!()
-    }
-
-    /// Used in default implementation: `mkfs -O` argument.
-    /// Example: `extra_attr,inode_checksum,sb_checksum,compression`
-    fn mkfs_opts(&self) -> Option<String> {
-        None
-    }
-
-    /// Used in default implementation: `mount -t` argument.
-    /// Example: `"ext4"` or `"btrfs"`
-    fn mount_t(&self) -> String {
-        todo!()
-    }
-
-    /// Used in default implementation: `mount -o` argument.
-    /// Example: `compress_algorithm=zstd:6,compress_chksum,atgc,gc_merge,lazytime`
-    fn mount_opts(&self) -> Option<String> {
-        None
-    }
-
-    fn get_internal_dirs(&self) -> RegexSet {
-        RegexSet::new::<_, &str>([]).unwrap()
+impl LittleFS {
+    pub const fn new() -> Self {
+        Self {}
     }
 }
