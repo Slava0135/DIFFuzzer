@@ -19,6 +19,7 @@ use anyhow::{Context, bail};
 use log::{debug, error, info};
 use serde::Deserialize;
 use serde_json::{Deserializer, Value};
+use crate::command::CommandWrapper;
 
 use crate::config::QemuConfig;
 
@@ -166,10 +167,9 @@ impl Drop for QemuSupervisor {
     fn drop(&mut self) {
         let id = self.id.load(Relaxed);
         if id != 0 {
-            Command::new("kill")
-                .arg(format!("{:?}", self.id))
-                .spawn()
-                .expect("QEMU not killed");
+            let mut cmd = CommandWrapper::new("kill");
+            cmd.arg(self.id.load(Relaxed).to_string());
+            cmd.exec_local(None).expect("QEMU not killed");
         }
     }
 }
