@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use crate::abstract_fs::trace::{TRACE_FILENAME, Trace};
+use crate::abstract_fs::trace::{TRACE_FILENAME, Trace, TraceDiff};
 
 use crate::abstract_fs::workload::Workload;
 use crate::command::CommandInterface;
@@ -261,6 +261,33 @@ impl Runner {
 
         Ok(())
     }
+
+    pub fn get_running_results(
+        &mut self,
+        fst_outcome: &Completed,
+        snd_outcome: &Completed,
+    ) -> anyhow::Result<RunningResults> {
+        let dash_interesting = self
+            .dash_objective
+            .is_interesting(&fst_outcome.dash_state, &snd_outcome.dash_state)
+            .with_context(|| "failed to do dash objective")?;
+
+        let dash_diff = if dash_interesting {
+            self.dash_objective
+                .get_diff(&fst_outcome.dash_state, &snd_outcome.dash_state)
+        } else {
+            vec![]
+        };
+
+        let trace_diff = self
+            .trace_objective
+            .get_diff(&fst_outcome.trace, &snd_outcome.trace);
+
+        return Ok(RunningResults {
+            dash_diff,
+            trace_diff,
+        });
+    }
 }
 
 pub struct Stats {
@@ -278,6 +305,26 @@ impl Stats {
             start: Instant::now(),
             last_time_showed: Instant::now(),
         }
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub struct RunningResults {
+    pub dash_diff: Vec<FileDiff>,
+    pub trace_diff: Vec<TraceDiff>,
+}
+
+impl RunningResults {
+    pub fn has_some_interesting(&self) -> bool {
+        self.dash_interesting() || self.trace_interesting()
+    }
+
+    pub fn dash_interesting(&self) -> bool {
+        self.dash_diff != vec![]
+    }
+
+    pub fn trace_interesting(&self) -> bool {
+        self.trace_diff != vec![]
     }
 }
 

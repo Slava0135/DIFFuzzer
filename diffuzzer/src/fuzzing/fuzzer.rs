@@ -61,30 +61,15 @@ pub trait Fuzzer {
     ) -> anyhow::Result<bool> {
         let runner = self.runner();
         debug!("do objectives");
-        let dash_is_interesting = runner
-            .dash_objective
-            .is_interesting()
-            .with_context(|| "failed to do hash objective")?;
-
-        let fst_trace =
-            parse_trace(&fst_outcome.dir).with_context(|| "failed to parse first trace")?;
-        let snd_trace =
-            parse_trace(&snd_outcome.dir).with_context(|| "failed to parse second trace")?;
-
-        let trace_is_interesting = runner
-            .trace_objective
-            .is_interesting(&fst_trace, &snd_trace)
-            .with_context(|| "failed to do trace objective")?;
-        if trace_is_interesting || dash_is_interesting {
+        let diffs = runner.get_running_results(fst_outcome, snd_outcome)?;
+        if diffs.has_some_interesting() {
             let reason = format!(
                 "error detected by: trace?: {}, hash?: {}",
-                trace_is_interesting, dash_is_interesting
+                diffs.trace_interesting(),
+                diffs.dash_interesting()
             );
             debug!("{}", reason);
-            let mut diff: Vec<FileDiff> = vec![];
-            if dash_is_interesting {
-                diff = runner.dash_objective.get_diff();
-            }
+
             let dir_name = input.generate_name();
             runner
                 .report_diff(
@@ -92,7 +77,7 @@ pub trait Fuzzer {
                     dir_name,
                     binary_path,
                     runner.crashes_path.clone(),
-                    diff,
+                    diffs.dash_diff,
                     fst_outcome,
                     snd_outcome,
                     reason,
