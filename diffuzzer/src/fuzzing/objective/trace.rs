@@ -2,10 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use log::debug;
-
-use crate::abstract_fs::trace::{Trace, TraceRow};
-use crate::fuzzing::objective::trace::TraceDiff::{DifferentLength, TraceRowIsDifferent};
+use crate::abstract_fs::trace::TraceDiff::{DifferentLength, TraceRowIsDifferent};
+use crate::abstract_fs::trace::{Trace, TraceDiff};
 
 pub struct TraceObjective {}
 
@@ -15,18 +13,7 @@ impl TraceObjective {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum TraceDiff {
-    TraceRowIsDifferent { fst: TraceRow, snd: TraceRow },
-    DifferentLength,
-}
-
 impl TraceObjective {
-    pub fn is_interesting(&mut self, fst_trace: &Trace, snd_trace: &Trace) -> anyhow::Result<bool> {
-        debug!("do trace objective");
-        Ok(!fst_trace.same_as(snd_trace))
-    }
-
     pub fn get_diff(&mut self, fst_trace: &Trace, snd_trace: &Trace) -> Vec<TraceDiff> {
         let mut trace_diff: Vec<TraceDiff> = vec![];
 

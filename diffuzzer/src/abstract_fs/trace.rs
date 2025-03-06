@@ -22,6 +22,12 @@ pub struct TraceRow {
     extra: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TraceDiff {
+    TraceRowIsDifferent { fst: TraceRow, snd: TraceRow },
+    DifferentLength,
+}
+
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone)]
 pub struct Errno {
     name: String,
@@ -93,9 +99,7 @@ impl Trace {
         }
         Ok(trace)
     }
-    pub fn same_as(&self, other: &Trace) -> bool {
-        self == other
-    }
+
     pub fn has_errors(&self) -> bool {
         self.rows.iter().any(|row| row.errno.code != 0)
     }
