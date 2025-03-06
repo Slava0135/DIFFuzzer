@@ -107,8 +107,8 @@ pub enum Mode {
         #[arg(short, long)]
         #[clap(value_parser = PossibleValuesParser::new(filesystems_available()))]
         second_filesystem: String,
-        /// Bug variation limit (default 0 - no limit)
-        #[arg(short, long, default_value_t = 0)]
-        variation_limit: usize,
+        /// The limit of possible inaccurate bugs. Default 10 (0 - no limit)
+        #[arg(short, long, default_value_t = 10)]
+        limit_bugs: usize,
     },
 }
