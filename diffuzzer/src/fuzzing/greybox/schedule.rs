@@ -59,7 +59,7 @@ impl Scheduler for QueueScheduler {
 ///
 /// A more efficient coverage-based greybox fuzzer discovers an undiscovered state
 /// in a low-density region while assigning the __least amount of total energy__.
-/// 
+///
 /// Exponential schedule (FAST) was proven to be the most effective:
 /// `p(i) = min((α(i) / β) * (2^s(i) / f(i)), M)`, where
 ///   - α(i) can depend on the execution time, block transition coverage, and creation time of ti. (AFL)
