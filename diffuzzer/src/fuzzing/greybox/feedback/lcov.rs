@@ -7,6 +7,8 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
 };
 
+use super::CoverageMap;
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct LCovTrace {
     pub files: HashMap<String, LCovTraceOneFile>,
@@ -49,7 +51,7 @@ impl LCovTrace {
     fn add_file(&mut self, name: String, file: LCovTraceOneFile) {
         self.files.insert(name, file);
     }
-    fn compact(&mut self) -> HashMap<u64, u64> {
+    fn map(&mut self) -> CoverageMap {
         let mut coverage_map = HashMap::new();
         for (file, trace) in &self.files {
             let mut hasher = DefaultHasher::new();

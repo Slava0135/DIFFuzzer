@@ -8,9 +8,7 @@ use anyhow::Context;
 use log::debug;
 
 use crate::{
-    command::{CommandInterface, CommandWrapper},
-    mount::{DEVICE, RAM_DISK_SIZE},
-    path::RemotePath,
+    command::{CommandInterface, CommandWrapper}, fuzzing::greybox::feedback::CoverageType, mount::{DEVICE, RAM_DISK_SIZE}, path::RemotePath
 };
 
 use super::FileSystemMount;
@@ -67,6 +65,9 @@ impl FileSystemMount for LittleFS {
             .with_context(|| "failed to remove mountpoint")?;
 
         Ok(())
+    }
+    fn coverage_type(&self) -> CoverageType {
+        CoverageType::LCov
     }
 }
 

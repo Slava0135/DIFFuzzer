@@ -14,7 +14,6 @@ use walkdir::WalkDir;
 
 use crate::command::CommandInterface;
 use crate::fuzzing::fuzzer::Fuzzer;
-use crate::fuzzing::greybox::feedback::kcov::parse_kcov;
 use crate::fuzzing::outcome::{Completed, Outcome};
 use crate::fuzzing::runner::Runner;
 use crate::path::{LocalPath, RemotePath};
@@ -22,9 +21,13 @@ use crate::save::{TEST_FILE_NAME, save_completed, save_testcase};
 use crate::supervisor::Supervisor;
 use crate::{abstract_fs::workload::Workload, config::Config, mount::FileSystemMount};
 
+use super::feedback::{
+    CoverageFeedback, CoverageType, DummyCoverageFeedback, InputCoverage, KCovCoverageFeedback,
+    LCovCoverageFeedback,
+};
+use super::mutator::Mutator;
 use super::schedule::{FastPowerScheduler, QueueScheduler, Scheduler};
 use super::seed::Seed;
-use super::{feedback::kcov::KCovFeedback, mutator::Mutator};
 
 pub struct GreyBoxFuzzer {
     runner: Runner,
@@ -35,7 +38,8 @@ pub struct GreyBoxFuzzer {
     corpus: Vec<Seed>,
     scheduler: Box<dyn Scheduler>,
 
-    kcov_feedback: KCovFeedback,
+    fst_coverage_feedback: Box<dyn CoverageFeedback>,
+    snd_coverage_feedback: Box<dyn CoverageFeedback>,
 
     mutator: Mutator,
 
@@ -118,7 +122,16 @@ impl GreyBoxFuzzer {
         )
         .with_context(|| "failed to create runner")?;
 
-        let kcov_feedback = KCovFeedback::new();
+        let fst_coverage_feedback: Box<dyn CoverageFeedback> = match fst_mount.coverage_type() {
+            CoverageType::None => Box::new(DummyCoverageFeedback::new()),
+            CoverageType::LCov => Box::new(LCovCoverageFeedback::new()),
+            CoverageType::KCov => Box::new(KCovCoverageFeedback::new()),
+        };
+        let snd_coverage_feedback: Box<dyn CoverageFeedback> = match snd_mount.coverage_type() {
+            CoverageType::None => Box::new(DummyCoverageFeedback::new()),
+            CoverageType::LCov => Box::new(LCovCoverageFeedback::new()),
+            CoverageType::KCov => Box::new(KCovCoverageFeedback::new()),
+        };
 
         Ok(Self {
             runner,
@@ -126,10 +139,11 @@ impl GreyBoxFuzzer {
             initial_corpus,
             next_initial: 0,
 
-            corpus: vec![Seed::new(Workload::new(), HashSet::new())],
+            corpus: vec![Seed::new(Workload::new(), HashSet::new(), HashSet::new())],
             scheduler,
 
-            kcov_feedback,
+            fst_coverage_feedback,
+            snd_coverage_feedback,
 
             mutator,
 
@@ -147,16 +161,23 @@ impl GreyBoxFuzzer {
             self.next_initial += 1;
             Ok(workload)
         } else {
-            let next = self
-                .scheduler
-                .choose(self.corpus.as_mut_slice(), self.kcov_feedback.map())?;
+            let next = self.scheduler.choose(
+                self.corpus.as_mut_slice(),
+                self.fst_coverage_feedback.map(),
+                self.snd_coverage_feedback.map(),
+            )?;
             Ok(self.mutator.mutate(next))
         }
     }
 
-    fn add_to_corpus(&mut self, input: Workload, coverage: HashSet<u64>) {
+    fn add_to_corpus(
+        &mut self,
+        input: Workload,
+        fst_coverage: InputCoverage,
+        snd_coverage: InputCoverage,
+    ) {
         debug!("add new input to corpus");
-        let seed = Seed::new(input, coverage);
+        let seed = Seed::new(input, fst_coverage, snd_coverage);
         self.corpus.push(seed);
     }
 
@@ -206,25 +227,21 @@ impl Fuzzer for GreyBoxFuzzer {
                 }
 
                 debug!("get feedback");
-                let fst_kcov = parse_kcov(&fst_outcome.dir).with_context(|| {
-                    format!(
-                        "failed to get kcov feedback for '{}'",
-                        self.runner.fst_fs_name
-                    )
-                })?;
-                let snd_kcov = parse_kcov(&snd_outcome.dir).with_context(|| {
-                    format!(
-                        "failed to get kcov feedback for '{}'",
-                        self.runner.snd_fs_name
-                    )
-                })?;
-                let kcov: HashSet<u64> = fst_kcov.union(&snd_kcov).copied().collect();
+                let fst_opinion = self
+                    .fst_coverage_feedback
+                    .opinion()
+                    .with_context(|| "failed to get first coverage feedback")?;
+                let snd_opinion = self
+                    .snd_coverage_feedback
+                    .opinion()
+                    .with_context(|| "failed to get second coverage feedback")?;
 
-                let kcov_is_interesting = self.kcov_feedback.is_interesting(&kcov);
-                self.kcov_feedback.update_map(&kcov);
-
-                if kcov_is_interesting {
-                    self.add_to_corpus(input.clone(), kcov);
+                if fst_opinion.is_interesting() || snd_opinion.is_interesting() {
+                    self.add_to_corpus(
+                        input.clone(),
+                        fst_opinion.coverage(),
+                        snd_opinion.coverage(),
+                    );
                     self.show_stats();
                     if self.corpus_path.is_some() {
                         self.save_input(input, &binary_path, &fst_outcome, &snd_outcome)
@@ -275,9 +292,12 @@ impl Fuzzer for GreyBoxFuzzer {
         let since_start = Instant::now().duration_since(self.runner.stats.start);
         let secs = since_start.as_secs();
         info!(
-            "corpus: {}, coverage: {} (points), crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
+            "corpus: {}, coverage: {} ({}) + {} ({}), crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
             self.corpus.len(),
-            self.kcov_feedback.map().len(),
+            self.fst_coverage_feedback.map().len(),
+            self.fst_coverage_feedback.coverage_type(),
+            self.snd_coverage_feedback.map().len(),
+            self.snd_coverage_feedback.coverage_type(),
             self.runner.stats.crashes,
             self.runner.stats.executions,
             (self.runner.stats.executions as f64) / (secs as f64),
