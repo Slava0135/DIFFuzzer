@@ -113,7 +113,7 @@ impl Reducer {
     }
 
     fn reduce(&mut self, bugs: &mut Vec<Bug>, output_dir: &LocalPath) -> anyhow::Result<()> {
-        info!("reduce using hash difference");
+        info!("reduce testcase");
         let mut all_bugs_reduced = false;
 
         while !all_bugs_reduced {
