@@ -118,7 +118,7 @@ impl QemuSupervisor {
         let event_handler = EventHandler::launch(&config.qmp_socket_path)
             .with_context(|| "failed to launch event handler")?;
 
-        let id = rx.recv().unwrap();
+        let id = rx.try_recv()?;
         Ok(Self {
             config: config.clone(),
             _qemu_thread,
@@ -138,9 +138,9 @@ impl QemuSupervisor {
     }
 
     fn check_pid_match(&self) -> bool {
-        let mut cmd_p_name = CommandWrapper::new("ps");
-        cmd_p_name.arg(format!("-p {} -o comm=", self.id));
-        let p_name: String = cmd_p_name
+        let mut ps = CommandWrapper::new("ps");
+        ps.arg(format!("-p {} -o comm=", self.id));
+        let p_name: String = ps
             .exec_local(None)
             .and_then(|output| Ok(String::from_utf8(output.stdout).unwrap_or(String::from(""))))
             .unwrap_or(String::from(""));
@@ -175,9 +175,9 @@ impl Drop for QemuSupervisor {
         if !self.check_pid_match() {
             return;
         }
-        let mut cmd_kill = CommandWrapper::new("kill");
-        cmd_kill.arg(self.id.to_string());
-        let _ = cmd_kill.exec_local(None);
+        let mut kill = CommandWrapper::new("kill");
+        kill.arg(self.id.to_string());
+        let _ = kill.exec_local(None);
     }
 }
 
