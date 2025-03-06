@@ -25,7 +25,7 @@ use super::runner::Runner;
 
 pub struct Reducer {
     runner: Runner,
-    variation_limit: usize,
+    limit_bugs: usize,
 }
 
 #[derive(Clone)]
@@ -59,7 +59,7 @@ impl Reducer {
         crashes_path: LocalPath,
         cmdi: Box<dyn CommandInterface>,
         supervisor: Box<dyn Supervisor>,
-        variation_limit: usize,
+        limit_bugs: usize,
     ) -> anyhow::Result<Self> {
         let runner = Runner::create(
             fst_mount,
@@ -74,7 +74,7 @@ impl Reducer {
         .with_context(|| "failed to create runner")?;
         Ok(Self {
             runner,
-            variation_limit,
+            limit_bugs,
         })
     }
 
@@ -291,6 +291,6 @@ impl Reducer {
     }
 
     fn limit_reached(&self, bugs_len: usize, new_bugs_len: usize) -> bool {
-        self.variation_limit > 0 && self.variation_limit <= (bugs_len + new_bugs_len)
+        self.limit_bugs > 0 && self.limit_bugs <= (bugs_len + new_bugs_len)
     }
 }
