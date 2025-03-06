@@ -7,10 +7,7 @@ use std::time::Instant;
 use anyhow::Context;
 use log::{debug, error, info, warn};
 
-use crate::{
-    abstract_fs::workload::Workload,
-    path::RemotePath,
-};
+use crate::{abstract_fs::workload::Workload, path::RemotePath};
 use dash::FileDiff;
 
 use super::{outcome::Completed, runner::Runner};
