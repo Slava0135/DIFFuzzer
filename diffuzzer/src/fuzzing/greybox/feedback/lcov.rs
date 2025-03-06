@@ -2,7 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
+};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct LCovTrace {
@@ -45,6 +48,25 @@ impl LCovTrace {
     }
     fn add_file(&mut self, name: String, file: LCovTraceOneFile) {
         self.files.insert(name, file);
+    }
+    fn compact(&mut self) -> HashMap<u64, u64> {
+        let mut coverage_map = HashMap::new();
+        for (file, trace) in &self.files {
+            let mut hasher = DefaultHasher::new();
+            file.hash(&mut hasher);
+            let file_hash = hasher.finish();
+            let short_file_hash = {
+                let high32 = (file_hash >> 32) as u32;
+                let low32 = file_hash as u32;
+                let h = (high32 ^ low32) as u64;
+                h << 32
+            };
+            for (line, count) in &trace.coverage_map {
+                let location_hash = short_file_hash + (*line as u64);
+                coverage_map.insert(location_hash, *count);
+            }
+        }
+        coverage_map
     }
 }
 
