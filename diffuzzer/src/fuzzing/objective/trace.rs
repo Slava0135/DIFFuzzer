@@ -5,7 +5,7 @@
 use log::debug;
 
 use crate::abstract_fs::trace::{Trace, TraceRow};
-use crate::fuzzing::objective::trace::TraceDiff::{DifferentLength, ExitCodeIsDifferent};
+use crate::fuzzing::objective::trace::TraceDiff::{DifferentLength, TraceRowIsDifferent};
 
 pub struct TraceObjective {}
 
@@ -17,7 +17,7 @@ impl TraceObjective {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TraceDiff {
-    ExitCodeIsDifferent { fst: TraceRow, snd: TraceRow },
+    TraceRowIsDifferent { fst: TraceRow, snd: TraceRow },
     DifferentLength,
 }
 
@@ -41,7 +41,7 @@ impl TraceObjective {
             if fst_row != snd_row {
                 fst_row.index = 0;
                 snd_row.index = 0;
-                trace_diff.push(ExitCodeIsDifferent {
+                trace_diff.push(TraceRowIsDifferent {
                     fst: fst_row,
                     snd: snd_row,
                 })
