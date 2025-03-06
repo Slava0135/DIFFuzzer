@@ -12,11 +12,11 @@ use std::{
     time::Duration,
 };
 
+use crate::command::CommandWrapper;
 use anyhow::{Context, bail};
 use log::{debug, error, info};
 use serde::Deserialize;
 use serde_json::{Deserializer, Value};
-use crate::command::CommandWrapper;
 
 use crate::config::QemuConfig;
 
@@ -58,7 +58,7 @@ pub struct QemuSupervisor {
     config: QemuConfig,
     _qemu_thread: JoinHandle<()>,
     event_handler: EventHandler,
-    id_receiver: Receiver<u32>,
+    id: u32,
 }
 
 impl QemuSupervisor {
@@ -118,11 +118,12 @@ impl QemuSupervisor {
         let event_handler = EventHandler::launch(&config.qmp_socket_path)
             .with_context(|| "failed to launch event handler")?;
 
+        let id = rx.recv().unwrap();
         Ok(Self {
             config: config.clone(),
             _qemu_thread,
             event_handler,
-            id_receiver: rx,
+            id,
         })
     }
 
@@ -134,6 +135,16 @@ impl QemuSupervisor {
                 &self.config.monitor_socket_path
             )
         })
+    }
+
+    fn check_pid_match(&self) -> bool {
+        let mut cmd_p_name = CommandWrapper::new("ps");
+        cmd_p_name.arg(format!("-p {} -o comm=", self.id));
+        let p_name: String = cmd_p_name
+            .exec_local(None)
+            .and_then(|output| Ok(String::from_utf8(output.stdout).unwrap_or(String::from(""))))
+            .unwrap_or(String::from(""));
+        return p_name.contains("qemu");
     }
 }
 
@@ -161,12 +172,12 @@ impl Supervisor for QemuSupervisor {
 
 impl Drop for QemuSupervisor {
     fn drop(&mut self) {
-        let id = self.id_receiver.recv().unwrap();
-        if id != 0 {
-            let mut cmd = CommandWrapper::new("kill");
-            cmd.arg(id.to_string());
-            cmd.exec_local(None).expect("QEMU not killed");
+        if !self.check_pid_match() {
+            return;
         }
+        let mut cmd_kill = CommandWrapper::new("kill");
+        cmd_kill.arg(self.id.to_string());
+        let _ = cmd_kill.exec_local(None);
     }
 }
 
