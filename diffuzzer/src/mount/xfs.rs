@@ -4,6 +4,8 @@
 
 use std::fmt::Display;
 
+use crate::fuzzing::greybox::feedback::CoverageType;
+
 use super::FileSystemMount;
 
 pub struct Xfs;
@@ -20,6 +22,9 @@ impl FileSystemMount for Xfs {
     }
     fn mount_t(&self) -> String {
         "xfs".to_owned()
+    }
+    fn coverage_type(&self) -> CoverageType {
+        CoverageType::KCov
     }
 }
 

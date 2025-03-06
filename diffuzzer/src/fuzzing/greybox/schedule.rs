@@ -1,17 +1,19 @@
-use std::collections::{HashMap, HashSet};
-
 use anyhow::Context;
 use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
 
 use crate::abstract_fs::workload::Workload;
 
-use super::seed::Seed;
+use super::{
+    feedback::{CoverageMap, InputCoverage},
+    seed::Seed,
+};
 
 pub trait Scheduler {
     fn choose(
         &mut self,
         corpus: &mut [Seed],
-        coverage_map: &HashMap<u64, u64>,
+        fst_coverage_map: &CoverageMap,
+        snd_coverage_map: &CoverageMap,
     ) -> anyhow::Result<Workload>;
 }
 
@@ -31,7 +33,8 @@ impl Scheduler for QueueScheduler {
     fn choose(
         &mut self,
         corpus: &mut [Seed],
-        _coverage_map: &HashMap<u64, u64>,
+        _fst_coverage_map: &CoverageMap,
+        _snd_coverage_map: &CoverageMap,
     ) -> anyhow::Result<Workload> {
         if self.next_index >= corpus.len() {
             self.next_index = 0
@@ -59,7 +62,7 @@ impl Scheduler for QueueScheduler {
 ///
 /// A more efficient coverage-based greybox fuzzer discovers an undiscovered state
 /// in a low-density region while assigning the __least amount of total energy__.
-/// 
+///
 /// Exponential schedule (FAST) was proven to be the most effective:
 /// `p(i) = min((α(i) / β) * (2^s(i) / f(i)), M)`, where
 ///   - α(i) can depend on the execution time, block transition coverage, and creation time of ti. (AFL)
@@ -85,15 +88,29 @@ impl Scheduler for FastPowerScheduler {
     fn choose(
         &mut self,
         corpus: &mut [Seed],
-        coverage_map: &HashMap<u64, u64>,
+        fst_coverage_map: &CoverageMap,
+        snd_coverage_map: &CoverageMap,
     ) -> anyhow::Result<Workload> {
-        let base: f64 = 2.0;
         let next = corpus
             .choose_weighted_mut(&mut self.rng, |seed| {
-                let p = base.powf(seed.times_choosen as f64)
-                    / path_frequency(&seed.coverage, &coverage_map) as f64;
-                let p = if p < self.m { p } else { self.m };
-                1.0 / p
+                let fst_power = power(
+                    seed.times_choosen,
+                    &seed.fst_coverage,
+                    fst_coverage_map,
+                    self.m,
+                );
+                let snd_power = power(
+                    seed.times_choosen,
+                    &seed.snd_coverage,
+                    snd_coverage_map,
+                    self.m,
+                );
+                let power = if fst_power < snd_power {
+                    fst_power
+                } else {
+                    snd_power
+                };
+                1.0 / power
             })
             .with_context(|| "failed to choose seed")?;
         next.times_choosen += 1;
@@ -101,12 +118,18 @@ impl Scheduler for FastPowerScheduler {
     }
 }
 
+fn power(times_choosen: u64, coverage: &InputCoverage, coverage_map: &CoverageMap, m: f64) -> f64 {
+    let base: f64 = 2.0;
+    let p = base.powf(times_choosen as f64) / path_frequency(coverage, coverage_map) as f64;
+    if p < m { p } else { m }
+}
+
 /// In original paper paths are considered equal only if coverage is exactly the same.
 ///
 /// Instead of finding path frequency, try to find least frequent address of the path.
 ///
 /// TODO: does this actually work?
-fn path_frequency(coverage: &HashSet<u64>, coverage_map: &HashMap<u64, u64>) -> u64 {
+fn path_frequency(coverage: &InputCoverage, coverage_map: &CoverageMap) -> u64 {
     *coverage
         .iter()
         .map(|addr| coverage_map.get(addr).unwrap_or(&1))
