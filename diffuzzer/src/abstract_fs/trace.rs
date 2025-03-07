@@ -105,6 +105,13 @@ impl Trace {
     }
 }
 
+impl TraceRow {
+    pub fn to_index_independent_form(mut self) -> TraceRow {
+        self.index = 0;
+        return self;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -23,14 +23,12 @@ impl TraceObjective {
         }
 
         for i in 0..fst_trace.rows.len() {
-            let mut fst_row = fst_trace.rows[i].clone();
-            let mut snd_row = snd_trace.rows[i].clone();
+            let fst_row = fst_trace.rows[i].clone();
+            let snd_row = snd_trace.rows[i].clone();
             if fst_row != snd_row {
-                fst_row.index = 0;
-                snd_row.index = 0;
                 trace_diff.push(TraceRowIsDifferent {
-                    fst: fst_row,
-                    snd: snd_row,
+                    fst: fst_row.to_index_independent_form(),
+                    snd: snd_row.to_index_independent_form(),
                 })
             }
         }
