@@ -13,7 +13,7 @@ pub struct Trace {
     pub rows: Vec<TraceRow>,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Deserialize, Serialize, Clone)]
 pub struct TraceRow {
     pub index: u32,
     command: String,
@@ -22,13 +22,13 @@ pub struct TraceRow {
     extra: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TraceDiff {
     TraceRowIsDifferent { fst: TraceRow, snd: TraceRow },
     DifferentLength,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Deserialize, Serialize, Clone)]
 pub struct Errno {
     name: String,
     code: i32,

@@ -2,10 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use std::collections::{HashMap, VecDeque};
 use std::fs::read_to_string;
 
 use anyhow::{Context, Ok};
-use log::{info, warn};
+use log::{error, info, warn};
+use thiserror::Error;
 
 use crate::fuzzing::outcome::Completed;
 use crate::path::RemotePath;
@@ -24,15 +26,24 @@ use super::runner::{Runner, RunningResults};
 pub struct Reducer {
     runner: Runner,
     limit_bugs: usize,
+    limit_counter: usize,
+    bugs: HashMap<RunningResults, Bug>,
+    bugs_queue: VecDeque<RunningResults>,
+}
+
+#[derive(Error, Debug, PartialEq)]
+pub enum ReducerError {
+    #[error("Empty queue of bugs")]
+    EmptyQueue,
+    #[error("Hash map does not contain bug")]
+    BugNotExists,
 }
 
 #[derive(Clone)]
 pub struct Bug {
     name: String,
     workload: Workload,
-    diffs: RunningResults,
-    index: usize,
-    reduced: bool,
+    remove_pointer: usize,
 }
 
 impl Reducer {
@@ -56,11 +67,24 @@ impl Reducer {
             (vec![], vec![]),
         )
         .with_context(|| "failed to create runner")?;
-        Ok(Self { runner, limit_bugs })
+        Ok(Self {
+            runner,
+            limit_bugs,
+            limit_counter: 0,
+            bugs: HashMap::new(),
+            bugs_queue: VecDeque::new(),
+        })
+    }
+
+    pub fn reset(&mut self) {
+        self.limit_counter = 0;
+        self.bugs = HashMap::new();
+        self.bugs_queue = VecDeque::new();
     }
 
     pub fn run(&mut self, test_path: &LocalPath, save_to_dir: &LocalPath) -> anyhow::Result<()> {
         info!("read testcase at '{}'", test_path);
+        self.reset();
         let input = read_to_string(test_path).with_context(|| "failed to read testcase")?;
         let input: Workload =
             serde_json::from_str(&input).with_context(|| "failed to parse json")?;
@@ -74,17 +98,16 @@ impl Reducer {
                     .get_running_results(&fst_outcome, &snd_outcome)?;
 
                 if diffs.has_some_interesting() {
-                    let index = input.ops.len() - 1;
-                    self.reduce(
-                        &mut vec![Bug {
+                    let remove_pointer = input.ops.len() - 1;
+                    self.bugs.insert(
+                        diffs,
+                        Bug {
                             name: "original".to_string(),
-                            diffs,
                             workload: input,
-                            index,
-                            reduced: false,
-                        }],
-                        save_to_dir,
-                    )?;
+                            remove_pointer,
+                        },
+                    );
+                    self.reduce(save_to_dir)?;
                 } else {
                     warn!("crash not detected");
                 }
@@ -95,46 +118,39 @@ impl Reducer {
         Ok(())
     }
 
-    fn reduce(&mut self, bugs: &mut Vec<Bug>, output_dir: &LocalPath) -> anyhow::Result<()> {
+    fn reduce(&mut self, output_dir: &LocalPath) -> anyhow::Result<()> {
         info!("reduce testcase");
-        let mut all_bugs_reduced = false;
+        while !self.bugs_queue.is_empty() {
+            let bug_diff = self
+                .bugs_queue
+                .pop_front()
+                .ok_or(ReducerError::EmptyQueue)?;
+            let bug = self
+                .bugs
+                .get(&bug_diff)
+                .ok_or(ReducerError::BugNotExists)?
+                .clone();
 
-        while !all_bugs_reduced {
-            all_bugs_reduced = true;
-            let mut new_bugs: Vec<Bug> = vec![];
+            if let Some(reduced) = remove(&bug.workload, bug.remove_pointer) {
+                let binary_path = self.runner.compile_test(&reduced)?;
 
-            for bug_index in 0..bugs.len() {
-                let bug = bugs.get(bug_index).unwrap().clone();
-                if bug.reduced {
-                    continue;
-                }
-                all_bugs_reduced = false;
-
-                if let Some(reduced) = remove(&bug.workload, bug.index) {
-                    let binary_path = self.runner.compile_test(&reduced)?;
-
-                    match self.runner.run_harness(&binary_path)? {
-                        (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => self
-                            .completed_handler(
-                                fst_outcome,
-                                snd_outcome,
-                                &bug,
-                                bugs,
-                                &mut new_bugs,
-                                reduced,
-                                output_dir,
-                                binary_path,
-                            )?, // todo: simplify
-                        _ => todo!("handle all outcomes"),
-                    };
-                }
-                if bug.index > 0 {
-                    bugs.get_mut(bug_index).unwrap().index -= 1;
-                } else {
-                    bugs.get_mut(bug_index).unwrap().reduced = true;
-                }
+                match self.runner.run_harness(&binary_path)? {
+                    (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => self
+                        .completed_handler(
+                            fst_outcome,
+                            snd_outcome,
+                            &bug,
+                            reduced,
+                            output_dir,
+                            binary_path,
+                        )?,
+                    _ => todo!("handle all outcomes"),
+                };
             }
-            bugs.append(&mut new_bugs);
+            if bug.remove_pointer > 0 {
+                self.bugs.get_mut(&bug_diff).unwrap().remove_pointer -= 1;
+                self.bugs_queue.push_back(bug_diff);
+            }
         }
         Ok(())
     }
@@ -144,42 +160,54 @@ impl Reducer {
         fst_outcome: Completed,
         snd_outcome: Completed,
         init_bug: &Bug,
-        bugs: &mut Vec<Bug>,
-        new_bugs: &mut Vec<Bug>,
         reduced_workload: Workload,
         output_dir: &LocalPath,
         binary_path: RemotePath,
     ) -> anyhow::Result<()> {
-        let diffs_info = self
+        let diffs = self
             .runner
             .get_running_results(&fst_outcome, &snd_outcome)?;
-        if !diffs_info.has_some_interesting() {
+        if !diffs.has_some_interesting() {
             return Ok(());
         }
 
-        let matched_name =
-            self.find_match_bug_and_update(&diffs_info, init_bug, bugs, &reduced_workload);
+        let matched_bug = self.bugs.get_mut(&diffs);
 
-        let bug_name = match matched_name {
-            Some(name) => name,
-            None => {
-                if self.limit_reached(bugs.len(), new_bugs.len()) {
+        let bug_name = match matched_bug {
+            Some(bug) => {
+                //todo: handle if len is equal or if workloads too different
+                if reduced_workload.ops.len() >= bug.workload.ops.len() {
                     return Ok(());
                 }
-
-                let new_bug = self.create_new_bug(&diffs_info, init_bug, &reduced_workload);
+                bug.workload = reduced_workload.clone();
+                if bug.name != init_bug.name {
+                    if bug.remove_pointer > 0 {
+                        bug.remove_pointer = init_bug.remove_pointer - 1
+                    } else {
+                        Self::remove_from_queue_by_value(&diffs, &mut self.bugs_queue);
+                    };
+                }
+                bug.name.clone()
+            }
+            None => {
+                if self.limit_reached() {
+                    return Ok(());
+                }
+                self.limit_counter += 1;
+                let new_bug = self.create_new_bug(init_bug, &reduced_workload);
                 let name = new_bug.name.clone();
-                new_bugs.push(new_bug);
+                self.bugs.insert(diffs.clone(), new_bug);
+                self.bugs_queue.push_back(diffs.clone());
                 name
             }
         };
 
         self.runner.report_diff(
             &reduced_workload,
-            format!("{}/{}", bug_name, init_bug.index),
+            format!("{}/{}", bug_name, init_bug.remove_pointer),
             &binary_path,
             output_dir.clone(),
-            diffs_info.dash_diff,
+            diffs.dash_diff,
             &fst_outcome,
             &snd_outcome,
             "".to_owned(),
@@ -188,50 +216,35 @@ impl Reducer {
         return Ok(());
     }
 
-    fn find_match_bug_and_update(
-        &mut self,
-        diffs_info: &RunningResults,
-        init_bug: &Bug,
-        bugs: &mut Vec<Bug>,
-        reduced_workload: &Workload,
-    ) -> Option<String> {
-        for b_i in 0..bugs.len() {
-            let matched_bug = bugs.get_mut(b_i).unwrap();
-            if *diffs_info == matched_bug.diffs {
-                matched_bug.workload = reduced_workload.clone();
-                if matched_bug.name != init_bug.name {
-                    matched_bug.reduced = init_bug.index == 0;
-                    matched_bug.index = if matched_bug.reduced {
-                        0
-                    } else {
-                        init_bug.index - 1
-                    };
-                }
-                return Some(matched_bug.name.clone());
-            }
-        }
-        return None;
-    }
-
-    fn create_new_bug(
-        &mut self,
-        diffs_info: &RunningResults,
-        init_bug: &Bug,
-        reduced_workload: &Workload,
-    ) -> Bug {
-        let reduced = init_bug.index == 0;
-        let index = if reduced { 0 } else { init_bug.index - 1 };
+    fn create_new_bug(&mut self, init_bug: &Bug, reduced_workload: &Workload) -> Bug {
+        let reduced = init_bug.remove_pointer == 0;
+        let remove_pointer = if reduced {
+            0
+        } else {
+            init_bug.remove_pointer - 1
+        };
 
         return Bug {
-            name: format!("{}-{}", init_bug.name.clone(), init_bug.index.clone()),
+            name: format!(
+                "{}-{}",
+                init_bug.name.clone(),
+                init_bug.remove_pointer.clone()
+            ),
             workload: reduced_workload.clone(),
-            diffs: diffs_info.clone(),
-            index,
-            reduced,
+            remove_pointer,
         };
     }
 
-    fn limit_reached(&self, bugs_len: usize, new_bugs_len: usize) -> bool {
-        self.limit_bugs > 0 && self.limit_bugs <= (bugs_len + new_bugs_len)
+    fn limit_reached(&self) -> bool {
+        self.limit_counter >= self.limit_bugs
+    }
+
+    fn remove_from_queue_by_value(
+        diffs: &RunningResults,
+        bugs_queue: &mut VecDeque<RunningResults>,
+    ) {
+        if let Some(diff_index) = bugs_queue.iter().position(|d| *d == *diffs) {
+            bugs_queue.remove(diff_index);
+        }
     }
 }
