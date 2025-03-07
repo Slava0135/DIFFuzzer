@@ -308,7 +308,7 @@ impl Stats {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct RunningResults {
     pub dash_diff: Vec<FileDiff>,
     pub trace_diff: Vec<TraceDiff>,
