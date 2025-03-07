@@ -13,16 +13,22 @@ pub struct Trace {
     pub rows: Vec<TraceRow>,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Deserialize, Serialize, Clone)]
 pub struct TraceRow {
-    index: u32,
+    pub index: u32,
     command: String,
     return_code: i32,
     errno: Errno,
     extra: String,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum TraceDiff {
+    TraceRowIsDifferent { fst: TraceRow, snd: TraceRow },
+    DifferentLength,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Deserialize, Serialize, Clone)]
 pub struct Errno {
     name: String,
     code: i32,
@@ -93,11 +99,16 @@ impl Trace {
         }
         Ok(trace)
     }
-    pub fn same_as(&self, other: &Trace) -> bool {
-        self == other
-    }
+
     pub fn has_errors(&self) -> bool {
         self.rows.iter().any(|row| row.errno.code != 0)
+    }
+}
+
+impl TraceRow {
+    pub fn to_index_independent_form(mut self) -> TraceRow {
+        self.index = 0;
+        return self;
     }
 }
 

@@ -17,7 +17,7 @@ use walkdir::WalkDir;
 
 pub const DIFF_FILENAME: &str = "dash-diff.txt";
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FileInfo {
     /// Absolute file path (with mount `/mnt/...` prefix)
     abs_path: String,
@@ -52,7 +52,7 @@ impl FileInfo {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum FileDiff {
     FileIsDifferent { fst: FileInfo, snd: FileInfo },
     OnlyOneExists(FileInfo),

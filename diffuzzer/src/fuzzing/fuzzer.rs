@@ -8,7 +8,6 @@ use anyhow::Context;
 use log::{debug, error, info, warn};
 
 use crate::{abstract_fs::workload::Workload, path::RemotePath};
-use dash::FileDiff;
 
 use super::{outcome::Completed, runner::Runner};
 
@@ -61,26 +60,15 @@ pub trait Fuzzer {
     ) -> anyhow::Result<bool> {
         let runner = self.runner();
         debug!("do objectives");
-        let hash_diff_interesting = runner
-            .dash_objective
-            .is_interesting(&fst_outcome.dash_state, &snd_outcome.dash_state)
-            .with_context(|| "failed to do hash objective")?;
-        let trace_is_interesting = runner
-            .trace_objective
-            .is_interesting(&fst_outcome.trace, &snd_outcome.trace)
-            .with_context(|| "failed to do trace objective")?;
-        if trace_is_interesting || hash_diff_interesting {
+        let diffs = runner.get_running_results(fst_outcome, snd_outcome)?;
+        if diffs.has_some_interesting() {
             let reason = format!(
                 "error detected by: trace?: {}, hash?: {}",
-                trace_is_interesting, hash_diff_interesting
+                diffs.trace_interesting(),
+                diffs.dash_interesting()
             );
             debug!("{}", reason);
-            let mut diff: Vec<FileDiff> = vec![];
-            if hash_diff_interesting {
-                diff = runner
-                    .dash_objective
-                    .get_diff(&fst_outcome.dash_state, &snd_outcome.dash_state);
-            }
+
             let dir_name = input.generate_name();
             runner
                 .report_diff(
@@ -88,7 +76,7 @@ pub trait Fuzzer {
                     dir_name,
                     binary_path,
                     runner.crashes_path.clone(),
-                    diff,
+                    diffs.dash_diff,
                     fst_outcome,
                     snd_outcome,
                     reason,
