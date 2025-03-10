@@ -2,9 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
+use std::rc::Rc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
@@ -14,6 +16,7 @@ use walkdir::WalkDir;
 
 use crate::command::CommandInterface;
 use crate::fuzzing::fuzzer::Fuzzer;
+use crate::fuzzing::observer::lcov::LCovObserver;
 use crate::fuzzing::outcome::{Completed, Outcome};
 use crate::fuzzing::runner::Runner;
 use crate::path::{LocalPath, RemotePath};
@@ -21,10 +24,9 @@ use crate::save::{TEST_FILE_NAME, save_completed, save_testcase};
 use crate::supervisor::Supervisor;
 use crate::{abstract_fs::workload::Workload, config::Config, mount::FileSystemMount};
 
-use super::feedback::{
-    CoverageFeedback, CoverageType, DummyCoverageFeedback, InputCoverage, KCovCoverageFeedback,
-    LCovCoverageFeedback,
-};
+use super::feedback::kcov::KCovCoverageFeedback;
+use super::feedback::lcov::LCovCoverageFeedback;
+use super::feedback::{CoverageFeedback, CoverageType, DummyCoverageFeedback, InputCoverage};
 use super::mutator::Mutator;
 use super::schedule::{FastPowerScheduler, QueueScheduler, Scheduler};
 use super::seed::Seed;
@@ -111,6 +113,8 @@ impl GreyBoxFuzzer {
             }
         };
 
+        let lcov_observer = Rc::new(RefCell::new(LCovObserver::new()));
+
         let runner = Runner::create(
             fst_mount,
             snd_mount,
@@ -119,6 +123,7 @@ impl GreyBoxFuzzer {
             false,
             cmdi,
             supervisor,
+            (vec![lcov_observer.clone()], vec![lcov_observer.clone()]),
         )
         .with_context(|| "failed to create runner")?;
 
@@ -229,11 +234,11 @@ impl Fuzzer for GreyBoxFuzzer {
                 debug!("get feedback");
                 let fst_opinion = self
                     .fst_coverage_feedback
-                    .opinion()
+                    .opinion(&fst_outcome)
                     .with_context(|| "failed to get first coverage feedback")?;
                 let snd_opinion = self
                     .snd_coverage_feedback
-                    .opinion()
+                    .opinion(&snd_outcome)
                     .with_context(|| "failed to get second coverage feedback")?;
 
                 if fst_opinion.is_interesting() || snd_opinion.is_interesting() {

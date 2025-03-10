@@ -7,6 +7,8 @@ use std::{
     fmt::Display,
 };
 
+use crate::fuzzing::outcome::Completed;
+
 pub mod kcov;
 pub mod lcov;
 
@@ -52,7 +54,7 @@ impl FeedbackOpinion {
 pub trait CoverageFeedback {
     fn coverage_type(&self) -> CoverageType;
     fn map(&self) -> &CoverageMap;
-    fn opinion(&mut self) -> anyhow::Result<FeedbackOpinion>;
+    fn opinion(&mut self, outcome: &Completed) -> anyhow::Result<FeedbackOpinion>;
 }
 
 pub type InputCoverage = HashSet<u64>;
@@ -78,55 +80,7 @@ impl CoverageFeedback for DummyCoverageFeedback {
     fn map(&self) -> &CoverageMap {
         &self.map
     }
-    fn opinion(&mut self) -> anyhow::Result<FeedbackOpinion> {
-        Ok(FeedbackOpinion::NotInteresting(HashSet::new()))
-    }
-}
-
-pub struct KCovCoverageFeedback {
-    map: CoverageMap,
-}
-
-impl KCovCoverageFeedback {
-    pub fn new() -> Self {
-        Self {
-            map: HashMap::new(),
-        }
-    }
-}
-
-impl CoverageFeedback for KCovCoverageFeedback {
-    fn coverage_type(&self) -> CoverageType {
-        CoverageType::KCov
-    }
-    fn map(&self) -> &CoverageMap {
-        &self.map
-    }
-    fn opinion(&mut self) -> anyhow::Result<FeedbackOpinion> {
-        Ok(FeedbackOpinion::NotInteresting(HashSet::new()))
-    }
-}
-
-pub struct LCovCoverageFeedback {
-    map: CoverageMap,
-}
-
-impl LCovCoverageFeedback {
-    pub fn new() -> Self {
-        Self {
-            map: HashMap::new(),
-        }
-    }
-}
-
-impl CoverageFeedback for LCovCoverageFeedback {
-    fn coverage_type(&self) -> CoverageType {
-        CoverageType::KCov
-    }
-    fn map(&self) -> &CoverageMap {
-        &self.map
-    }
-    fn opinion(&mut self) -> anyhow::Result<FeedbackOpinion> {
+    fn opinion(&mut self, _outcome: &Completed) -> anyhow::Result<FeedbackOpinion> {
         Ok(FeedbackOpinion::NotInteresting(HashSet::new()))
     }
 }

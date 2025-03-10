@@ -7,7 +7,11 @@ use std::time::Instant;
 use anyhow::Context;
 use log::{debug, error, info, warn};
 
-use crate::{abstract_fs::workload::Workload, path::RemotePath};
+use crate::{
+    abstract_fs::workload::Workload,
+    fuzzing::runner::parse_trace,
+    path::RemotePath,
+};
 use dash::FileDiff;
 
 use super::{outcome::Completed, runner::Runner};
@@ -61,25 +65,29 @@ pub trait Fuzzer {
     ) -> anyhow::Result<bool> {
         let runner = self.runner();
         debug!("do objectives");
-        let hash_diff_interesting = runner
+        let dash_is_interesting = runner
             .dash_objective
-            .is_interesting(&fst_outcome.dash_state, &snd_outcome.dash_state)
+            .is_interesting()
             .with_context(|| "failed to do hash objective")?;
+
+        let fst_trace =
+            parse_trace(&fst_outcome.dir).with_context(|| "failed to parse first trace")?;
+        let snd_trace =
+            parse_trace(&snd_outcome.dir).with_context(|| "failed to parse second trace")?;
+
         let trace_is_interesting = runner
             .trace_objective
-            .is_interesting(&fst_outcome.trace, &snd_outcome.trace)
+            .is_interesting(&fst_trace, &snd_trace)
             .with_context(|| "failed to do trace objective")?;
-        if trace_is_interesting || hash_diff_interesting {
+        if trace_is_interesting || dash_is_interesting {
             let reason = format!(
                 "error detected by: trace?: {}, hash?: {}",
-                trace_is_interesting, hash_diff_interesting
+                trace_is_interesting, dash_is_interesting
             );
             debug!("{}", reason);
             let mut diff: Vec<FileDiff> = vec![];
-            if hash_diff_interesting {
-                diff = runner
-                    .dash_objective
-                    .get_diff(&fst_outcome.dash_state, &snd_outcome.dash_state);
+            if dash_is_interesting {
+                diff = runner.dash_objective.get_diff();
             }
             let dir_name = input.generate_name();
             runner
@@ -110,7 +118,13 @@ pub trait Fuzzer {
         snd_outcome: &Completed,
     ) -> anyhow::Result<bool> {
         debug!("detect errors");
-        if fst_outcome.trace.has_errors() && snd_outcome.trace.has_errors() {
+
+        let fst_trace =
+            parse_trace(&fst_outcome.dir).with_context(|| "failed to parse first trace")?;
+        let snd_trace =
+            parse_trace(&snd_outcome.dir).with_context(|| "failed to parse second trace")?;
+
+        if fst_trace.has_errors() && snd_trace.has_errors() {
             let reason = "both traces contain errors, potential bug in model".to_owned();
             warn!("{}", reason);
             let accidents_path = self.runner().accidents_path.clone();

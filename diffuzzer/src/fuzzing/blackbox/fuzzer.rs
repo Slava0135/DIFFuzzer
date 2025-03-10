@@ -41,6 +41,7 @@ impl BlackBoxFuzzer {
             false,
             cmdi,
             supervisor,
+            (vec![], vec![]),
         )
         .with_context(|| "failed to create runner")?;
         Ok(Self {

@@ -10,40 +10,51 @@ use std::{
 use anyhow::Context;
 use log::debug;
 
-use crate::path::LocalPath;
+use crate::{fuzzing::outcome::Completed, path::LocalPath};
 
-use super::{CoverageMap, InputCoverage};
+use super::{CoverageFeedback, CoverageMap, CoverageType, FeedbackOpinion, InputCoverage};
 
 pub const KCOV_FILENAME: &str = "kcov.dat";
 
-pub struct KCovFeedback {
-    coverage_map: CoverageMap,
+pub struct KCovCoverageFeedback {
+    map: CoverageMap,
 }
 
-impl KCovFeedback {
+impl KCovCoverageFeedback {
     pub fn new() -> Self {
         Self {
-            coverage_map: HashMap::new(),
+            map: HashMap::new(),
         }
-    }
-    pub fn is_interesting(&mut self, coverage: &InputCoverage) -> bool {
-        debug!("do kcov feedback");
-        let old = self.coverage_map.keys().copied().collect();
-        let diff: Vec<&u64> = coverage.difference(&old).collect();
-        !diff.is_empty()
-    }
-    pub fn update_map(&mut self, coverage: &InputCoverage) {
-        for addr in coverage {
-            let count = self.coverage_map.get(addr).unwrap_or(&0);
-            self.coverage_map.insert(*addr, *count + 1);
-        }
-    }
-    pub fn map(&self) -> &CoverageMap {
-        &self.coverage_map
     }
 }
 
-pub fn parse_kcov(dir: &LocalPath) -> anyhow::Result<InputCoverage> {
+impl CoverageFeedback for KCovCoverageFeedback {
+    fn coverage_type(&self) -> CoverageType {
+        CoverageType::KCov
+    }
+    fn map(&self) -> &CoverageMap {
+        &self.map
+    }
+    fn opinion(&mut self, outcome: &Completed) -> anyhow::Result<FeedbackOpinion> {
+        debug!("do kcov feedback");
+        let new_coverage = parse_kcov(&outcome.dir)?;
+        let mut is_interesting = false;
+        for addr in &new_coverage {
+            let count = self.map.get(addr).unwrap_or(&0);
+            if *count == 0 {
+                is_interesting = true;
+            }
+            self.map.insert(*addr, *count + 1);
+        }
+        if is_interesting {
+            Ok(FeedbackOpinion::Interesting(new_coverage))
+        } else {
+            Ok(FeedbackOpinion::NotInteresting(new_coverage))
+        }
+    }
+}
+
+fn parse_kcov(dir: &LocalPath) -> anyhow::Result<InputCoverage> {
     let path = dir.join(KCOV_FILENAME);
     let kcov = fs::read_to_string(&path)
         .with_context(|| format!("failed to read kcov file at {}", path))?;

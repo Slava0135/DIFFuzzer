@@ -14,13 +14,17 @@ use crate::supervisor::Supervisor;
 use anyhow::{Context, Ok};
 use dash::FileDiff;
 use log::{debug, info};
+use std::cell::RefCell;
 use std::fs;
 use std::path::Path;
+use std::rc::Rc;
 use std::time::Instant;
 
 use super::harness::Harness;
 use super::objective::dash::DashObjective;
 use super::objective::trace::TraceObjective;
+use super::observer::dash::DashObserver;
+use super::observer::ObserverList;
 use super::outcome::{Completed, Outcome};
 
 pub struct Runner {
@@ -60,6 +64,7 @@ impl Runner {
         keep_fs: bool,
         cmdi: Box<dyn CommandInterface>,
         supervisor: Box<dyn Supervisor>,
+        mut observers: (ObserverList, ObserverList),
     ) -> anyhow::Result<Self> {
         let temp_dir = cmdi
             .setup_remote_dir()
@@ -84,15 +89,28 @@ impl Runner {
             .join(snd_fs_name.to_lowercase())
             .join(&config.fs_name);
 
-        let dash_objective = DashObjective::create(
-            cmdi.as_ref(),
-            fst_fs_dir.clone(),
-            snd_fs_dir.clone(),
-            fst_mount.get_internal_dirs(),
-            snd_mount.get_internal_dirs(),
-            &config,
-        )
-        .with_context(|| "failed to create Dash objective")?;
+        let fst_dash_observer = Rc::new(RefCell::new(
+            DashObserver::create(
+                &config,
+                cmdi.as_ref(),
+                fst_fs_dir.clone(),
+                fst_mount.get_internal_dirs(),
+            )
+            .with_context(|| "failed to create first Dash observer")?,
+        ));
+        let snd_dash_observer = Rc::new(RefCell::new(
+            DashObserver::create(
+                &config,
+                cmdi.as_ref(),
+                snd_fs_dir.clone(),
+                snd_mount.get_internal_dirs(),
+            )
+            .with_context(|| "failed to create first Dash observer")?,
+        ));
+        observers.0.push(fst_dash_observer.clone());
+        observers.1.push(snd_dash_observer.clone());
+
+        let dash_objective = DashObjective::new(&config, fst_dash_observer, snd_dash_observer);
         let trace_objective = TraceObjective::new();
 
         let fst_harness = Harness::new(
@@ -101,6 +119,7 @@ impl Runner {
             exec_dir.clone(),
             LocalPath::new_tmp("outcome-1"),
             config.timeout,
+            observers.0,
         );
         let snd_harness = Harness::new(
             snd_mount,
@@ -108,6 +127,7 @@ impl Runner {
             exec_dir.clone(),
             LocalPath::new_tmp("outcome-2"),
             config.timeout,
+            observers.1,
         );
 
         let runner = Self {
@@ -162,12 +182,6 @@ impl Runner {
                 binary_path,
                 self.keep_fs,
                 self.supervisor.as_mut(),
-                |cmdi| {
-                    self.dash_objective
-                        .calculate_fst(cmdi)
-                        .with_context(|| "Failed on Dash calculating")
-                        .unwrap()
-                },
             )
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
         match fst_outcome {
@@ -190,12 +204,6 @@ impl Runner {
                 binary_path,
                 self.keep_fs,
                 self.supervisor.as_mut(),
-                |cmdi| {
-                    self.dash_objective
-                        .calculate_snd(cmdi)
-                        .with_context(|| "Failed on Dash calculating")
-                        .unwrap()
-                },
             )
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
 

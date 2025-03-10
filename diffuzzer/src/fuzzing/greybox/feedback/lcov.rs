@@ -3,11 +3,36 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use std::{
-    collections::HashMap,
-    hash::{DefaultHasher, Hash, Hasher},
+    collections::{HashMap, HashSet}, hash::{DefaultHasher, Hash, Hasher}
 };
 
-use super::CoverageMap;
+use crate::fuzzing::outcome::Completed;
+
+use super::{CoverageFeedback, CoverageMap, CoverageType, FeedbackOpinion};
+
+pub struct LCovCoverageFeedback {
+    map: CoverageMap,
+}
+
+impl LCovCoverageFeedback {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+        }
+    }
+}
+
+impl CoverageFeedback for LCovCoverageFeedback {
+    fn coverage_type(&self) -> CoverageType {
+        CoverageType::LCov
+    }
+    fn map(&self) -> &CoverageMap {
+        &self.map
+    }
+    fn opinion(&mut self, _outcome: &Completed) -> anyhow::Result<FeedbackOpinion> {
+        Ok(FeedbackOpinion::NotInteresting(HashSet::new()))
+    }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct LCovTrace {
