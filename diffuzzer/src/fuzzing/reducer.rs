@@ -12,7 +12,7 @@ use crate::{
     abstract_fs::{mutator::remove, workload::Workload},
     command::CommandInterface,
     config::Config,
-    fuzzing::outcome::Outcome,
+    fuzzing::{outcome::Outcome, runner::parse_trace},
     mount::FileSystemMount,
     path::LocalPath,
     supervisor::Supervisor,
@@ -41,6 +41,7 @@ impl Reducer {
             false,
             cmdi,
             supervisor,
+            (vec![], vec![]),
         )
         .with_context(|| "failed to create runner")?;
         Ok(Self { runner })
@@ -56,22 +57,23 @@ impl Reducer {
 
         match self.runner.run_harness(&binary_path)? {
             (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
+                let fst_trace =
+                    parse_trace(&fst_outcome.dir).with_context(|| "failed to parse first trace")?;
+                let snd_trace = parse_trace(&snd_outcome.dir)
+                    .with_context(|| "failed to parse second trace")?;
                 let hash_diff_interesting = self
                     .runner
                     .dash_objective
-                    .is_interesting(&fst_outcome.dash_state, &snd_outcome.dash_state)
+                    .is_interesting()
                     .with_context(|| "failed to do hash objective")?;
                 let _trace_is_interesting = self
                     .runner
                     .trace_objective
-                    .is_interesting(&fst_outcome.trace, &snd_outcome.trace)
+                    .is_interesting(&fst_trace, &snd_trace)
                     .with_context(|| "failed to do trace objective")?;
 
                 if hash_diff_interesting {
-                    let old_diff = self
-                        .runner
-                        .dash_objective
-                        .get_diff(&fst_outcome.dash_state, &snd_outcome.dash_state);
+                    let old_diff = self.runner.dash_objective.get_diff();
                     self.reduce_by_hash(input, old_diff, save_to_dir)?;
                 } else {
                     warn!("crash not detected");
@@ -100,13 +102,10 @@ impl Reducer {
                         let hash_diff_interesting = self
                             .runner
                             .dash_objective
-                            .is_interesting(&fst_outcome.dash_state, &snd_outcome.dash_state)
+                            .is_interesting()
                             .with_context(|| "failed to do hash objective")?;
                         if hash_diff_interesting {
-                            let new_diff = self
-                                .runner
-                                .dash_objective
-                                .get_diff(&fst_outcome.dash_state, &snd_outcome.dash_state);
+                            let new_diff = self.runner.dash_objective.get_diff();
                             if old_diff == new_diff {
                                 workload = reduced;
                                 info!("workload reduced (length = {})", workload.ops.len());

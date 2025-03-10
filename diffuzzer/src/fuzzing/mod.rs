@@ -12,3 +12,4 @@ pub mod outcome;
 pub mod reducer;
 pub mod runner;
 pub mod solo_single;
+pub mod observer;

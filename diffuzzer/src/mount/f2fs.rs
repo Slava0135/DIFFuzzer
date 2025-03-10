@@ -6,6 +6,8 @@ use std::fmt::Display;
 
 use regex::RegexSet;
 
+use crate::fuzzing::greybox::feedback::CoverageType;
+
 use super::FileSystemMount;
 
 pub struct F2FS;
@@ -29,9 +31,11 @@ impl FileSystemMount for F2FS {
     fn mount_opts(&self) -> Option<String> {
         Some("compress_algorithm=zstd:6,compress_chksum,atgc,gc_merge,lazytime".to_owned())
     }
-
     fn get_internal_dirs(&self) -> RegexSet {
         RegexSet::new([r"^/?lost\+found($|/)"]).unwrap()
+    }
+    fn coverage_type(&self) -> CoverageType {
+        CoverageType::KCov
     }
 }
 

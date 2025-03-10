@@ -64,7 +64,6 @@ pub struct QemuConfig {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DashConfig {
     pub enabled: bool,
-    pub output_path: String,
     pub debug_binary_path: String,
     pub release_binary_path: String,
 }

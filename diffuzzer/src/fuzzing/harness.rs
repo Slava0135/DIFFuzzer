@@ -2,14 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use anyhow::{Context, bail};
 
 use crate::command::{CommandInterface, CommandWrapper, ExecError};
-use crate::fuzzing::objective::dash::DashState;
 use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
 use crate::supervisor::Supervisor;
 
+use super::observer::Observer;
 use super::outcome::{Completed, Outcome};
 
 pub struct Harness {
@@ -18,6 +21,7 @@ pub struct Harness {
     exec_dir: RemotePath,
     outcome_dir: LocalPath,
     timeout: u8,
+    observers: Vec<Rc<RefCell<dyn Observer>>>,
 }
 
 impl Harness {
@@ -27,6 +31,7 @@ impl Harness {
         exec_dir: RemotePath,
         outcome_dir: LocalPath,
         timeout: u8,
+        observers: Vec<Rc<RefCell<dyn Observer>>>,
     ) -> Self {
         Self {
             fs_mount,
@@ -34,15 +39,15 @@ impl Harness {
             exec_dir,
             outcome_dir,
             timeout,
+            observers,
         }
     }
-    pub fn run<C: FnMut(&dyn CommandInterface) -> DashState>(
+    pub fn run(
         &self,
         cmdi: &dyn CommandInterface,
         binary_path: &RemotePath,
         keep_fs: bool,
         supervisor: &mut dyn Supervisor,
-        mut completion_callback: C,
     ) -> anyhow::Result<Outcome> {
         supervisor.reset_events()?;
 
@@ -53,6 +58,13 @@ impl Harness {
             )
         })?;
 
+        for observer in &self.observers {
+            observer
+                .borrow_mut()
+                .pre_exec(cmdi, &self.exec_dir)
+                .with_context(|| "failed to call observer pre-execution callback")?;
+        }
+
         let mut exec = CommandWrapper::new(binary_path.base.as_ref());
         exec.arg(self.fs_dir.base.as_ref());
 
@@ -60,7 +72,12 @@ impl Harness {
 
         match output {
             Ok(output) => {
-                let dash_state: DashState = completion_callback(cmdi);
+                for observer in &self.observers {
+                    observer
+                        .borrow_mut()
+                        .post_exec(cmdi, &self.exec_dir)
+                        .with_context(|| "failed to call observer post-execution callback")?;
+                }
 
                 if !keep_fs {
                     self.teardown(cmdi)?;
@@ -78,10 +95,12 @@ impl Harness {
                     stdout,
                     stderr,
                     self.outcome_dir.clone(),
-                    dash_state,
                 )))
             }
             Err(ExecError::TimedOut(_)) => {
+                for observer in &self.observers {
+                    observer.borrow_mut().skip_exec();
+                }
                 if supervisor.had_panic_event()? {
                     Ok(Outcome::Panicked)
                 } else {
@@ -92,6 +111,9 @@ impl Harness {
                 }
             }
             Err(ExecError::IoError(msg)) => {
+                for observer in &self.observers {
+                    observer.borrow_mut().skip_exec();
+                }
                 bail!("failed to run test binary: {}", msg);
             }
         }

@@ -4,6 +4,8 @@
 
 use std::fmt::Display;
 
+use crate::fuzzing::greybox::feedback::CoverageType;
+
 use super::FileSystemMount;
 
 pub struct Btrfs;
@@ -20,6 +22,9 @@ impl FileSystemMount for Btrfs {
     }
     fn mount_t(&self) -> String {
         "btrfs".to_owned()
+    }
+    fn coverage_type(&self) -> CoverageType {
+        CoverageType::KCov
     }
 }
 

@@ -10,7 +10,6 @@ use std::{
 use anyhow::Context;
 use log::info;
 
-use crate::fuzzing::objective::dash::DashState;
 use crate::{
     abstract_fs::workload::Workload,
     command::CommandInterface,
@@ -58,18 +57,13 @@ pub fn run(
         exec_dir,
         LocalPath::new_tmp("outcome-single"),
         config.timeout,
+        vec![],
     );
 
     info!("run harness");
 
     let outcome = harness
-        .run(
-            cmdi.as_ref(),
-            &binary_path,
-            keep_fs,
-            supervisor.as_mut(),
-            |_| DashState::default(),
-        )
+        .run(cmdi.as_ref(), &binary_path, keep_fs, supervisor.as_mut())
         .with_context(|| "failed to run harness")?;
 
     info!("save results");

@@ -5,6 +5,7 @@
 pub mod btrfs;
 pub mod ext4;
 pub mod f2fs;
+pub mod littlefs;
 pub mod xfs;
 
 use std::fmt::Display;
@@ -15,6 +16,7 @@ use regex::RegexSet;
 
 use crate::{
     command::{CommandInterface, CommandWrapper},
+    fuzzing::greybox::feedback::CoverageType,
     path::RemotePath,
 };
 
@@ -104,4 +106,6 @@ pub trait FileSystemMount: Display {
     fn get_internal_dirs(&self) -> RegexSet {
         RegexSet::new::<_, &str>([]).unwrap()
     }
+
+    fn coverage_type(&self) -> CoverageType;
 }

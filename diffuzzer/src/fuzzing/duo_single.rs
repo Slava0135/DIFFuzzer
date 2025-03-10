@@ -41,6 +41,7 @@ impl DuoSingleFuzzer {
             keep_fs,
             cmdi,
             supervisor,
+            (vec![], vec![]),
         )
         .with_context(|| "failed to create runner")?;
         Ok(Self { runner, test_path })
