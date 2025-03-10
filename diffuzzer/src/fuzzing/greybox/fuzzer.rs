@@ -119,7 +119,10 @@ impl GreyBoxFuzzer {
         let fst_coverage_feedback: Box<dyn CoverageFeedback> = match fst_mount.coverage_type() {
             CoverageType::None => Box::new(DummyCoverageFeedback::new()),
             CoverageType::LCov => {
-                let fst_lcov_observer = Rc::new(RefCell::new(LCovObserver::new()));
+                let source_dir = fst_mount
+                    .source_dir()
+                    .with_context(|| "Source directory is missing for first filesystem")?;
+                let fst_lcov_observer = Rc::new(RefCell::new(LCovObserver::new(source_dir)));
                 observers.0.push(fst_lcov_observer);
                 Box::new(LCovCoverageFeedback::new())
             }
@@ -128,7 +131,10 @@ impl GreyBoxFuzzer {
         let snd_coverage_feedback: Box<dyn CoverageFeedback> = match snd_mount.coverage_type() {
             CoverageType::None => Box::new(DummyCoverageFeedback::new()),
             CoverageType::LCov => {
-                let snd_lcov_observer = Rc::new(RefCell::new(LCovObserver::new()));
+                let source_dir = snd_mount
+                    .source_dir()
+                    .with_context(|| "Source directory is missing for second filesystem")?;
+                let snd_lcov_observer = Rc::new(RefCell::new(LCovObserver::new(source_dir)));
                 observers.1.push(snd_lcov_observer);
                 Box::new(LCovCoverageFeedback::new())
             }

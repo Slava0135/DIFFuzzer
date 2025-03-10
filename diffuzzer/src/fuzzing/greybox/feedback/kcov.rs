@@ -2,17 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::{
-    collections::{HashMap, HashSet},
-    fs,
-};
+use std::{collections::HashMap, fs};
 
 use anyhow::Context;
 use log::debug;
 
 use crate::{fuzzing::outcome::Completed, path::LocalPath};
 
-use super::{CoverageFeedback, CoverageMap, CoverageType, FeedbackOpinion, InputCoverage};
+use super::{CoverageFeedback, CoverageMap, CoverageType, FeedbackOpinion};
 
 pub const KCOV_FILENAME: &str = "kcov.dat";
 
@@ -39,32 +36,37 @@ impl CoverageFeedback for KCovCoverageFeedback {
         debug!("do kcov feedback");
         let new_coverage = parse_kcov(&outcome.dir)?;
         let mut is_interesting = false;
-        for addr in &new_coverage {
-            let count = self.map.get(addr).unwrap_or(&0);
-            if *count == 0 {
+        for (addr, count) in &new_coverage {
+            let total = self.map.get(addr).unwrap_or(&0);
+            if *total == 0 {
                 is_interesting = true;
             }
-            self.map.insert(*addr, *count + 1);
+            self.map.insert(*addr, *total + *count);
         }
         if is_interesting {
-            Ok(FeedbackOpinion::Interesting(new_coverage))
+            Ok(FeedbackOpinion::Interesting(
+                new_coverage.keys().copied().collect(),
+            ))
         } else {
-            Ok(FeedbackOpinion::NotInteresting(new_coverage))
+            Ok(FeedbackOpinion::NotInteresting(
+                new_coverage.keys().copied().collect(),
+            ))
         }
     }
 }
 
-fn parse_kcov(dir: &LocalPath) -> anyhow::Result<InputCoverage> {
+fn parse_kcov(dir: &LocalPath) -> anyhow::Result<CoverageMap> {
     let path = dir.join(KCOV_FILENAME);
     let kcov = fs::read_to_string(&path)
         .with_context(|| format!("failed to read kcov file at {}", path))?;
-    let mut coverage = HashSet::new();
+    let mut map = CoverageMap::new();
     for line in kcov.lines() {
         let addr = parse_addr(line)
             .with_context(|| format!("failed to parse addr from kcov line '{}'", line))?;
-        coverage.insert(addr);
+        let count = map.get(&addr).unwrap_or(&0);
+        map.insert(addr, *count + 1);
     }
-    Ok(coverage)
+    Ok(map)
 }
 
 fn parse_addr(addr: &str) -> Result<u64, std::num::ParseIntError> {

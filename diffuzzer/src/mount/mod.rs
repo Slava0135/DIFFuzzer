@@ -108,4 +108,10 @@ pub trait FileSystemMount: Display {
     }
 
     fn coverage_type(&self) -> CoverageType;
+
+    /// Directory with source files, if exists.
+    /// Required for LCov.
+    fn source_dir(&self) -> Option<RemotePath> {
+        None
+    }
 }

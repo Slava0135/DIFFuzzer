@@ -2,13 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::fmt::Display;
+use std::{fmt::Display, path::Path};
 
 use anyhow::Context;
 use log::debug;
 
 use crate::{
-    command::{CommandInterface, CommandWrapper}, fuzzing::greybox::feedback::CoverageType, mount::{DEVICE, RAM_DISK_SIZE}, path::RemotePath
+    command::{CommandInterface, CommandWrapper},
+    fuzzing::greybox::feedback::CoverageType,
+    mount::{DEVICE, RAM_DISK_SIZE},
+    path::RemotePath,
 };
 
 use super::FileSystemMount;
@@ -36,12 +39,17 @@ impl FileSystemMount for LittleFS {
         cmdi.exec(modprobe, None)
             .with_context(|| "failed to load module 'brd'")?;
 
-        let mut format = CommandWrapper::new("/lfs");
+        let lfs_path = self
+            .source_dir()
+            .with_context(|| "Source directory with binary missing")?
+            .join("/lfs");
+
+        let mut format = CommandWrapper::new(lfs_path.base.as_ref());
         format.arg("--format").arg(DEVICE);
         cmdi.exec(format, None)
             .with_context(|| format!("failed to format device '{}'", DEVICE))?;
 
-        let mut mount = CommandWrapper::new("/lfs");
+        let mut mount = CommandWrapper::new(lfs_path.base.as_ref());
         mount.arg(DEVICE).arg(path.base.as_ref());
         cmdi.exec(mount, None)
             .with_context(|| format!("failed to mount filesystem at '{}'", path))?;
@@ -68,6 +76,9 @@ impl FileSystemMount for LittleFS {
     }
     fn coverage_type(&self) -> CoverageType {
         CoverageType::LCov
+    }
+    fn source_dir(&self) -> Option<RemotePath> {
+        Some(RemotePath::new(Path::new("/root/littlefs-fuse")))
     }
 }
 
