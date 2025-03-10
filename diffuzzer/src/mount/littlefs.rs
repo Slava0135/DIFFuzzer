@@ -42,7 +42,7 @@ impl FileSystemMount for LittleFS {
         let lfs_path = self
             .source_dir()
             .with_context(|| "Source directory with binary missing")?
-            .join("/lfs");
+            .join("lfs");
 
         let mut format = CommandWrapper::new(lfs_path.base.as_ref());
         format.arg("--format").arg(DEVICE);
