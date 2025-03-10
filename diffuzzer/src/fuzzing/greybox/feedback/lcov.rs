@@ -271,10 +271,10 @@ end_of_record
         lfs_util_h_map.insert(140, 10);
         lfs_util_h_map.insert(144, 1);
         lfs_util_h_map.insert(146, 1);
-        lfs_util_h_map.insert(161, 0);
-        lfs_util_h_map.insert(163, 0);
-        lfs_util_h_map.insert(170, 0);
-        lfs_util_h_map.insert(172, 0);
+        // lfs_util_h_map.insert(161, 0);
+        // lfs_util_h_map.insert(163, 0);
+        // lfs_util_h_map.insert(170, 0);
+        // lfs_util_h_map.insert(172, 0);
         lfs_util_h_map.insert(182, 2);
         lfs_util_h_map.insert(183, 2);
         lfs_util_h_map.insert(187, 18);
