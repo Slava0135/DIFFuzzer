@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
 use std::path::Path;
 
 use anyhow::Context;
@@ -23,14 +27,6 @@ pub struct DashObserver {
 }
 
 impl Observer for DashObserver {
-    fn pre_exec(
-        &mut self,
-        _cmdi: &dyn CommandInterface,
-        _output_dir: &RemotePath,
-    ) -> anyhow::Result<()> {
-        Ok(())
-    }
-
     fn post_exec(
         &mut self,
         cmdi: &dyn CommandInterface,
@@ -61,8 +57,6 @@ impl Observer for DashObserver {
         }
         Ok(())
     }
-
-    fn skip_exec(&mut self) {}
 }
 
 impl DashObserver {

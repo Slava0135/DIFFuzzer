@@ -3,10 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use std::{
-    collections::{HashMap, HashSet}, hash::{DefaultHasher, Hash, Hasher}
+    collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
 };
 
-use crate::fuzzing::outcome::Completed;
+use log::debug;
+
+use crate::fuzzing::{observer::lcov::LCovObserver, outcome::Completed};
 
 use super::{CoverageFeedback, CoverageMap, CoverageType, FeedbackOpinion};
 
@@ -29,8 +32,28 @@ impl CoverageFeedback for LCovCoverageFeedback {
     fn map(&self) -> &CoverageMap {
         &self.map
     }
-    fn opinion(&mut self, _outcome: &Completed) -> anyhow::Result<FeedbackOpinion> {
-        Ok(FeedbackOpinion::NotInteresting(HashSet::new()))
+    fn opinion(&mut self, outcome: &Completed) -> anyhow::Result<FeedbackOpinion> {
+        debug!("do lcov feedback");
+        let data = LCovObserver::read_lcov(outcome)?;
+        let trace = LCovTrace::parse_from(&data);
+        let new_coverage = trace.map();
+        let mut is_interesting = false;
+        for (addr, count) in &new_coverage {
+            let total = self.map.get(addr).unwrap_or(&0);
+            if *total == 0 {
+                is_interesting = true;
+            }
+            self.map.insert(*addr, *total + *count);
+        }
+        if is_interesting {
+            Ok(FeedbackOpinion::Interesting(
+                new_coverage.keys().copied().collect(),
+            ))
+        } else {
+            Ok(FeedbackOpinion::NotInteresting(
+                new_coverage.keys().copied().collect(),
+            ))
+        }
     }
 }
 
@@ -76,7 +99,7 @@ impl LCovTrace {
     fn add_file(&mut self, name: String, file: LCovTraceOneFile) {
         self.files.insert(name, file);
     }
-    fn map(&mut self) -> CoverageMap {
+    fn map(&self) -> CoverageMap {
         let mut coverage_map = HashMap::new();
         for (file, trace) in &self.files {
             let mut hasher = DefaultHasher::new();
@@ -117,7 +140,11 @@ impl LCovLine {
                     if segments.len() >= 2 {
                         match (segments[0].parse::<u32>(), segments[1].parse::<u64>()) {
                             (Ok(line), Ok(count)) => {
-                                return Some(LCovLine::LineExecutionCount(line, count));
+                                return if count > 0 {
+                                    Some(LCovLine::LineExecutionCount(line, count))
+                                } else {
+                                    None
+                                }
                             }
                             _ => {}
                         }
@@ -244,10 +271,10 @@ end_of_record
         lfs_util_h_map.insert(140, 10);
         lfs_util_h_map.insert(144, 1);
         lfs_util_h_map.insert(146, 1);
-        lfs_util_h_map.insert(161, 0);
-        lfs_util_h_map.insert(163, 0);
-        lfs_util_h_map.insert(170, 0);
-        lfs_util_h_map.insert(172, 0);
+        // lfs_util_h_map.insert(161, 0);
+        // lfs_util_h_map.insert(163, 0);
+        // lfs_util_h_map.insert(170, 0);
+        // lfs_util_h_map.insert(172, 0);
         lfs_util_h_map.insert(182, 2);
         lfs_util_h_map.insert(183, 2);
         lfs_util_h_map.insert(187, 18);

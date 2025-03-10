@@ -23,8 +23,8 @@ use std::time::Instant;
 use super::harness::Harness;
 use super::objective::dash::DashObjective;
 use super::objective::trace::TraceObjective;
-use super::observer::dash::DashObserver;
 use super::observer::ObserverList;
+use super::observer::dash::DashObserver;
 use super::outcome::{Completed, Outcome};
 
 pub struct Runner {
@@ -37,8 +37,6 @@ pub struct Runner {
 
     /// Directory with executor and test source.
     pub test_dir: RemotePath,
-    /// Directory where test will be executed and test output files saved.
-    pub exec_dir: RemotePath,
 
     pub crashes_path: LocalPath,
     pub accidents_path: LocalPath,
@@ -137,8 +135,6 @@ impl Runner {
             cmdi,
             supervisor,
 
-            exec_dir,
-
             test_dir,
             crashes_path,
             accidents_path,
@@ -173,8 +169,6 @@ impl Runner {
     pub fn run_harness(&mut self, binary_path: &RemotePath) -> anyhow::Result<(Outcome, Outcome)> {
         debug!("run harness at '{}'", binary_path);
 
-        setup_dir(self.cmdi.as_ref(), &self.exec_dir)
-            .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;
         let fst_outcome = self
             .fst_harness
             .run(
@@ -195,8 +189,6 @@ impl Runner {
             _ => {}
         }
 
-        setup_dir(self.cmdi.as_ref(), &self.exec_dir)
-            .with_context(|| format!("failed to setup remote exec dir at '{}'", &self.exec_dir))?;
         let snd_outcome = self
             .snd_harness
             .run(
@@ -292,9 +284,4 @@ impl Stats {
 pub fn parse_trace(dir: &LocalPath) -> anyhow::Result<Trace> {
     let trace = fs::read_to_string(dir.join(TRACE_FILENAME))?;
     anyhow::Ok(Trace::try_parse(trace).with_context(|| "failed to parse trace")?)
-}
-
-pub fn setup_dir(cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<()> {
-    cmdi.remove_dir_all(path).unwrap_or(());
-    cmdi.create_dir_all(path)
 }

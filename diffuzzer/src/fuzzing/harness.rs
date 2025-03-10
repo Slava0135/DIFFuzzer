@@ -49,6 +49,10 @@ impl Harness {
         keep_fs: bool,
         supervisor: &mut dyn Supervisor,
     ) -> anyhow::Result<Outcome> {
+        cmdi.remove_dir_all(&self.exec_dir).unwrap_or(());
+        cmdi.create_dir_all(&self.exec_dir)
+            .with_context(|| "failed to setup exec directory")?;
+
         supervisor.reset_events()?;
 
         self.fs_mount.setup(cmdi, &self.fs_dir).with_context(|| {
@@ -81,6 +85,12 @@ impl Harness {
 
                 if !keep_fs {
                     self.teardown(cmdi)?;
+                    for observer in &self.observers {
+                        observer
+                            .borrow_mut()
+                            .post_teardown(cmdi, &self.exec_dir)
+                            .with_context(|| "failed to call observer post-execution callback")?;
+                    }
                 }
 
                 let stdout = String::from_utf8(output.stdout)

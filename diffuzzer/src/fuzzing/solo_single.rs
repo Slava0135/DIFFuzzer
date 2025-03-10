@@ -14,7 +14,7 @@ use crate::{
     abstract_fs::workload::Workload,
     command::CommandInterface,
     config::Config,
-    fuzzing::{harness::Harness, outcome::Outcome, runner::setup_dir},
+    fuzzing::{harness::Harness, outcome::Outcome},
     mount::FileSystemMount,
     path::{LocalPath, RemotePath},
     save::{save_completed, save_reason, save_testcase},
@@ -40,7 +40,6 @@ pub fn run(
     let test_dir = remote_dir.clone();
 
     let exec_dir = remote_dir.join("exec");
-    setup_dir(cmdi.as_ref(), &exec_dir)?;
 
     info!("compile test at '{}'", test_dir);
     let binary_path = input
