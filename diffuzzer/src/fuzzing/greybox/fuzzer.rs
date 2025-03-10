@@ -115,14 +115,25 @@ impl GreyBoxFuzzer {
         };
 
         let mut observers: (ObserverList, ObserverList) = (vec![], vec![]);
-        if let CoverageType::LCov = fst_mount.coverage_type() {
-            let fst_lcov_observer = Rc::new(RefCell::new(LCovObserver::new()));
-            observers.0.push(fst_lcov_observer);
-        }
-        if let CoverageType::LCov = snd_mount.coverage_type() {
-            let snd_lcov_observer = Rc::new(RefCell::new(LCovObserver::new()));
-            observers.1.push(snd_lcov_observer);
-        }
+
+        let fst_coverage_feedback: Box<dyn CoverageFeedback> = match fst_mount.coverage_type() {
+            CoverageType::None => Box::new(DummyCoverageFeedback::new()),
+            CoverageType::LCov => {
+                let fst_lcov_observer = Rc::new(RefCell::new(LCovObserver::new()));
+                observers.0.push(fst_lcov_observer);
+                Box::new(LCovCoverageFeedback::new())
+            }
+            CoverageType::KCov => Box::new(KCovCoverageFeedback::new()),
+        };
+        let snd_coverage_feedback: Box<dyn CoverageFeedback> = match snd_mount.coverage_type() {
+            CoverageType::None => Box::new(DummyCoverageFeedback::new()),
+            CoverageType::LCov => {
+                let snd_lcov_observer = Rc::new(RefCell::new(LCovObserver::new()));
+                observers.1.push(snd_lcov_observer);
+                Box::new(LCovCoverageFeedback::new())
+            }
+            CoverageType::KCov => Box::new(KCovCoverageFeedback::new()),
+        };
 
         let runner = Runner::create(
             fst_mount,
@@ -135,17 +146,6 @@ impl GreyBoxFuzzer {
             observers,
         )
         .with_context(|| "failed to create runner")?;
-
-        let fst_coverage_feedback: Box<dyn CoverageFeedback> = match fst_mount.coverage_type() {
-            CoverageType::None => Box::new(DummyCoverageFeedback::new()),
-            CoverageType::LCov => Box::new(LCovCoverageFeedback::new()),
-            CoverageType::KCov => Box::new(KCovCoverageFeedback::new()),
-        };
-        let snd_coverage_feedback: Box<dyn CoverageFeedback> = match snd_mount.coverage_type() {
-            CoverageType::None => Box::new(DummyCoverageFeedback::new()),
-            CoverageType::LCov => Box::new(LCovCoverageFeedback::new()),
-            CoverageType::KCov => Box::new(KCovCoverageFeedback::new()),
-        };
 
         Ok(Self {
             runner,
