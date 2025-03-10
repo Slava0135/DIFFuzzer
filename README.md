@@ -17,9 +17,10 @@ Key features:
 
 - __Filesystem Semantics__ - to generate "good" inputs, filesystem semantics must be modelled properly (as was shown in [Hydra](https://dl.acm.org/doi/abs/10.1145/3341301.3359662)).
 - __Differential__ - two filesystems are tested against same input and differences in their execution are observed in order to discover __semantic__ bugs.
-- __Coverage Guided__ - similar to [Syzkaller](https://github.com/google/syzkaller), kernel coverage (KCov) is used to pick and mutate "interesting" inputs.
+- __Coverage Guided__ - similar to [Syzkaller](https://github.com/google/syzkaller), kernel coverage (__KCov__) is used to pick and mutate "interesting" inputs.
 - __Native and QEMU__ - can be run on local machine as well as in VM using __QEMU__.
-- __Easy Filesystem Integration__ - see: [Adding New Filesystem](#adding-new-filesystem). Because fuzzer is differential, only 1 filesystem with coverage support is enough, although not as effective.
+- __FUSE Supported__ - can be used for testing __FUSE__ file systems using __LCov__ coverage information (can run without coverage, but not as effective).
+- __Easy Filesystem Integration__ - see [Adding New Filesystem](#adding-new-filesystem).
 - __Kernel Version Agnostic__ - only "hard" kernel dependency is __KCov__ feature.
 
 ## Build
@@ -79,7 +80,6 @@ DIFFuzzer comes with many modes:
 
 - greybox - greybox fuzzing (with coverage and mutations)
 - blackbox - blackbox fuzzing
-- single - run single test
 - reduce - reduce testcase with bug
 
 ```sh
@@ -94,6 +94,8 @@ Implement [trait](./diffuzzer/src/mount/mod.rs) (interface) for mounting filesys
 Add filesystem to [this file](./diffuzzer/src/filesystems.rs).
 
 Done!
+
+For additional information read [Filesystems](./docs/Filesystems.md) docs.
 
 ## Bugs Found
 
