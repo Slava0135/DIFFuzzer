@@ -140,7 +140,11 @@ impl LCovLine {
                     if segments.len() >= 2 {
                         match (segments[0].parse::<u32>(), segments[1].parse::<u64>()) {
                             (Ok(line), Ok(count)) => {
-                                return Some(LCovLine::LineExecutionCount(line, count));
+                                return if count > 0 {
+                                    Some(LCovLine::LineExecutionCount(line, count))
+                                } else {
+                                    None
+                                }
                             }
                             _ => {}
                         }
