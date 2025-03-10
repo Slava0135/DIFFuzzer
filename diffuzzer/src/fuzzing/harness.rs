@@ -85,6 +85,12 @@ impl Harness {
 
                 if !keep_fs {
                     self.teardown(cmdi)?;
+                    for observer in &self.observers {
+                        observer
+                            .borrow_mut()
+                            .post_teardown(cmdi, &self.exec_dir)
+                            .with_context(|| "failed to call observer post-execution callback")?;
+                    }
                 }
 
                 let stdout = String::from_utf8(output.stdout)

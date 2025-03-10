@@ -41,11 +41,10 @@ impl Observer for LCovObserver {
             .arg(output_dir.join(LCOV_INFO_FILE_NAME).base.as_ref());
         cmdi.exec(lcov, None)
             .with_context(|| "failed to capture initial zero lcov coverage data")?;
-
         Ok(())
     }
 
-    fn post_exec(
+    fn post_teardown(
         &mut self,
         cmdi: &dyn CommandInterface,
         output_dir: &RemotePath,
@@ -58,11 +57,8 @@ impl Observer for LCovObserver {
             .arg(output_dir.join(LCOV_INFO_FILE_NAME).base.as_ref());
         cmdi.exec(lcov, None)
             .with_context(|| "failed to capture lcov coverage data")?;
-
         Ok(())
     }
-
-    fn skip_exec(&mut self) {}
 }
 
 impl LCovObserver {
