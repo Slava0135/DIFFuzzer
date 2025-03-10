@@ -49,6 +49,10 @@ impl Harness {
         keep_fs: bool,
         supervisor: &mut dyn Supervisor,
     ) -> anyhow::Result<Outcome> {
+        cmdi.remove_dir_all(&self.exec_dir).unwrap_or(());
+        cmdi.create_dir_all(&self.exec_dir)
+            .with_context(|| "failed to setup exec directory")?;
+
         supervisor.reset_events()?;
 
         self.fs_mount.setup(cmdi, &self.fs_dir).with_context(|| {
