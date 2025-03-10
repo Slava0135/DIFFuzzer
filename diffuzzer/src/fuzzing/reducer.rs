@@ -15,7 +15,7 @@ use crate::{
     abstract_fs::{mutator::remove, workload::Workload},
     command::CommandInterface,
     config::Config,
-    fuzzing::{outcome::Outcome, runner::parse_trace},
+    fuzzing::{outcome::Outcome},
     mount::FileSystemMount,
     path::LocalPath,
     supervisor::Supervisor,

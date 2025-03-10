@@ -12,7 +12,6 @@ use crate::{
     fuzzing::runner::parse_trace,
     path::RemotePath,
 };
-use dash::FileDiff;
 
 use super::{outcome::Completed, runner::Runner};
 

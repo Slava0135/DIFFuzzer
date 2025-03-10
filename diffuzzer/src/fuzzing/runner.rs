@@ -267,21 +267,26 @@ impl Runner {
         fst_outcome: &Completed,
         snd_outcome: &Completed,
     ) -> anyhow::Result<RunningResults> {
+        let fst_trace =
+            parse_trace(&fst_outcome.dir).with_context(|| "failed to parse first trace")?;
+        let snd_trace = parse_trace(&snd_outcome.dir)
+            .with_context(|| "failed to parse second trace")?;
+
         let dash_interesting = self
             .dash_objective
-            .is_interesting(&fst_outcome.dash_state, &snd_outcome.dash_state)
+            .is_interesting()
             .with_context(|| "failed to do dash objective")?;
 
         let dash_diff = if dash_interesting {
             self.dash_objective
-                .get_diff(&fst_outcome.dash_state, &snd_outcome.dash_state)
+                .get_diff()
         } else {
             vec![]
         };
 
         let trace_diff = self
             .trace_objective
-            .get_diff(&fst_outcome.trace, &snd_outcome.trace);
+            .get_diff(&fst_trace, &snd_trace);
 
         return Ok(RunningResults {
             dash_diff,
