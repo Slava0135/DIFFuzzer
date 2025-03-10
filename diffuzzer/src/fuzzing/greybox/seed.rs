@@ -1,4 +1,3 @@
-
 use crate::abstract_fs::workload::Workload;
 
 use super::feedback::InputCoverage;

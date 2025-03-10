@@ -119,6 +119,16 @@ impl CommandWrapper {
         self.internal.arg(arg);
         self
     }
+
+    pub fn args<I, S>(&mut self, args: I) -> &mut Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        self.internal.args(args);
+        self
+    }
+
     /// Execute command on host (local) machine.
     pub fn exec_local(mut self, timeout: Option<u8>) -> Result<Output, ExecError> {
         let output = match timeout {

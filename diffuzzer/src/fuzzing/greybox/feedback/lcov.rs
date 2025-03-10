@@ -144,7 +144,7 @@ impl LCovLine {
                                     Some(LCovLine::LineExecutionCount(line, count))
                                 } else {
                                     None
-                                }
+                                };
                             }
                             _ => {}
                         }
