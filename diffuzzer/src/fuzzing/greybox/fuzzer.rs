@@ -16,6 +16,7 @@ use walkdir::WalkDir;
 
 use crate::command::CommandInterface;
 use crate::fuzzing::fuzzer::Fuzzer;
+use crate::fuzzing::observer::ObserverList;
 use crate::fuzzing::observer::lcov::LCovObserver;
 use crate::fuzzing::outcome::{Completed, Outcome};
 use crate::fuzzing::runner::Runner;
@@ -113,7 +114,15 @@ impl GreyBoxFuzzer {
             }
         };
 
-        let lcov_observer = Rc::new(RefCell::new(LCovObserver::new()));
+        let mut observers: (ObserverList, ObserverList) = (vec![], vec![]);
+        if let CoverageType::LCov = fst_mount.coverage_type() {
+            let fst_lcov_observer = Rc::new(RefCell::new(LCovObserver::new()));
+            observers.0.push(fst_lcov_observer);
+        }
+        if let CoverageType::LCov = snd_mount.coverage_type() {
+            let snd_lcov_observer = Rc::new(RefCell::new(LCovObserver::new()));
+            observers.1.push(snd_lcov_observer);
+        }
 
         let runner = Runner::create(
             fst_mount,
@@ -123,7 +132,7 @@ impl GreyBoxFuzzer {
             false,
             cmdi,
             supervisor,
-            (vec![lcov_observer.clone()], vec![lcov_observer.clone()]),
+            observers,
         )
         .with_context(|| "failed to create runner")?;
 
