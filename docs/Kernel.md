@@ -211,3 +211,30 @@ root@ubuntu:/linux-5.15.178# make install
 ```
 
 On next boot, new kernel will be used.
+
+### Direct boot
+
+In order to pass kernel command line arguments (and enable panics on KASAN reports for instance) QEMU direct boot is required.
+
+Put Linux source directory in an archive:
+
+```sh
+root@ubuntu:/# tar -cvf /linux.tar /linux-5.15.178
+```
+
+Copy archive from VM:
+
+```sh
+./tools/copy-from.sh /linux.tar ~/path/to/linux.tar
+```
+
+Extract:
+
+```sh
+cd ~/path/to/
+tar -xvf linux.tar
+```
+
+Source should be located at `~/path/to/linux-5.15.178` and `bzImage` file, required for direct boot, should be at `~/path/to/linux-5.15.178/arch/x86/boot/bzImage`.
+
+Update `config.toml` accordingly and use environmental variables when launching scripts with said path.
