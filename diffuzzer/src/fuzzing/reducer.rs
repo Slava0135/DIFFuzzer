@@ -21,7 +21,7 @@ use crate::{
     supervisor::Supervisor,
 };
 
-use super::runner::{Runner, DiffOutcome};
+use super::runner::{DiffOutcome, Runner};
 
 pub struct Reducer {
     runner: Runner,
@@ -93,9 +93,7 @@ impl Reducer {
 
         match self.runner.run_harness(&binary_path)? {
             (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
-                let diffs = self
-                    .runner
-                    .get_diffs(&fst_outcome, &snd_outcome)?;
+                let diffs = self.runner.get_diffs(&fst_outcome, &snd_outcome)?;
 
                 if diffs.has_some_interesting() {
                     let remove_pointer = input.ops.len() - 1;
@@ -164,9 +162,7 @@ impl Reducer {
         output_dir: &LocalPath,
         binary_path: RemotePath,
     ) -> anyhow::Result<()> {
-        let diffs = self
-            .runner
-            .get_diffs(&fst_outcome, &snd_outcome)?;
+        let diffs = self.runner.get_diffs(&fst_outcome, &snd_outcome)?;
         if !diffs.has_some_interesting() {
             return Ok(());
         }
@@ -236,13 +232,10 @@ impl Reducer {
     }
 
     fn limit_reached(&self) -> bool {
-        self.limit_counter >= self.limit_bugs
+        self.limit_bugs != 0 && self.limit_counter >= self.limit_bugs
     }
 
-    fn remove_from_queue_by_value(
-        diffs: &DiffOutcome,
-        bugs_queue: &mut VecDeque<DiffOutcome>,
-    ) {
+    fn remove_from_queue_by_value(diffs: &DiffOutcome, bugs_queue: &mut VecDeque<DiffOutcome>) {
         if let Some(diff_index) = bugs_queue.iter().position(|d| *d == *diffs) {
             bugs_queue.remove(diff_index);
         }
