@@ -59,6 +59,13 @@ pub struct QemuConfig {
     pub monitor_socket_path: String,
     /// Path to QMP unix socket
     pub qmp_socket_path: String,
+    /// Run QEMU direct boot with custom kernel and command line arguments
+    /// This is required for fuzzing with KASAN
+    pub direct_boot: bool,
+    /// Path to kernel bzImage (direct boot)
+    pub kernel_image_path: String,
+    /// Root disk partition (direct boot)
+    pub root_disk_partition: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

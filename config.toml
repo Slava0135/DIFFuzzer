@@ -1,11 +1,14 @@
-fs_name = "fstest" 
+fs_name = "fstest"
 heartbeat_interval = 30 # in seconds
 max_workload_length = 100 
 timeout = 10 # in seconds
 
 [qemu]
-launch_script = "./tools/launch-snapshot.sh"
 os_image = "./disk.img"
+direct_boot = false # required for fuzzing with KASAN
+kernel_image_path = ".../linux-x.xx/arch/x86/boot/bzImage"
+root_disk_partition = "/dev/vda1"
+launch_script = "./tools/launch-snapshot.sh"
 ssh_port = 2222
 ssh_private_key_path = "./ssh.key"
 boot_wait_time = 10 # in seconds

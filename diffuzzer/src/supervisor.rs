@@ -75,7 +75,10 @@ impl QemuSupervisor {
             .env("OS_IMAGE", config.os_image.clone())
             .env("SSH_PORT", config.ssh_port.to_string())
             .env("QMP_SOCKET_PATH", config.qmp_socket_path.clone())
-            .env("MONITOR_SOCKET_PATH", config.monitor_socket_path.clone());
+            .env("MONITOR_SOCKET_PATH", config.monitor_socket_path.clone())
+            .env("DIRECT_BOOT", config.direct_boot.to_string())
+            .env("KERNEL_IMAGE_PATH", &config.kernel_image_path)
+            .env("ROOT_DISK_PARTITION", &config.root_disk_partition);
         launch
             .stdin(Stdio::null())
             .stdout(Stdio::null())
