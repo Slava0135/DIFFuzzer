@@ -138,7 +138,7 @@ impl QemuSupervisor {
 
     fn check_pid_match(&self) -> bool {
         let mut ps = CommandWrapper::new("ps");
-        ps.arg(format!("-p {} -o comm=", self.id));
+        ps.args(["-p", self.id.to_string().as_str(), "-o", "comm="]);
         let p_name: String = ps
             .exec_local(None)
             .and_then(|output| Ok(String::from_utf8(output.stdout).unwrap_or(String::from(""))))
