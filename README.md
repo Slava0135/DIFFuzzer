@@ -1,7 +1,5 @@
 # DIFFuzzer - Differential Filesystem Fuzzer
 
-> IMPORTANT: Project is Work in Progress (WIP).
-
 __DIFFuzzer__ - is a fuzzer, that aims to find __memory__ and __semantic__ bugs in __kernel__ (Linux) and __userspace__ (FUSE) filesystems.
 
 It expands on previous works, such as:
@@ -21,7 +19,16 @@ Key features:
 - __Native and QEMU__ - can be run on local machine as well as in VM using __QEMU__.
 - __FUSE Supported__ - can be used for testing __FUSE__ file systems using __LCov__ coverage information (can run without coverage, but not as effective).
 - __Easy Filesystem Integration__ - see [Adding New Filesystem](#adding-new-filesystem).
-- __Kernel Version Agnostic__ - only "hard" kernel dependency is __KCov__ feature.
+- __Kernel Version Agnostic__ - only __KCov__ is required.
+
+## Structure
+
+Project consists of 4 parts:
+
+- `diffuzzer` - fuzzer itself.
+- `dash` - differential abstract state hasher, used for evaluating and comparing file system states.
+- `executor` - runtime/library that is used by tests.
+- `tools` - miscellaneous scripts.
 
 ## Build
 
@@ -29,7 +36,7 @@ Key features:
 
 Install rust.
 
-Build:
+Build project:
 
 ```sh
 cargo build --release
@@ -61,12 +68,14 @@ Compiled binaries will be put in `./target/release/...`
 
 Configure with:
 
-- [fuzzer configuration file](./config.toml) in TOML format
-- [logging configuration file](./log4rs.yml) in YAML format ([docs](https://docs.rs/log4rs/latest/log4rs/#configuration)).
+- [Fuzzer configuration file](./config.toml) in TOML format ([docs](./diffuzzer/src/config.rs)).
+- [Logging configuration file](./log4rs.yml) in YAML format ([docs](https://docs.rs/log4rs/latest/log4rs/#configuration)).
 
 ## QEMU
 
 Read [QEMU configuration](./docs/QEMU.md) docs.
+
+> __You need to configure QEMU image before running fuzzer.__
 
 ## Usage
 
@@ -78,20 +87,27 @@ For usage:
 
 DIFFuzzer comes with many modes:
 
-- greybox - greybox fuzzing (with coverage and mutations)
-- blackbox - blackbox fuzzing
-- reduce - reduce testcase with bug
+- `greybox` - greybox fuzzing (with coverage and mutations)
+- `blackbox` - blackbox fuzzing
+- `reduce` - reduce testcase with bug
+- `solo-single` - run single test
+- `duo-single` - run single test for 2 filesystems
 
 ```sh
-./target/release/diffuzzer greybox -f ext4 -s btrfs    # QEMU
-./target/release/diffuzzer -n greybox -f ext4 -s btrfs # native
+./target/release/diffuzzer greybox -f ext4 -s btrfs
+```
+
+There is also an option to run without QEMU (*not recommended*):
+
+```sh
+./target/release/diffuzzer -n greybox -f ext4 -s btrfs
 ```
 
 ## Adding New Filesystem
 
 Implement [trait](./diffuzzer/src/mount/mod.rs) (interface) for mounting filesystem. Default implementation uses `mkfs` and `mount` and can be used for most kernel filesystems (e.g. Ext4, Btrfs).
 
-Add filesystem to [this file](./diffuzzer/src/filesystems.rs).
+Add your filesystem to [this file](./diffuzzer/src/filesystems.rs).
 
 Done!
 
@@ -99,7 +115,7 @@ For additional information read [Filesystems](./docs/Filesystems.md) docs.
 
 ## Bugs Found
 
->TODO: bugs
+>TBD
 
 ## License
 
