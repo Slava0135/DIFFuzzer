@@ -127,6 +127,7 @@ impl CommandWrapper {
                 timeout.arg(secs.to_string());
                 timeout.arg(self.internal.get_program());
                 timeout.args(self.internal.get_args());
+                timeout.current_dir(self.internal.get_current_dir().unwrap_or(Path::new(".")));
                 timeout.output()
             }
             None => self.internal.output(),
