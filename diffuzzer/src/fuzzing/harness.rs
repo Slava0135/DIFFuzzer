@@ -2,9 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use anyhow::{Context, bail};
 
 use crate::command::{CommandInterface, CommandWrapper, ExecError};
@@ -12,7 +9,7 @@ use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
 use crate::supervisor::Supervisor;
 
-use super::observer::Observer;
+use super::observer::ObserverList;
 use super::outcome::{Completed, Outcome};
 
 pub struct Harness {
@@ -21,7 +18,7 @@ pub struct Harness {
     exec_dir: RemotePath,
     outcome_dir: LocalPath,
     timeout: u8,
-    observers: Vec<Rc<RefCell<dyn Observer>>>,
+    observers: ObserverList,
 }
 
 impl Harness {
@@ -31,7 +28,7 @@ impl Harness {
         exec_dir: RemotePath,
         outcome_dir: LocalPath,
         timeout: u8,
-        observers: Vec<Rc<RefCell<dyn Observer>>>,
+        observers: ObserverList,
     ) -> Self {
         Self {
             fs_mount,
