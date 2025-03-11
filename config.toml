@@ -1,11 +1,13 @@
+# See "diffuzzer/src/config.rs" for documentation
+
 fs_name = "fstest"
 heartbeat_interval = 30 # in seconds
-max_workload_length = 100 
+max_workload_length = 100
 timeout = 10 # in seconds
 
 [qemu]
-os_image = "./disk.img"
-direct_boot = false # required for fuzzing with KASAN
+os_image = "./disk.img" 
+direct_boot = false
 kernel_image_path = ".../linux-x.xx/arch/x86/boot/bzImage"
 root_disk_partition = "/dev/vda1"
 launch_script = "./tools/launch-snapshot.sh"
@@ -24,7 +26,6 @@ m_constant = 10000
 
 [dash]
 enabled = true
-output_path = "/tmp/diffuzzer-dash-output.json"
 debug_binary_path = "./target/debug/dash"
 release_binary_path = "./target/release/dash"
 

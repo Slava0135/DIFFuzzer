@@ -12,7 +12,7 @@ pub struct Config {
     pub operation_weights: OperationWeights,
     pub mutation_weights: MutationWeights,
     pub max_workload_length: u16,
-    /// Filesystem name that used for mountpoint path
+    /// Filesystem name that is used for mountpoint path
     pub fs_name: String,
     /// Interval after which, if nothing happens, log is updated
     pub heartbeat_interval: u16,
