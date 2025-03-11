@@ -36,12 +36,15 @@ impl CoverageFeedback for KCovCoverageFeedback {
         debug!("do kcov feedback");
         let new_coverage = parse_kcov(&outcome.dir)?;
         let mut is_interesting = false;
-        for (addr, count) in &new_coverage {
+        for (addr, _count) in &new_coverage {
             let total = self.map.get(addr).unwrap_or(&0);
             if *total == 0 {
                 is_interesting = true;
             }
-            self.map.insert(*addr, *total + *count);
+            // TODO: do we want to increment by count?
+            // Right now power schedule uses map values as path frequencies
+            // so its more reasonable to increment by one...
+            self.map.insert(*addr, *total + 1);
         }
         if is_interesting {
             Ok(FeedbackOpinion::Interesting(

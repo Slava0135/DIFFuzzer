@@ -38,12 +38,12 @@ impl CoverageFeedback for LCovCoverageFeedback {
         let trace = LCovTrace::parse_from(&data);
         let new_coverage = trace.map();
         let mut is_interesting = false;
-        for (addr, count) in &new_coverage {
+        for (addr, _count) in &new_coverage {
             let total = self.map.get(addr).unwrap_or(&0);
             if *total == 0 {
                 is_interesting = true;
             }
-            self.map.insert(*addr, *total + *count);
+            self.map.insert(*addr, *total + 1);
         }
         if is_interesting {
             Ok(FeedbackOpinion::Interesting(
