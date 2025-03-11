@@ -8,7 +8,7 @@ It expands on previous works, such as:
 - [Dogfood](https://dl.acm.org/doi/abs/10.1145/3377811.3380350), filsystem test workload generator.
 - [CrashMonkey](https://dl.acm.org/doi/abs/10.1145/3320275), filesystem crash consistency testing framework.
 - [Metis](https://www.usenix.org/conference/fast24/presentation/liu-yifei), filesystem model checking tool.
-- [SibyLFS](https://dl.acm.org/doi/abs/10.1145/2815400.2815411), oracle-based testing for filesystems.
+- [SibylFS](https://dl.acm.org/doi/abs/10.1145/2815400.2815411), oracle-based testing for filesystems.
 - and other...
 
 Key features:
