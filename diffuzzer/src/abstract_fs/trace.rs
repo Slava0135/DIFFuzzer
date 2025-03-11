@@ -15,7 +15,7 @@ pub struct Trace {
 
 #[derive(Debug, PartialEq, Eq, Hash, Deserialize, Serialize, Clone)]
 pub struct TraceRow {
-    pub index: u32,
+    index: u32,
     command: String,
     return_code: i32,
     errno: Errno,
@@ -106,9 +106,11 @@ impl Trace {
 }
 
 impl TraceRow {
-    pub fn to_index_independent_form(mut self) -> TraceRow {
-        self.index = 0;
-        return self;
+    pub fn ignore_index_equal(&self, other: &TraceRow) -> bool {
+        return self.command == other.command
+            && self.return_code == other.return_code
+            && self.extra == other.extra
+            && self.errno == other.errno;
     }
 }
 
@@ -160,9 +162,9 @@ Index,Command,ReturnCode,Errno,Extra
                         return_code: 42,
                         errno: Errno {
                             name: "Success".to_owned(),
-                            code: 0
+                            code: 0,
                         },
-                        extra: "a=1".to_owned()
+                        extra: "a=1".to_owned(),
                     },
                     TraceRow {
                         index: 2,
@@ -170,9 +172,9 @@ Index,Command,ReturnCode,Errno,Extra
                         return_code: -1,
                         errno: Errno {
                             name: "Error".to_owned(),
-                            code: 42
+                            code: 42,
                         },
-                        extra: "b=2".to_owned()
+                        extra: "b=2".to_owned(),
                     },
                 ]
             }),

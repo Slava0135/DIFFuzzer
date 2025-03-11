@@ -7,11 +7,7 @@ use std::time::Instant;
 use anyhow::Context;
 use log::{debug, error, info, warn};
 
-use crate::{
-    abstract_fs::workload::Workload,
-    fuzzing::runner::parse_trace,
-    path::RemotePath,
-};
+use crate::{abstract_fs::workload::Workload, fuzzing::runner::parse_trace, path::RemotePath};
 
 use super::{outcome::Completed, runner::Runner};
 

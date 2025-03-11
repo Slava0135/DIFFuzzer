@@ -269,8 +269,8 @@ impl Runner {
     ) -> anyhow::Result<RunningResults> {
         let fst_trace =
             parse_trace(&fst_outcome.dir).with_context(|| "failed to parse first trace")?;
-        let snd_trace = parse_trace(&snd_outcome.dir)
-            .with_context(|| "failed to parse second trace")?;
+        let snd_trace =
+            parse_trace(&snd_outcome.dir).with_context(|| "failed to parse second trace")?;
 
         let dash_interesting = self
             .dash_objective
@@ -278,15 +278,12 @@ impl Runner {
             .with_context(|| "failed to do dash objective")?;
 
         let dash_diff = if dash_interesting {
-            self.dash_objective
-                .get_diff()
+            self.dash_objective.get_diff()
         } else {
             vec![]
         };
 
-        let trace_diff = self
-            .trace_objective
-            .get_diff(&fst_trace, &snd_trace);
+        let trace_diff = self.trace_objective.get_diff(&fst_trace, &snd_trace);
 
         return Ok(RunningResults {
             dash_diff,
