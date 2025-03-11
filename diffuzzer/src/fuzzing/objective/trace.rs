@@ -23,7 +23,7 @@ impl TraceObjective {
         }
 
         for i in 0..fst_trace.rows.len() {
-            let mut fst_row = fst_trace.rows[i].clone();
+            let fst_row = fst_trace.rows[i].clone();
             let snd_row = snd_trace.rows[i].clone();
             if !fst_row.ignore_index_equal(&snd_row) {
                 trace_diff.push(TraceRowIsDifferent {

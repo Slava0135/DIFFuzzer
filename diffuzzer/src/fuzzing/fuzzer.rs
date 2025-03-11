@@ -60,7 +60,7 @@ pub trait Fuzzer {
     ) -> anyhow::Result<bool> {
         let runner = self.runner();
         debug!("do objectives");
-        let diffs = runner.get_running_results(fst_outcome, snd_outcome)?;
+        let diffs = runner.get_diffs(fst_outcome, snd_outcome)?;
         if diffs.has_some_interesting() {
             let reason = format!(
                 "error detected by: trace?: {}, hash?: {}",

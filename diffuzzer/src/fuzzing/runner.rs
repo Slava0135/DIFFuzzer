@@ -262,11 +262,11 @@ impl Runner {
         Ok(())
     }
 
-    pub fn get_running_results(
+    pub fn get_diffs(
         &mut self,
         fst_outcome: &Completed,
         snd_outcome: &Completed,
-    ) -> anyhow::Result<RunningResults> {
+    ) -> anyhow::Result<DiffOutcome> {
         let fst_trace =
             parse_trace(&fst_outcome.dir).with_context(|| "failed to parse first trace")?;
         let snd_trace =
@@ -285,7 +285,7 @@ impl Runner {
 
         let trace_diff = self.trace_objective.get_diff(&fst_trace, &snd_trace);
 
-        return Ok(RunningResults {
+        return Ok(DiffOutcome {
             dash_diff,
             trace_diff,
         });
@@ -311,12 +311,12 @@ impl Stats {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct RunningResults {
+pub struct DiffOutcome {
     pub dash_diff: Vec<FileDiff>,
     pub trace_diff: Vec<TraceDiff>,
 }
 
-impl RunningResults {
+impl DiffOutcome {
     pub fn has_some_interesting(&self) -> bool {
         self.dash_interesting() || self.trace_interesting()
     }
