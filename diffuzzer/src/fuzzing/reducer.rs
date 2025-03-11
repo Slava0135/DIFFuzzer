@@ -76,15 +76,8 @@ impl Reducer {
         })
     }
 
-    pub fn reset(&mut self) {
-        self.limit_counter = 0;
-        self.bugs = HashMap::new();
-        self.bugs_queue = VecDeque::new();
-    }
-
     pub fn run(&mut self, test_path: &LocalPath, save_to_dir: &LocalPath) -> anyhow::Result<()> {
         info!("read testcase at '{}'", test_path);
-        self.reset();
         let input = read_to_string(test_path).with_context(|| "failed to read testcase")?;
         let input: Workload =
             serde_json::from_str(&input).with_context(|| "failed to parse json")?;
