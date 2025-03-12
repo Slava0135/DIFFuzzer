@@ -311,7 +311,7 @@ impl CommandInterface for RemoteCommandInterface {
         scp.exec_local(None).with_context(|| {
             format!(
                 "failed to copy file to '{}' (local) from '{}' (remote)",
-                remote_path, local_path,
+                local_path, remote_path,
             )
         })?;
         Ok(())
@@ -330,7 +330,7 @@ impl CommandInterface for RemoteCommandInterface {
         scp.exec_local(None).with_context(|| {
             format!(
                 "failed to copy file from '{}' (local) to '{}' (remote)",
-                remote_path, local_path,
+                local_path, remote_path,
             )
         })?;
         Ok(())
