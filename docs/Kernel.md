@@ -155,7 +155,7 @@ Don't forget to enable modules for file systems (search for section `File system
 root@ubuntu:/linux-5.15.178# ./scripts/config -e XFS_FS -e BTRFS_FS -e F2FS_FS ... # can also add BCACHEFS_FS in Linux 6.7+ 
 ```
 
-> Some options (like compression) must be enabled explicitly, read corresponding file system documentation.
+> Some options (like compression) must be enabled explicitly, read [Filesystems](./Filesystems.md) docs.
 
 Disable kernel signing, otherwise you will (likely) get build error:
 
