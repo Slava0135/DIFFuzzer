@@ -85,7 +85,13 @@ Copy configuration of the running kernel (__only loaded modules will be included
 root@ubuntu:/linux-5.15.178# make localmodconfig
 ```
 
-You can enable them manually, or, instead, you can include *all* installed modules (will increase compilation time):
+To pick default options automatically (if asked, this can happen if building kernel version is different from currently installed):
+
+```sh
+root@ubuntu:/linux-5.15.178# yes "" | make localmodconfig
+```
+
+You can enable unloaded modules manually, or, instead, you can include *all* installed modules (will increase compilation time):
 
 ```sh
 root@ubuntu:/linux-5.15.178# cp -v /boot/config-$(uname -r) .config
@@ -146,8 +152,10 @@ root@ubuntu:/linux-5.15.178# ./scripts/config -d RANDOMIZE_BASE
 Don't forget to enable modules for file systems (search for section `File systems` inside `.config` file):
 
 ```sh
-root@ubuntu:/linux-5.15.178# ./scripts/config -e XFS_FS -e BTRFS_FS -e F2FS_FS
+root@ubuntu:/linux-5.15.178# ./scripts/config -e XFS_FS -e BTRFS_FS -e F2FS_FS ... # can also add BCACHEFS_FS in Linux 6.7+ 
 ```
+
+> Some options (like compression) must be enabled explicitly, read corresponding file system documentation.
 
 Disable kernel signing, otherwise you will (likely) get build error:
 
@@ -177,9 +185,15 @@ Build with 6 cores (jobs):
 root@ubuntu:/linux-5.15.178# fakeroot make -j6
 ```
 
-> You may be asked questions about further module configuration, just pick default answers.
+You may be asked questions about further module configuration again, just pick default answers manually, or use `yes` to pick them automatically:
 
-Make sure `make` finished successfully:
+```sh
+root@ubuntu:/linux-5.15.178# yes "" | fakeroot make -j6
+```
+
+> To enable all options in question replace with `yes "y" | ...`
+
+Check that `make` finished successfully:
 
 ```sh
 ...
@@ -214,9 +228,16 @@ On next boot, new kernel will be used.
 
 ### Direct boot
 
-In order to pass kernel command line arguments (and enable panics on KASAN reports for instance) QEMU direct boot is required.
+In order to pass kernel command line arguments (to enable panics on KASAN reports for instance) QEMU direct boot is required.
 
-Put Linux source directory in an archive:
+Another option is to put command line arguments into configuration before building kernel:
+
+```properties
+CONFIG_CMDLINE_BOOL=y
+CONFIG_CMDLINE="net.ifnames=0 oops=panic panic_on_warn=1 ..."
+```
+
+Otherwise, put Linux source directory in an archive:
 
 ```sh
 root@ubuntu:/# tar -cvf /linux.tar /linux-5.15.178
