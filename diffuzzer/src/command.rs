@@ -137,6 +137,9 @@ impl CommandWrapper {
                 timeout.arg(secs.to_string());
                 timeout.arg(self.internal.get_program());
                 timeout.args(self.internal.get_args());
+                if let Some(dir) = self.internal.get_current_dir() {
+                    timeout.current_dir(dir);
+                }
                 timeout.output()
             }
             None => self.internal.output(),
