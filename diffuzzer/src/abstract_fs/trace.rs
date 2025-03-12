@@ -13,7 +13,7 @@ pub struct Trace {
     pub rows: Vec<TraceRow>,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Deserialize, Serialize, Clone)]
 pub struct TraceRow {
     index: u32,
     command: String,
@@ -22,7 +22,13 @@ pub struct TraceRow {
     extra: String,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum TraceDiff {
+    TraceRowIsDifferent { fst: TraceRow, snd: TraceRow },
+    DifferentLength,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Deserialize, Serialize, Clone)]
 pub struct Errno {
     name: String,
     code: i32,
@@ -93,11 +99,18 @@ impl Trace {
         }
         Ok(trace)
     }
-    pub fn same_as(&self, other: &Trace) -> bool {
-        self == other
-    }
+
     pub fn has_errors(&self) -> bool {
         self.rows.iter().any(|row| row.errno.code != 0)
+    }
+}
+
+impl TraceRow {
+    pub fn ignore_index_equal(&self, other: &TraceRow) -> bool {
+        return self.command == other.command
+            && self.return_code == other.return_code
+            && self.extra == other.extra
+            && self.errno == other.errno;
     }
 }
 
@@ -149,9 +162,9 @@ Index,Command,ReturnCode,Errno,Extra
                         return_code: 42,
                         errno: Errno {
                             name: "Success".to_owned(),
-                            code: 0
+                            code: 0,
                         },
-                        extra: "a=1".to_owned()
+                        extra: "a=1".to_owned(),
                     },
                     TraceRow {
                         index: 2,
@@ -159,9 +172,9 @@ Index,Command,ReturnCode,Errno,Extra
                         return_code: -1,
                         errno: Errno {
                             name: "Error".to_owned(),
-                            code: 42
+                            code: 42,
                         },
-                        extra: "b=2".to_owned()
+                        extra: "b=2".to_owned(),
                     },
                 ]
             }),
