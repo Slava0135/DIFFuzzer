@@ -16,6 +16,11 @@ pub struct Trace {
 #[derive(Debug, PartialEq, Eq, Hash, Deserialize, Serialize, Clone)]
 pub struct TraceRow {
     index: u32,
+    pub data: UnorderedTraceRow,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Deserialize, Serialize, Clone)]
+pub struct UnorderedTraceRow {
     command: String,
     return_code: i32,
     errno: Errno,
@@ -24,7 +29,7 @@ pub struct TraceRow {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TraceDiff {
-    TraceRowIsDifferent { fst: TraceRow, snd: TraceRow },
+    TraceRowIsDifferent { fst: UnorderedTraceRow, snd: UnorderedTraceRow },
     DifferentLength,
 }
 
@@ -91,28 +96,22 @@ impl Trace {
 
             trace.rows.push(TraceRow {
                 index,
-                command,
-                return_code,
-                errno: Errno { name, code },
-                extra,
+                data: UnorderedTraceRow {
+                    command,
+                    return_code,
+                    errno: Errno { name, code },
+                    extra,
+                },
             });
         }
         Ok(trace)
     }
 
     pub fn has_errors(&self) -> bool {
-        self.rows.iter().any(|row| row.errno.code != 0)
+        self.rows.iter().any(|row| row.data.errno.code != 0)
     }
 }
 
-impl TraceRow {
-    pub fn ignore_index_equal(&self, other: &TraceRow) -> bool {
-        return self.command == other.command
-            && self.return_code == other.return_code
-            && self.extra == other.extra
-            && self.errno == other.errno;
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -138,7 +137,7 @@ Index,Command,ReturnCode,Errno,Extra
     1,    Foo,        42,Success(0),a=1, ???
     2,    Bar,        -1,Error(42),b=2
 "#
-        .trim();
+            .trim();
         assert_eq!(
             Err(TraceError::InvalidColumnNumber),
             Trace::try_parse(trace.to_owned())
@@ -152,29 +151,33 @@ Index,Command,ReturnCode,Errno,Extra
     1,    Foo,        42,Success(0),a=1
     2,    Bar,        -1,Error(42),b=2
 "#
-        .trim();
+            .trim();
         assert_eq!(
             Ok(Trace {
                 rows: vec![
                     TraceRow {
                         index: 1,
-                        command: "Foo".to_owned(),
-                        return_code: 42,
-                        errno: Errno {
-                            name: "Success".to_owned(),
-                            code: 0,
+                        data: UnorderedTraceRow {
+                            command: "Foo".to_owned(),
+                            return_code: 42,
+                            errno: Errno {
+                                name: "Success".to_owned(),
+                                code: 0,
+                            },
+                            extra: "a=1".to_owned(),
                         },
-                        extra: "a=1".to_owned(),
                     },
                     TraceRow {
                         index: 2,
-                        command: "Bar".to_owned(),
-                        return_code: -1,
-                        errno: Errno {
-                            name: "Error".to_owned(),
-                            code: 42,
+                        data: UnorderedTraceRow {
+                            command: "Bar".to_owned(),
+                            return_code: -1,
+                            errno: Errno {
+                                name: "Error".to_owned(),
+                                code: 42,
+                            },
+                            extra: "b=2".to_owned(),
                         },
-                        extra: "b=2".to_owned(),
                     },
                 ]
             }),
@@ -189,7 +192,7 @@ Index,Command,ReturnCode,Errno,Extra
             1,    Foo,        42,Success 0,a=1
             2,    Bar,        -1,Error(42),b=2
         "#
-        .trim();
+            .trim();
         assert_eq!(
             Err(TraceError::InvalidErrno("Success 0".to_owned())),
             Trace::try_parse(trace.to_owned())
