@@ -7,6 +7,7 @@ pub mod ext4;
 pub mod f2fs;
 pub mod littlefs;
 pub mod xfs;
+pub mod bcachefs;
 
 use std::fmt::Display;
 
@@ -30,13 +31,7 @@ pub trait FileSystemMount: Display {
         cmdi.create_dir_all(path)
             .with_context(|| "failed to create mountpoint")?;
 
-        let mut modprobe = CommandWrapper::new("modprobe");
-        modprobe
-            .arg("brd")
-            .arg("rd_nr=1")
-            .arg(format!("rd_size={RAM_DISK_SIZE}"));
-        cmdi.exec(modprobe, None)
-            .with_context(|| "failed to load module 'brd'")?;
+        setup_modprobe(cmdi)?;
 
         let mut mkfs = CommandWrapper::new(self.mkfs_cmd());
         if let Some(opts) = self.mkfs_opts() {
@@ -114,4 +109,15 @@ pub trait FileSystemMount: Display {
     fn source_dir(&self) -> Option<RemotePath> {
         None
     }
+}
+
+fn setup_modprobe(cmdi: &dyn CommandInterface) -> anyhow::Result<()> {
+    let mut modprobe = CommandWrapper::new("modprobe");
+    modprobe
+        .arg("brd")
+        .arg("rd_nr=1")
+        .arg(format!("rd_size={RAM_DISK_SIZE}"));
+    cmdi.exec(modprobe, None)
+        .with_context(|| "failed to load module 'brd'")?;
+    Ok(())
 }

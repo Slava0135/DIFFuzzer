@@ -2,30 +2,34 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::{fmt::Display, path::Path};
+use std::fmt::Display;
 
 use anyhow::Context;
 use log::debug;
+use regex::RegexSet;
 
 use crate::{
-    command::{CommandInterface, CommandWrapper},
+    command::CommandWrapper,
     fuzzing::greybox::feedback::CoverageType,
     mount::{DEVICE, setup_modprobe},
-    path::RemotePath,
 };
 
 use super::FileSystemMount;
 
-pub struct LittleFS;
+pub struct BcacheFS;
 
-impl Display for LittleFS {
+impl Display for BcacheFS {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "LittleFS")
+        write!(f, "BcacheFS")
     }
 }
 
-impl FileSystemMount for LittleFS {
-    fn setup(&self, cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<()> {
+impl FileSystemMount for BcacheFS {
+    fn setup(
+        &self,
+        cmdi: &dyn crate::command::CommandInterface,
+        path: &crate::path::RemotePath,
+    ) -> anyhow::Result<()> {
         debug!("setup '{}' filesystem at '{}'", self, path);
 
         cmdi.create_dir_all(path)
@@ -33,32 +37,29 @@ impl FileSystemMount for LittleFS {
 
         setup_modprobe(cmdi)?;
 
-        let lfs_path = self
-            .source_dir()
-            .with_context(|| "Source directory with binary missing")?
-            .join("lfs");
-
-        let mut format = CommandWrapper::new(lfs_path.base.as_ref());
-        format.arg("--format").arg(DEVICE);
+        let mut format = CommandWrapper::new("bcachefs");
+        format.arg("format").arg(DEVICE);
         cmdi.exec(format, None)
             .with_context(|| format!("failed to format device '{}'", DEVICE))?;
 
-        let mut mount = CommandWrapper::new(lfs_path.base.as_ref());
+        // mount -t bcachefs /dev/sda1 /mnt
+        let mut mount = CommandWrapper::new("mount");
+        mount.arg("-t").arg("bcachefs");
         mount.arg(DEVICE).arg(path.base.as_ref());
         cmdi.exec(mount, None)
             .with_context(|| format!("failed to mount filesystem at '{}'", path))?;
 
         Ok(())
     }
-    fn coverage_type(&self) -> CoverageType {
-        CoverageType::LCov
+    fn get_internal_dirs(&self) -> RegexSet {
+        RegexSet::new([r"^/?lost\+found($|/)"]).unwrap()
     }
-    fn source_dir(&self) -> Option<RemotePath> {
-        Some(RemotePath::new(Path::new("/root/littlefs-fuse")))
+    fn coverage_type(&self) -> CoverageType {
+        CoverageType::KCov
     }
 }
 
-impl LittleFS {
+impl BcacheFS {
     pub const fn new() -> Self {
         Self {}
     }
