@@ -23,13 +23,10 @@ impl TraceObjective {
         }
 
         for i in 0..fst_trace.rows.len() {
-            let fst_row = fst_trace.rows[i].data.clone();
-            let snd_row = snd_trace.rows[i].data.clone();
-            if fst_row != snd_row {
-                trace_diff.push(TraceRowIsDifferent {
-                    fst: fst_row,
-                    snd: snd_row,
-                })
+            let fst = fst_trace.rows[i].clone();
+            let snd = snd_trace.rows[i].clone();
+            if fst != snd {
+                trace_diff.push(TraceRowIsDifferent { fst, snd })
             }
         }
         return trace_diff;

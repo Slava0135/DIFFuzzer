@@ -2,8 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use std::hash::{Hash, Hasher};
 use std::num::ParseIntError;
 
+use crate::abstract_fs::trace::TraceDiff::{DifferentLength, TraceRowIsDifferent};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -27,10 +29,42 @@ pub struct UnorderedTraceRow {
     extra: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Eq)]
 pub enum TraceDiff {
-    TraceRowIsDifferent { fst: UnorderedTraceRow, snd: UnorderedTraceRow },
+    TraceRowIsDifferent { fst: TraceRow, snd: TraceRow },
     DifferentLength,
+}
+
+impl PartialEq for TraceDiff {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (DifferentLength, DifferentLength) => true,
+            (
+                TraceRowIsDifferent {
+                    fst: fst_a,
+                    snd: snd_a,
+                },
+                TraceRowIsDifferent {
+                    fst: fst_b,
+                    snd: snd_b,
+                },
+            ) => fst_a.data == fst_b.data && snd_a.data == snd_b.data,
+            _ => false,
+        }
+    }
+}
+
+impl Hash for TraceDiff {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            TraceRowIsDifferent { fst, snd } => {
+                state.write_u8(1);
+                fst.data.hash(state);
+                snd.data.hash(state);
+            }
+            DifferentLength => state.write_u8(2),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Deserialize, Serialize, Clone)]
@@ -112,10 +146,10 @@ impl Trace {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::hash::DefaultHasher;
 
     #[test]
     fn test_empty_trace() {
@@ -137,7 +171,7 @@ Index,Command,ReturnCode,Errno,Extra
     1,    Foo,        42,Success(0),a=1, ???
     2,    Bar,        -1,Error(42),b=2
 "#
-            .trim();
+        .trim();
         assert_eq!(
             Err(TraceError::InvalidColumnNumber),
             Trace::try_parse(trace.to_owned())
@@ -151,7 +185,7 @@ Index,Command,ReturnCode,Errno,Extra
     1,    Foo,        42,Success(0),a=1
     2,    Bar,        -1,Error(42),b=2
 "#
-            .trim();
+        .trim();
         assert_eq!(
             Ok(Trace {
                 rows: vec![
@@ -192,10 +226,143 @@ Index,Command,ReturnCode,Errno,Extra
             1,    Foo,        42,Success 0,a=1
             2,    Bar,        -1,Error(42),b=2
         "#
-            .trim();
+        .trim();
         assert_eq!(
             Err(TraceError::InvalidErrno("Success 0".to_owned())),
             Trace::try_parse(trace.to_owned())
         )
+    }
+
+    #[test]
+    fn test_hash_diff_outcome_different_length() {
+        let a = DifferentLength {};
+        let b = DifferentLength {};
+        let c = TraceRowIsDifferent {
+            fst: TraceRow {
+                index: 1,
+                data: UnorderedTraceRow {
+                    command: "a".to_string(),
+                    return_code: 1,
+                    errno: Errno {
+                        name: "err".to_string(),
+                        code: 1,
+                    },
+                    extra: "extra".to_string(),
+                },
+            },
+            snd: TraceRow {
+                index: 1,
+                data: UnorderedTraceRow {
+                    command: "a".to_string(),
+                    return_code: 2,
+                    errno: Errno {
+                        name: "err".to_string(),
+                        code: 1,
+                    },
+                    extra: "extra".to_string(),
+                },
+            },
+        };
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+        assert_eq!(calculate_hash(&a), calculate_hash(&b));
+        assert_ne!(calculate_hash(&a), calculate_hash(&c));
+    }
+
+    #[test]
+    fn test_hash_diff_outcome_trace_row_diff() {
+        let a = TraceRowIsDifferent {
+            fst: TraceRow {
+                index: 1,
+                data: UnorderedTraceRow {
+                    command: "a".to_string(),
+                    return_code: 1,
+                    errno: Errno {
+                        name: "err".to_string(),
+                        code: 1,
+                    },
+                    extra: "extra".to_string(),
+                },
+            },
+            snd: TraceRow {
+                index: 1,
+                data: UnorderedTraceRow {
+                    command: "a".to_string(),
+                    return_code: 2,
+                    errno: Errno {
+                        name: "err".to_string(),
+                        code: 1,
+                    },
+                    extra: "extra".to_string(),
+                },
+            },
+        };
+
+        let b = TraceRowIsDifferent {
+            fst: TraceRow {
+                index: 5,
+                data: UnorderedTraceRow {
+                    command: "a".to_string(),
+                    return_code: 1,
+                    errno: Errno {
+                        name: "err".to_string(),
+                        code: 1,
+                    },
+                    extra: "extra".to_string(),
+                },
+            },
+            snd: TraceRow {
+                index: 5,
+                data: UnorderedTraceRow {
+                    command: "a".to_string(),
+                    return_code: 2,
+                    errno: Errno {
+                        name: "err".to_string(),
+                        code: 1,
+                    },
+                    extra: "extra".to_string(),
+                },
+            },
+        };
+
+        let c = TraceRowIsDifferent {
+            fst: TraceRow {
+                index: 1,
+                data: UnorderedTraceRow {
+                    command: "b".to_string(),
+                    return_code: 1,
+                    errno: Errno {
+                        name: "err".to_string(),
+                        code: 1,
+                    },
+                    extra: "extra".to_string(),
+                },
+            },
+            snd: TraceRow {
+                index: 1,
+                data: UnorderedTraceRow {
+                    command: "b".to_string(),
+                    return_code: 2,
+                    errno: Errno {
+                        name: "err".to_string(),
+                        code: 1,
+                    },
+                    extra: "extra".to_string(),
+                },
+            },
+        };
+
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+        assert_ne!(b, c);
+        assert_eq!(calculate_hash(&a), calculate_hash(&b));
+        assert_ne!(calculate_hash(&a), calculate_hash(&c));
+        assert_ne!(calculate_hash(&b), calculate_hash(&c));
+    }
+
+    fn calculate_hash<T: Hash>(t: &T) -> u64 {
+        let mut s = DefaultHasher::new();
+        t.hash(&mut s);
+        s.finish()
     }
 }
