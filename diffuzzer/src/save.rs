@@ -77,9 +77,9 @@ pub fn save_completed(
 
 pub fn save_diff(output_dir: &LocalPath, diff_hash: Vec<FileDiff>) -> anyhow::Result<()> {
     let diff_hash_path = output_dir.join(DIFF_FILENAME);
+    fs::write(&diff_hash_path, "").with_context(|| "failed to init diff file")?;
     let mut file = OpenOptions::new()
         .append(true)
-        .create(true)
         .open(&diff_hash_path)
         .with_context(|| format!("failed to save hash difference at '{}'", diff_hash_path))?;
 

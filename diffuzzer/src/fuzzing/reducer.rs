@@ -6,7 +6,7 @@ use std::collections::{HashMap, VecDeque};
 use std::fs::read_to_string;
 
 use anyhow::{Context, Ok};
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use thiserror::Error;
 
 use crate::fuzzing::outcome::Completed;
@@ -99,6 +99,7 @@ impl Reducer {
                         },
                     );
                     self.bugs_queue.push_back(diffs);
+                    self.limit_counter += 1;
                     self.reduce(save_to_dir)?;
                 } else {
                     warn!("crash not detected");
@@ -106,7 +107,16 @@ impl Reducer {
             }
             _ => todo!("handle all outcomes"),
         };
-
+        info!("Reducing complete with:");
+        for (diff, bug) in (&self.bugs).into_iter() {
+            info!(
+                "{} | length = {} | dash bug = {} | trace bug = {}",
+                bug.name,
+                bug.workload.ops.len(),
+                diff.dash_interesting(),
+                diff.trace_interesting()
+            )
+        }
         Ok(())
     }
 
@@ -156,8 +166,13 @@ impl Reducer {
         output_dir: &LocalPath,
         binary_path: RemotePath,
     ) -> anyhow::Result<()> {
+        debug!(
+            "\"{}\" reduction attempt with deletion of the operation n.{}",
+            init_bug.name, init_bug.remove_pointer
+        );
         let diffs = self.runner.get_diffs(&fst_outcome, &snd_outcome)?;
         if !diffs.has_some_interesting() {
+            debug!("Bugs not found");
             return Ok(());
         }
 
@@ -165,7 +180,11 @@ impl Reducer {
 
         let bug_name = match matched_bug {
             Some(bug) => {
-                //todo: handle if len is equal or if workloads too different
+                debug!(
+                    "Already existing bug \"{}\" reduced, workload length = {}",
+                    bug.name,
+                    reduced_workload.ops.len()
+                );
                 if reduced_workload.ops.len() >= bug.workload.ops.len() {
                     return Ok(());
                 }
@@ -181,10 +200,16 @@ impl Reducer {
             }
             None => {
                 if self.limit_reached() {
+                    debug!("New bug found but limitation of variations has been reached");
                     return Ok(());
                 }
                 self.limit_counter += 1;
                 let new_bug = self.create_new_bug(init_bug, &reduced_workload);
+                debug!(
+                    "New bug \"{}\" found, workload length = {}",
+                    new_bug.name,
+                    reduced_workload.ops.len()
+                );
                 let name = new_bug.name.clone();
                 self.bugs.insert(diffs.clone(), new_bug);
                 self.bugs_queue.push_back(diffs.clone());
@@ -194,7 +219,7 @@ impl Reducer {
 
         self.runner.report_diff(
             &reduced_workload,
-            format!("{}/{}", bug_name, init_bug.remove_pointer),
+            bug_name,
             &binary_path,
             output_dir.clone(),
             diffs.dash_diff,
