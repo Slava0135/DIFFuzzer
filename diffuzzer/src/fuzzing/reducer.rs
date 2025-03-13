@@ -6,7 +6,7 @@ use std::collections::{HashMap, VecDeque};
 use std::fs::read_to_string;
 
 use anyhow::{Context, Ok};
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use thiserror::Error;
 
 use crate::fuzzing::outcome::Completed;
@@ -157,8 +157,13 @@ impl Reducer {
         output_dir: &LocalPath,
         binary_path: RemotePath,
     ) -> anyhow::Result<()> {
+        debug!(
+            "Try reduce {} with {} op. remove",
+            init_bug.name, init_bug.remove_pointer
+        );
         let diffs = self.runner.get_diffs(&fst_outcome, &snd_outcome)?;
         if !diffs.has_some_interesting() {
+            debug!("Bugs not found");
             return Ok(());
         }
 
@@ -166,7 +171,11 @@ impl Reducer {
 
         let bug_name = match matched_bug {
             Some(bug) => {
-                //todo: handle if len is equal or if workloads too different
+                debug!(
+                    "Already existing bug {} reduced, workload length = {}",
+                    bug.name,
+                    reduced_workload.ops.len()
+                );
                 if reduced_workload.ops.len() >= bug.workload.ops.len() {
                     return Ok(());
                 }
@@ -182,10 +191,16 @@ impl Reducer {
             }
             None => {
                 if self.limit_reached() {
+                    debug!("New bug found but limitation of variations has been reached");
                     return Ok(());
                 }
                 self.limit_counter += 1;
                 let new_bug = self.create_new_bug(init_bug, &reduced_workload);
+                debug!(
+                    "New bug {} found, workload length = {}",
+                    new_bug.name,
+                    reduced_workload.ops.len()
+                );
                 let name = new_bug.name.clone();
                 self.bugs.insert(diffs.clone(), new_bug);
                 self.bugs_queue.push_back(diffs.clone());
