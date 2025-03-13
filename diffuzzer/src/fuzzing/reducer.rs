@@ -99,6 +99,7 @@ impl Reducer {
                         },
                     );
                     self.bugs_queue.push_back(diffs);
+                    self.limit_counter += 1;
                     self.reduce(save_to_dir)?;
                 } else {
                     warn!("crash not detected");
@@ -194,7 +195,7 @@ impl Reducer {
 
         self.runner.report_diff(
             &reduced_workload,
-            format!("{}/{}", bug_name, init_bug.remove_pointer),
+            bug_name,
             &binary_path,
             output_dir.clone(),
             diffs.dash_diff,
