@@ -93,6 +93,8 @@ DIFFuzzer comes with many modes:
 - `solo-single` - run single test
 - `duo-single` - run single test for 2 filesystems
 
+> __For greybox fuzzing, kernel instrumented with KCov is required.__
+
 ```sh
 ./target/release/diffuzzer greybox -f ext4 -s btrfs
 ```
