@@ -115,9 +115,14 @@ Done!
 
 For additional information read [Filesystems](./docs/Filesystems.md) docs.
 
-## Bugs Found
+## Discovered Bugs
 
->TBD
+[HERE](./discovered/)
+
+File System | Details | Type | Link
+----------- | ------- | ---- | ----
+LittleFS-FUSE | Data is lost if file with open descriptor is renamed before writing | Specification Violation | [Link](./discovered/littlefs/78/Issue.md)
+LittleFS-FUSE | Removing directory with unlinked open file fails | Specification Violation | [Link](./discovered/littlefs/79/Issue.md)
 
 ## License
 

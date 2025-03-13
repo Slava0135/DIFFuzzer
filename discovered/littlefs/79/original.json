@@ -1,0 +1,219 @@
+{
+    "ops": [
+        {
+            "MKDIR": {
+                "path": "/5",
+                "mode": [
+                    "S_IRWXU",
+                    "S_IRWXG",
+                    "S_IROTH",
+                    "S_IXOTH"
+                ]
+            }
+        },
+        {
+            "CREATE": {
+                "path": "/5/9",
+                "mode": [
+                    "S_IRWXU",
+                    "S_IRWXG",
+                    "S_IROTH",
+                    "S_IXOTH"
+                ]
+            }
+        },
+        {
+            "OPEN": {
+                "path": "/5/9",
+                "des": 0
+            }
+        },
+        {
+            "MKDIR": {
+                "path": "/5/12",
+                "mode": [
+                    "S_IRWXU",
+                    "S_IRWXG",
+                    "S_IROTH",
+                    "S_IXOTH"
+                ]
+            }
+        },
+        {
+            "REMOVE": {
+                "path": "/5"
+            }
+        },
+        {
+            "CREATE": {
+                "path": "/3",
+                "mode": [
+                    "S_IRWXU",
+                    "S_IRWXG",
+                    "S_IROTH",
+                    "S_IXOTH"
+                ]
+            }
+        },
+        {
+            "OPEN": {
+                "path": "/3",
+                "des": 1
+            }
+        },
+        {
+            "CREATE": {
+                "path": "/1",
+                "mode": [
+                    "S_IRWXU",
+                    "S_IRWXG",
+                    "S_IROTH",
+                    "S_IXOTH"
+                ]
+            }
+        },
+        {
+            "WRITE": {
+                "des": 0,
+                "src_offset": 512,
+                "size": 16
+            }
+        },
+        {
+            "MKDIR": {
+                "path": "/0",
+                "mode": [
+                    "S_IRWXU",
+                    "S_IRWXG",
+                    "S_IROTH",
+                    "S_IXOTH"
+                ]
+            }
+        },
+        {
+            "MKDIR": {
+                "path": "/2",
+                "mode": [
+                    "S_IRWXU",
+                    "S_IRWXG",
+                    "S_IROTH",
+                    "S_IXOTH"
+                ]
+            }
+        },
+        {
+            "WRITE": {
+                "des": 0,
+                "src_offset": 4096,
+                "size": 255
+            }
+        },
+        {
+            "MKDIR": {
+                "path": "/11",
+                "mode": [
+                    "S_IRWXU",
+                    "S_IRWXG",
+                    "S_IROTH",
+                    "S_IXOTH"
+                ]
+            }
+        },
+        {
+            "WRITE": {
+                "des": 0,
+                "src_offset": 127,
+                "size": 128
+            }
+        },
+        {
+            "WRITE": {
+                "des": 0,
+                "src_offset": 32,
+                "size": 127
+            }
+        },
+        {
+            "READ": {
+                "des": 0,
+                "size": 127
+            }
+        },
+        {
+            "OPEN": {
+                "path": "/1",
+                "des": 2
+            }
+        },
+        {
+            "MKDIR": {
+                "path": "/2/8",
+                "mode": [
+                    "S_IRWXU",
+                    "S_IRWXG",
+                    "S_IROTH",
+                    "S_IXOTH"
+                ]
+            }
+        },
+        {
+            "MKDIR": {
+                "path": "/7",
+                "mode": [
+                    "S_IRWXU",
+                    "S_IRWXG",
+                    "S_IROTH",
+                    "S_IXOTH"
+                ]
+            }
+        },
+        {
+            "WRITE": {
+                "des": 1,
+                "src_offset": 32,
+                "size": 100000
+            }
+        },
+        {
+            "MKDIR": {
+                "path": "/0/10",
+                "mode": [
+                    "S_IRWXU",
+                    "S_IRWXG",
+                    "S_IROTH",
+                    "S_IXOTH"
+                ]
+            }
+        },
+        {
+            "RENAME": {
+                "old_path": "/2",
+                "new_path": "/6"
+            }
+        },
+        {
+            "READ": {
+                "des": 2,
+                "size": 32768
+            }
+        },
+        {
+            "REMOVE": {
+                "path": "/6"
+            }
+        },
+        {
+            "WRITE": {
+                "des": 0,
+                "src_offset": 65536,
+                "size": 255
+            }
+        },
+        {
+            "RENAME": {
+                "old_path": "/3",
+                "new_path": "/4"
+            }
+        }
+    ]
+}

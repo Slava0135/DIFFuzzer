@@ -1,0 +1,51 @@
+{
+    "ops": [
+        {
+            "CREATE": {
+                "path": "/1",
+                "mode": [
+                    "S_IRWXU",
+                    "S_IRWXG",
+                    "S_IROTH",
+                    "S_IXOTH"
+                ]
+            }
+        },
+        {
+            "OPEN": {
+                "path": "/1",
+                "des": 0
+            }
+        },
+        {
+            "RENAME": {
+                "old_path": "/1",
+                "new_path": "/2"
+            }
+        },
+        {
+            "WRITE": {
+                "des": 0,
+                "src_offset": 0,
+                "size": 10
+            }
+        },
+        {
+            "CLOSE": {
+                "des": 0
+            }
+        },
+        {
+            "OPEN": {
+                "path": "/2",
+                "des": 1
+            }
+        },
+        {
+            "READ": {
+                "des": 1,
+                "size": 10
+            }
+        }
+    ]
+}
