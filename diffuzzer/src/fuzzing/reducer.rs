@@ -107,7 +107,16 @@ impl Reducer {
             }
             _ => todo!("handle all outcomes"),
         };
-
+        info!("Reducing complete with:");
+        for (diff, bug) in (&self.bugs).into_iter() {
+            info!(
+                "{} | length = {} | dash bug = {} | trace bug = {}",
+                bug.name,
+                bug.workload.ops.len(),
+                diff.dash_interesting(),
+                diff.trace_interesting()
+            )
+        }
         Ok(())
     }
 
@@ -158,7 +167,7 @@ impl Reducer {
         binary_path: RemotePath,
     ) -> anyhow::Result<()> {
         debug!(
-            "Try reduce {} with {} op. remove",
+            "\"{}\" reduction attempt with deletion of the operation n.{}",
             init_bug.name, init_bug.remove_pointer
         );
         let diffs = self.runner.get_diffs(&fst_outcome, &snd_outcome)?;
@@ -172,7 +181,7 @@ impl Reducer {
         let bug_name = match matched_bug {
             Some(bug) => {
                 debug!(
-                    "Already existing bug {} reduced, workload length = {}",
+                    "Already existing bug \"{}\" reduced, workload length = {}",
                     bug.name,
                     reduced_workload.ops.len()
                 );
@@ -197,7 +206,7 @@ impl Reducer {
                 self.limit_counter += 1;
                 let new_bug = self.create_new_bug(init_bug, &reduced_workload);
                 debug!(
-                    "New bug {} found, workload length = {}",
+                    "New bug \"{}\" found, workload length = {}",
                     new_bug.name,
                     reduced_workload.ops.len()
                 );
