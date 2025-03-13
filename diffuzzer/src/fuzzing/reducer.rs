@@ -91,13 +91,14 @@ impl Reducer {
                 if diffs.has_some_interesting() {
                     let remove_pointer = input.ops.len() - 1;
                     self.bugs.insert(
-                        diffs,
+                        diffs.clone(),
                         Bug {
                             name: "original".to_string(),
                             workload: input,
                             remove_pointer,
                         },
                     );
+                    self.bugs_queue.push_back(diffs);
                     self.reduce(save_to_dir)?;
                 } else {
                     warn!("crash not detected");
