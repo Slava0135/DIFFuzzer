@@ -2,11 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::{
+ use std::{
     ffi::OsStr,
     fs,
     path::Path,
-    process::{Command, Output},
+    process::{Command, Output, Stdio},
 };
 
 use anyhow::Context;
@@ -55,6 +55,7 @@ pub trait CommandInterface {
     fn read_to_string(&self, path: &RemotePath) -> anyhow::Result<String>;
 
     fn exec(&self, cmd: CommandWrapper, timeout: Option<u8>) -> Result<Output, ExecError>;
+
     /// Execute command with current working directory changed.
     fn exec_in_dir(
         &self,
@@ -62,6 +63,10 @@ pub trait CommandInterface {
         dir: &RemotePath,
         timeout: Option<u8>,
     ) -> Result<Output, ExecError>;
+
+    /// Execute command in background with stdout and stderr disabled.
+    fn exec_background(&self, cmd: CommandWrapper) -> Result<(), ExecError>;
+
     /// Setup directory on remote where tests are compiled and executed.
     fn setup_remote_dir(&self) -> anyhow::Result<RemotePath> {
         let remote_dir = RemotePath::new_tmp("remote");
@@ -249,6 +254,19 @@ impl CommandInterface for LocalCommandInterface {
         cmd.internal.current_dir(dir.base.as_ref());
         cmd.exec_local(timeout)
     }
+    fn exec_background(&self, cmd: CommandWrapper) -> Result<(), ExecError> {
+        let mut cmd = cmd.internal;
+        cmd.stdin(Stdio::null());
+        cmd.stdout(Stdio::null());
+        cmd.stderr(Stdio::null());
+        match cmd.spawn() {
+            Err(err) => Err(ExecError::IoError(format!(
+                "failed to run local command in background: {:?}\n{}",
+                cmd, err
+            ))),
+            Ok(_) => Ok(()),
+        }
+    }
 }
 
 /// Uses SSH to execute command on guest (remote) machine
@@ -383,6 +401,23 @@ impl CommandInterface for RemoteCommandInterface {
                 ExecError::TimedOut(format!("remote command error: {:?}\n{}", cmd.internal, v))
             }
         })
+    }
+    fn exec_background(&self, cmd: CommandWrapper) -> Result<(), ExecError> {
+        let mut ssh = self.exec_common();
+        ssh.arg("-t")
+            .arg(format!("{:?}", cmd.internal))
+            .arg(">/dev/null")
+            .arg("2>&1")
+            .arg("&");
+        ssh.exec_local(None).map_err(|v| match v {
+            ExecError::IoError(v) => {
+                ExecError::IoError(format!("remote command error: {:?}\n{}", cmd.internal, v))
+            }
+            ExecError::TimedOut(v) => {
+                ExecError::TimedOut(format!("remote command error: {:?}\n{}", cmd.internal, v))
+            }
+        })?;
+        Ok(())
     }
 }
 
