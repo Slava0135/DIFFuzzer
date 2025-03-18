@@ -322,11 +322,11 @@ impl DiffOutcome {
     }
 
     pub fn dash_interesting(&self) -> bool {
-        self.dash_diff != vec![]
+        !self.dash_diff.is_empty()
     }
 
     pub fn trace_interesting(&self) -> bool {
-        self.trace_diff != vec![]
+        !self.trace_diff.is_empty()
     }
 }
 
