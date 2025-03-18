@@ -33,9 +33,9 @@ pub struct Reducer {
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ReducerError {
-    #[error("Empty queue of bugs")]
+    #[error("empty queue of bugs")]
     EmptyQueue,
-    #[error("Hash map does not contain bug")]
+    #[error("hash map does not contain bug")]
     BugNotExists,
 }
 
@@ -107,10 +107,10 @@ impl Reducer {
             }
             _ => todo!("handle all outcomes"),
         };
-        info!("Reducing complete with:");
+        info!("reduced:");
         for (diff, bug) in self.bugs.iter() {
             info!(
-                "{} | length = {} | dash bug = {} | trace bug = {}",
+                "name: {}, length: {}, dash?: {}, trace?: {}",
                 bug.name,
                 bug.workload.ops.len(),
                 diff.dash_interesting(),
@@ -121,12 +121,7 @@ impl Reducer {
     }
 
     fn reduce(&mut self, output_dir: &LocalPath) -> anyhow::Result<()> {
-        info!("reduce testcase");
-        while !self.bugs_queue.is_empty() {
-            let bug_diff = self
-                .bugs_queue
-                .pop_front()
-                .ok_or(ReducerError::EmptyQueue)?;
+        while let Some(bug_diff) = self.bugs_queue.pop_front() {
             let bug = self
                 .bugs
                 .get(&bug_diff)
@@ -167,12 +162,12 @@ impl Reducer {
         binary_path: RemotePath,
     ) -> anyhow::Result<()> {
         debug!(
-            "\"{}\" reduction attempt with deletion of the operation n.{}",
+            "reduce case \"{}\" by removing operation {}",
             init_bug.name, init_bug.remove_pointer
         );
         let diffs = self.runner.get_diffs(&fst_outcome, &snd_outcome)?;
         if !diffs.has_some_interesting() {
-            debug!("Bugs not found");
+            debug!("bugs not found");
             return Ok(());
         }
 
@@ -181,7 +176,7 @@ impl Reducer {
         let bug_name = match matched_bug {
             Some(bug) => {
                 debug!(
-                    "Already existing bug \"{}\" reduced, workload length = {}",
+                    "already existing bug \"{}\" reduced, length = {}",
                     bug.name,
                     reduced_workload.ops.len()
                 );
@@ -200,13 +195,13 @@ impl Reducer {
             }
             None => {
                 if self.limit_reached() {
-                    debug!("New bug found but limitation of variations has been reached");
+                    debug!("new bug found but limitation of variations has been reached");
                     return Ok(());
                 }
                 self.limit_counter += 1;
                 let new_bug = self.create_new_bug(init_bug, &reduced_workload);
                 debug!(
-                    "New bug \"{}\" found, workload length = {}",
+                    "new bug \"{}\" found, length = {}",
                     new_bug.name,
                     reduced_workload.ops.len()
                 );
