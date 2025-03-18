@@ -32,6 +32,6 @@ impl TraceObjective {
                 })
             }
         }
-        return trace_diff;
+        trace_diff
     }
 }

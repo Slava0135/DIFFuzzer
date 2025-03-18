@@ -108,7 +108,7 @@ impl Reducer {
             _ => todo!("handle all outcomes"),
         };
         info!("Reducing complete with:");
-        for (diff, bug) in (&self.bugs).into_iter() {
+        for (diff, bug) in self.bugs.iter() {
             info!(
                 "{} | length = {} | dash bug = {} | trace bug = {}",
                 bug.name,
@@ -228,7 +228,7 @@ impl Reducer {
             "".to_owned(),
         )?;
 
-        return Ok(());
+        Ok(())
     }
 
     fn create_new_bug(&mut self, init_bug: &Bug, reduced_workload: &Workload) -> Bug {
@@ -239,7 +239,7 @@ impl Reducer {
             init_bug.remove_pointer - 1
         };
 
-        return Bug {
+        Bug {
             name: format!(
                 "{}-{}",
                 init_bug.name.clone(),
@@ -247,7 +247,7 @@ impl Reducer {
             ),
             workload: reduced_workload.clone(),
             remove_pointer,
-        };
+        }
     }
 
     fn limit_reached(&self) -> bool {

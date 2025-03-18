@@ -36,7 +36,7 @@ impl CoverageFeedback for KCovCoverageFeedback {
         debug!("do kcov feedback");
         let new_coverage = parse_kcov(&outcome.dir)?;
         let mut is_interesting = false;
-        for (addr, _count) in &new_coverage {
+        for addr in new_coverage.keys() {
             let total = self.map.get(addr).unwrap_or(&0);
             if *total == 0 {
                 is_interesting = true;

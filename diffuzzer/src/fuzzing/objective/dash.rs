@@ -42,10 +42,10 @@ impl DashObjective {
 
     pub fn get_diff(&self) -> Vec<FileDiff> {
         get_diff(
-            &self.fst_observer.borrow().fs_state(),
-            &self.snd_observer.borrow().fs_state(),
-            &self.fst_observer.borrow().fs_internal(),
-            &self.snd_observer.borrow().fs_internal(),
+            self.fst_observer.borrow().fs_state(),
+            self.snd_observer.borrow().fs_state(),
+            self.fst_observer.borrow().fs_internal(),
+            self.snd_observer.borrow().fs_internal(),
             &self.hasher_options,
         )
     }

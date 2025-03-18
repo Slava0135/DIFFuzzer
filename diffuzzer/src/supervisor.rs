@@ -146,7 +146,7 @@ impl QemuSupervisor {
             .exec_local(None)
             .and_then(|output| Ok(String::from_utf8(output.stdout).unwrap_or(String::from(""))))
             .unwrap_or(String::from(""));
-        return p_name.contains("qemu");
+        p_name.contains("qemu")
     }
 }
 

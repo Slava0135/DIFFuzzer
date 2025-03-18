@@ -107,10 +107,10 @@ impl Trace {
 
 impl TraceRow {
     pub fn ignore_index_equal(&self, other: &TraceRow) -> bool {
-        return self.command == other.command
+        self.command == other.command
             && self.return_code == other.return_code
             && self.extra == other.extra
-            && self.errno == other.errno;
+            && self.errno == other.errno
     }
 }
 

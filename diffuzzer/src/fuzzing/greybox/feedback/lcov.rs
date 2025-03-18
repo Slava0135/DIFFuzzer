@@ -38,7 +38,7 @@ impl CoverageFeedback for LCovCoverageFeedback {
         let trace = LCovTrace::parse_from(&data);
         let new_coverage = trace.map();
         let mut is_interesting = false;
-        for (addr, _count) in &new_coverage {
+        for addr in new_coverage.keys() {
             let total = self.map.get(addr).unwrap_or(&0);
             if *total == 0 {
                 is_interesting = true;
@@ -70,22 +70,22 @@ impl LCovTrace {
         for line in data.lines() {
             if let Some(line) = LCovLine::parse_from(line) {
                 match line {
-                    LCovLine::SourceFileName(next_file) => match current_file.clone() {
-                        None => current_file = Some(next_file),
-                        _ => {}
-                    },
+                    LCovLine::SourceFileName(next_file) => {
+                        if current_file.is_none() {
+                            current_file = Some(next_file)
+                        }
+                    }
                     LCovLine::LineExecutionCount(line, count) => {
                         trace.add_line(line, count);
                     }
-                    LCovLine::EndOfRecord() => match current_file.clone() {
-                        Some(file) => {
+                    LCovLine::EndOfRecord() => {
+                        if let Some(file) = current_file.clone() {
                             let old = trace;
                             trace = LCovTraceOneFile::new();
                             lcov.add_file(file, old);
                             current_file = None;
                         }
-                        _ => {}
-                    },
+                    }
                 }
             }
         }
@@ -138,15 +138,14 @@ impl LCovLine {
                 "DA" => {
                     let segments: Vec<&str> = data.split(',').collect();
                     if segments.len() >= 2 {
-                        match (segments[0].parse::<u32>(), segments[1].parse::<u64>()) {
-                            (Ok(line), Ok(count)) => {
-                                return if count > 0 {
-                                    Some(LCovLine::LineExecutionCount(line, count))
-                                } else {
-                                    None
-                                };
-                            }
-                            _ => {}
+                        if let (Ok(line), Ok(count)) =
+                            (segments[0].parse::<u32>(), segments[1].parse::<u64>())
+                        {
+                            return if count > 0 {
+                                Some(LCovLine::LineExecutionCount(line, count))
+                            } else {
+                                None
+                            };
                         }
                     }
                 }

@@ -285,10 +285,10 @@ impl Runner {
 
         let trace_diff = self.trace_objective.get_diff(&fst_trace, &snd_trace);
 
-        return Ok(DiffOutcome {
+        Ok(DiffOutcome {
             dash_diff,
             trace_diff,
-        });
+        })
     }
 }
 
