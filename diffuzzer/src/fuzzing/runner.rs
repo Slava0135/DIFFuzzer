@@ -9,7 +9,7 @@ use crate::command::CommandInterface;
 use crate::config::Config;
 use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
-use crate::save::{save_completed, save_diff, save_reason, save_testcase};
+use crate::save::{save_completed, save_dash, save_reason, save_testcase};
 use crate::supervisor::Supervisor;
 use anyhow::{Context, Ok};
 use dash::FileDiff;
@@ -230,7 +230,7 @@ impl Runner {
         save_completed(&crash_dir, &self.snd_fs_name, &diff.snd_outcome)
             .with_context(|| "failed to save second outcome")?;
 
-        save_diff(&crash_dir, diff.dash_diff.clone())
+        save_dash(&crash_dir, diff.dash_diff.clone())
             .with_context(|| "failed to save dash diff")?;
         save_reason(&crash_dir, reason).with_context(|| "failed to save reason")?;
 

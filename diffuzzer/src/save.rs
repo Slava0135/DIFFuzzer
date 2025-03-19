@@ -7,7 +7,6 @@ use std::fs::OpenOptions;
 use std::io::Write;
 
 use anyhow::Context;
-use dash::FileDiff::{FileIsDifferent, OnlyOneExists};
 use dash::{DIFF_FILENAME, FileDiff};
 
 use crate::command::CommandInterface;
@@ -18,6 +17,7 @@ use crate::{
     abstract_fs::{trace::TRACE_FILENAME, workload::Workload},
     path::RemotePath,
 };
+use dash::FileDiff::{FileIsDifferent, OnlyOneExists};
 
 pub const TEST_FILE_NAME: &str = "test.json";
 
@@ -75,7 +75,7 @@ pub fn save_completed(
     Ok(())
 }
 
-pub fn save_diff(output_dir: &LocalPath, diff_hash: Vec<FileDiff>) -> anyhow::Result<()> {
+pub fn save_dash(output_dir: &LocalPath, dash_diff: Vec<FileDiff>) -> anyhow::Result<()> {
     let diff_hash_path = output_dir.join(DIFF_FILENAME);
     fs::write(&diff_hash_path, "").with_context(|| "failed to init diff file")?;
     let mut file = OpenOptions::new()
@@ -83,12 +83,12 @@ pub fn save_diff(output_dir: &LocalPath, diff_hash: Vec<FileDiff>) -> anyhow::Re
         .open(&diff_hash_path)
         .with_context(|| format!("failed to save hash difference at '{}'", diff_hash_path))?;
 
-    for diff in diff_hash {
+    for diff in dash_diff {
         let txt = match diff {
             FileIsDifferent { fst, snd } => {
-                format!("File with different hash:\n {}\n\n {}\n\n", fst, snd)
+                format!("File with different hash:\n\t{}\n\t{}\n\n", fst, snd)
             }
-            OnlyOneExists(f) => format!("File exists only in one FS:\n {}\n\n", f),
+            OnlyOneExists(f) => format!("File exists only in one FS:\n\t{}\n\n", f),
         };
         file.write(txt.as_bytes())
             .with_context(|| format!("failed to save source file to '{}'", diff_hash_path))?;
