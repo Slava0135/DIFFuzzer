@@ -72,7 +72,7 @@ impl Reducer {
         &mut self,
         mut bugcase: Workload,
         output_dir: &LocalPath,
-        diff: DiffCompleted,
+        original_diff: DiffCompleted,
     ) -> anyhow::Result<()> {
         info!("reduce by diff");
         let mut idx_to_remove = bugcase.ops.len() - 1;
@@ -84,16 +84,16 @@ impl Reducer {
                 match self.runner.run_harness(&binary_path)? {
                     DiffOutcome::DiffCompleted(next_diff) => {
                         if next_diff.any_interesting() {
-                            if same_diff(&diff, &next_diff) {
+                            if same_diff(&original_diff, &next_diff) {
                                 bugcase = reduced;
                                 let mut reason = Reason::new();
-                                if diff.trace_interesting() {
+                                if next_diff.trace_interesting() {
                                     reason.md.heading("Trace Difference Found".to_owned());
-                                    reason.add_trace_diff(&diff.trace_diff);
+                                    reason.add_trace_diff(&next_diff.trace_diff);
                                 }
-                                if diff.dash_interesting() {
+                                if next_diff.dash_interesting() {
                                     reason.md.heading("Dash Difference Found".to_owned());
-                                    reason.add_dash_diff(&diff.dash_diff);
+                                    reason.add_dash_diff(&next_diff.dash_diff);
                                 }
                                 self.runner
                                     .report_diff(
@@ -107,13 +107,13 @@ impl Reducer {
                                     .with_context(|| "failed to save reduced bugcase")?;
                             } else {
                                 let mut reason = Reason::new();
-                                if diff.trace_interesting() {
+                                if next_diff.trace_interesting() {
                                     reason.md.heading("Trace Difference Found".to_owned());
-                                    reason.add_trace_diff(&diff.trace_diff);
+                                    reason.add_trace_diff(&next_diff.trace_diff);
                                 }
-                                if diff.dash_interesting() {
+                                if next_diff.dash_interesting() {
                                     reason.md.heading("Dash Difference Found".to_owned());
-                                    reason.add_dash_diff(&diff.dash_diff);
+                                    reason.add_dash_diff(&next_diff.dash_diff);
                                 }
                                 self.runner
                                     .report_diff(
