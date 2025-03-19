@@ -79,9 +79,8 @@ impl Reducer {
     ) -> anyhow::Result<()> {
         info!("reduce by diff");
         let mut idx_to_remove = bugcase.ops.len() - 1;
-        let mut last_binary_path = None;
-        let mut last_diff = None;
         loop {
+            info!("trying to remove operation at index {}", idx_to_remove);
             if let Some(reduced) = remove(&bugcase, idx_to_remove) {
                 let binary_path = self.runner.compile_test(&reduced)?;
                 let variation_name = format!("variation-{}", idx_to_remove);
@@ -91,29 +90,41 @@ impl Reducer {
                             .runner
                             .diff(fst_outcome, snd_outcome)
                             .with_context(|| "failed to produce diff outcome")?;
-                        if !diff.any_interesting() {
-                            continue;
-                        }
-                        if same_diff(&diff, &next_diff) {
-                            bugcase = reduced;
-                            last_binary_path = Some(binary_path);
-                            last_diff = Some(next_diff);
-                        } else {
-                            let reason = format!(
-                                "error detected by: trace?: {}, hash?: {}",
-                                diff.trace_interesting(),
-                                diff.dash_interesting()
-                            );
-                            self.runner
-                                .report_diff(
-                                    &bugcase,
-                                    variation_name,
-                                    &binary_path,
-                                    output_dir.clone(),
-                                    &next_diff,
-                                    reason,
-                                )
-                                .with_context(|| "failed to report bug variation")?;
+                        if next_diff.any_interesting() {
+                            if same_diff(&diff, &next_diff) {
+                                bugcase = reduced;
+                                let reason = format!(
+                                    "error detected by: trace?: {}, hash?: {}",
+                                    next_diff.trace_interesting(),
+                                    next_diff.dash_interesting()
+                                );
+                                self.runner
+                                    .report_diff(
+                                        &bugcase,
+                                        "reduced".to_owned(),
+                                        &binary_path,
+                                        output_dir.clone(),
+                                        &next_diff,
+                                        reason,
+                                    )
+                                    .with_context(|| "failed to save reduced bugcase")?;
+                            } else {
+                                let reason = format!(
+                                    "error detected by: trace?: {}, hash?: {}",
+                                    next_diff.trace_interesting(),
+                                    next_diff.dash_interesting()
+                                );
+                                self.runner
+                                    .report_diff(
+                                        &bugcase,
+                                        variation_name,
+                                        &binary_path,
+                                        output_dir.clone(),
+                                        &next_diff,
+                                        reason,
+                                    )
+                                    .with_context(|| "failed to report bug variation")?;
+                            }
                         }
                     }
                     (Outcome::Panicked, _) => {
@@ -171,23 +182,6 @@ impl Reducer {
             }
             idx_to_remove -= 1
         }
-        let binary_path = last_binary_path.with_context(|| "failed to get bugcase binary path")?;
-        let diff = last_diff.with_context(|| "failed to get bugcase diff")?;
-        let reason = format!(
-            "error detected by: trace?: {}, hash?: {}",
-            diff.trace_interesting(),
-            diff.dash_interesting()
-        );
-        self.runner
-            .report_diff(
-                &bugcase,
-                "reduced".to_owned(),
-                &binary_path,
-                output_dir.clone(),
-                &diff,
-                reason,
-            )
-            .with_context(|| "failed to save reduced bugcase")?;
         Ok(())
     }
 }
