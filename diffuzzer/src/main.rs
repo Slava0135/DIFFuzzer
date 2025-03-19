@@ -29,6 +29,7 @@ mod mount;
 mod path;
 mod save;
 mod supervisor;
+mod markdown;
 
 fn main() {
     let status = run();
