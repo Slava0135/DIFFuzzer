@@ -98,7 +98,6 @@ pub fn run(
             )
             .with_context(|| "failed to save reason")?;
         }
-        Outcome::Skipped => {}
     };
 
     Ok(())

@@ -2,7 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use crate::path::LocalPath;
+use dash::FileDiff;
+
+use crate::{
+    abstract_fs::trace::{Trace, TraceDiff},
+    path::LocalPath,
+};
 
 pub struct Completed {
     pub stdout: String,
@@ -28,6 +33,35 @@ pub enum Outcome {
     TimedOut,
     /// Test execution caused system shutdown / panic.
     Panicked,
-    /// Test was not executed.
-    Skipped,
+}
+
+pub struct DiffCompleted {
+    pub dash_diff: Vec<FileDiff>,
+    pub trace_diff: Vec<TraceDiff>,
+    pub fst_outcome: Completed,
+    pub snd_outcome: Completed,
+    pub fst_trace: Trace,
+    pub snd_trace: Trace,
+}
+
+impl DiffCompleted {
+    pub fn any_interesting(&self) -> bool {
+        self.dash_interesting() || self.trace_interesting()
+    }
+
+    pub fn dash_interesting(&self) -> bool {
+        !self.dash_diff.is_empty()
+    }
+
+    pub fn trace_interesting(&self) -> bool {
+        !self.trace_diff.is_empty()
+    }
+}
+
+pub enum DiffOutcome {
+    DiffCompleted(DiffCompleted),
+    FirstTimedOut { fs_name: String, timeout: u8 },
+    SecondTimedOut { fs_name: String, timeout: u8 },
+    FirstPanicked { fs_name: String },
+    SecondPanicked { fs_name: String },
 }

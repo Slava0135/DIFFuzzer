@@ -11,13 +11,13 @@ use crate::{
     abstract_fs::{mutator::remove, trace::TraceDiff, workload::Workload},
     command::CommandInterface,
     config::Config,
-    fuzzing::outcome::Outcome,
+    fuzzing::outcome::DiffOutcome,
     mount::FileSystemMount,
     path::LocalPath,
     supervisor::Supervisor,
 };
 
-use super::runner::{DiffOutcome, Runner};
+use super::{outcome::DiffCompleted, runner::Runner};
 
 pub struct Reducer {
     runner: Runner,
@@ -55,11 +55,7 @@ impl Reducer {
         let binary_path = self.runner.compile_test(&input)?;
 
         match self.runner.run_harness(&binary_path)? {
-            (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
-                let diff = self
-                    .runner
-                    .diff(fst_outcome, snd_outcome)
-                    .with_context(|| "failed to produce diff outcome")?;
+            DiffOutcome::DiffCompleted(diff) => {
                 if diff.any_interesting() {
                     self.reduce_by_diff(input, output_dir, diff)?;
                 } else {
@@ -75,7 +71,7 @@ impl Reducer {
         &mut self,
         mut bugcase: Workload,
         output_dir: &LocalPath,
-        diff: DiffOutcome,
+        diff: DiffCompleted,
     ) -> anyhow::Result<()> {
         info!("reduce by diff");
         let mut idx_to_remove = bugcase.ops.len() - 1;
@@ -85,11 +81,7 @@ impl Reducer {
                 let binary_path = self.runner.compile_test(&reduced)?;
                 let variation_name = format!("variation-{}", idx_to_remove);
                 match self.runner.run_harness(&binary_path)? {
-                    (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
-                        let next_diff = self
-                            .runner
-                            .diff(fst_outcome, snd_outcome)
-                            .with_context(|| "failed to produce diff outcome")?;
+                    DiffOutcome::DiffCompleted(next_diff) => {
                         if next_diff.any_interesting() {
                             if same_diff(&diff, &next_diff) {
                                 bugcase = reduced;
@@ -127,54 +119,46 @@ impl Reducer {
                             }
                         }
                     }
-                    (Outcome::Panicked, _) => {
+                    DiffOutcome::FirstPanicked { fs_name } => {
                         self.runner
                             .report_crash(
                                 &reduced,
                                 variation_name,
                                 output_dir.clone(),
-                                format!("Filesystem '{}' panicked", self.runner.fst_fs_name),
+                                format!("Filesystem '{}' panicked", fs_name),
                             )
                             .with_context(|| "failed to report bug variation")?;
                     }
-                    (_, Outcome::Panicked) => {
+                    DiffOutcome::SecondPanicked { fs_name } => {
                         self.runner
                             .report_crash(
                                 &reduced,
                                 variation_name,
                                 output_dir.clone(),
-                                format!("Filesystem '{}' panicked", self.runner.snd_fs_name),
+                                format!("Filesystem '{}' panicked", fs_name),
                             )
                             .with_context(|| "failed to report bug variation")?;
                     }
-                    (Outcome::TimedOut, _) => {
+                    DiffOutcome::FirstTimedOut { fs_name, timeout } => {
                         self.runner
                             .report_crash(
                                 &reduced,
                                 variation_name,
                                 output_dir.clone(),
-                                format!(
-                                    "Filesystem '{}' timed out after {}s",
-                                    self.runner.fst_fs_name, self.runner.config.timeout
-                                ),
+                                format!("Filesystem '{}' timed out after {}s", fs_name, timeout),
                             )
                             .with_context(|| "failed to report bug variation")?;
                     }
-                    (_, Outcome::TimedOut) => {
+                    DiffOutcome::SecondTimedOut { fs_name, timeout } => {
                         self.runner
                             .report_crash(
                                 &reduced,
                                 variation_name,
                                 output_dir.clone(),
-                                format!(
-                                    "Filesystem '{}' timed out after {}s",
-                                    self.runner.snd_fs_name, self.runner.config.timeout
-                                ),
+                                format!("Filesystem '{}' timed out after {}s", fs_name, timeout),
                             )
                             .with_context(|| "failed to report bug variation")?;
                     }
-                    (Outcome::Skipped, _) => {}
-                    (_, Outcome::Skipped) => {}
                 };
             }
             if idx_to_remove == 0 {
@@ -186,7 +170,7 @@ impl Reducer {
     }
 }
 
-fn same_diff(old: &DiffOutcome, new: &DiffOutcome) -> bool {
+fn same_diff(old: &DiffCompleted, new: &DiffCompleted) -> bool {
     if old.trace_diff.len() != new.trace_diff.len() {
         return false;
     }

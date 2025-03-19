@@ -13,7 +13,7 @@ use crate::command::CommandInterface;
 use crate::config::Config;
 
 use crate::fuzzing::fuzzer::Fuzzer;
-use crate::fuzzing::outcome::Outcome;
+use crate::fuzzing::outcome::DiffOutcome;
 use crate::fuzzing::runner::Runner;
 use crate::mount::FileSystemMount;
 use crate::path::LocalPath;
@@ -65,50 +65,30 @@ impl Fuzzer for BlackBoxFuzzer {
         let binary_path = self.runner().compile_test(&input)?;
 
         match self.runner().run_harness(&binary_path)? {
-            (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
-                let diff = self
-                    .runner()
-                    .diff(fst_outcome, snd_outcome)
-                    .with_context(|| "failed to produce diff outcome")?;
-
+            DiffOutcome::DiffCompleted(diff) => {
                 if self.detect_errors(&input, &binary_path, &diff)? {
                     return Ok(());
                 }
-
                 self.do_objective(&input, &binary_path, &diff)?;
             }
-            (Outcome::Panicked, _) => {
+            DiffOutcome::FirstPanicked { fs_name } => {
+                self.report_crash(&input, format!("Filesystem '{}' panicked", fs_name))?;
+            }
+            DiffOutcome::SecondPanicked { fs_name } => {
+                self.report_crash(&input, format!("Filesystem '{}' panicked", fs_name))?;
+            }
+            DiffOutcome::FirstTimedOut { fs_name, timeout } => {
                 self.report_crash(
                     &input,
-                    format!("Filesystem '{}' panicked", self.runner.fst_fs_name),
+                    format!("Filesystem '{}' timed out after {}s", fs_name, timeout),
                 )?;
             }
-            (_, Outcome::Panicked) => {
+            DiffOutcome::SecondTimedOut { fs_name, timeout } => {
                 self.report_crash(
                     &input,
-                    format!("Filesystem '{}' panicked", self.runner.snd_fs_name),
+                    format!("Filesystem '{}' timed out after {}s", fs_name, timeout),
                 )?;
             }
-            (Outcome::TimedOut, _) => {
-                self.report_crash(
-                    &input,
-                    format!(
-                        "Filesystem '{}' timed out after {}s",
-                        self.runner.fst_fs_name, self.runner.config.timeout
-                    ),
-                )?;
-            }
-            (_, Outcome::TimedOut) => {
-                self.report_crash(
-                    &input,
-                    format!(
-                        "Filesystem '{}' timed out after {}s",
-                        self.runner.snd_fs_name, self.runner.config.timeout
-                    ),
-                )?;
-            }
-            (Outcome::Skipped, _) => {}
-            (_, Outcome::Skipped) => {}
         };
 
         Ok(())

@@ -9,9 +9,10 @@ use log::{debug, error, info, warn};
 
 use crate::{abstract_fs::workload::Workload, path::RemotePath};
 
-use super::
-    runner::{DiffOutcome, Runner}
-;
+use super::{
+    outcome::DiffCompleted,
+    runner::Runner,
+};
 
 pub trait Fuzzer {
     fn run(&mut self, test_count: Option<u64>) {
@@ -57,7 +58,7 @@ pub trait Fuzzer {
         &mut self,
         input: &Workload,
         binary_path: &RemotePath,
-        diff: &DiffOutcome,
+        diff: &DiffCompleted,
     ) -> anyhow::Result<bool> {
         let runner = self.runner();
         debug!("do objectives");
@@ -92,7 +93,7 @@ pub trait Fuzzer {
         &mut self,
         input: &Workload,
         binary_path: &RemotePath,
-        diff: &DiffOutcome,
+        diff: &DiffCompleted,
     ) -> anyhow::Result<bool> {
         debug!("detect errors");
 

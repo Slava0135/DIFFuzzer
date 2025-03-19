@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use crate::abstract_fs::trace::{TRACE_FILENAME, Trace, TraceDiff};
+use crate::abstract_fs::trace::{TRACE_FILENAME, Trace};
 
 use crate::abstract_fs::workload::Workload;
 use crate::command::CommandInterface;
@@ -12,20 +12,19 @@ use crate::path::{LocalPath, RemotePath};
 use crate::save::{save_completed, save_dash, save_reason, save_testcase};
 use crate::supervisor::Supervisor;
 use anyhow::{Context, Ok};
-use dash::FileDiff;
 use log::{debug, info};
 use std::cell::RefCell;
+use std::fs;
 use std::path::Path;
 use std::rc::Rc;
 use std::time::Instant;
-use std::fs;
 
 use super::harness::Harness;
 use super::objective::dash::DashObjective;
 use super::objective::trace::TraceObjective;
 use super::observer::ObserverList;
 use super::observer::dash::DashObserver;
-use super::outcome::{Completed, Outcome};
+use super::outcome::{Completed, DiffCompleted, DiffOutcome, Outcome};
 
 pub struct Runner {
     pub config: Config,
@@ -166,7 +165,7 @@ impl Runner {
         Ok(binary_path)
     }
 
-    pub fn run_harness(&mut self, binary_path: &RemotePath) -> anyhow::Result<(Outcome, Outcome)> {
+    pub fn run_harness(&mut self, binary_path: &RemotePath) -> anyhow::Result<DiffOutcome> {
         debug!("run harness at '{}'", binary_path);
 
         let fst_outcome = self
@@ -178,16 +177,23 @@ impl Runner {
                 self.supervisor.as_mut(),
             )
             .with_context(|| format!("failed to run first harness '{}'", self.fst_fs_name))?;
-        match fst_outcome {
+        let fst_outcome = match fst_outcome {
             Outcome::Panicked => {
                 self.supervisor
                     .load_snapshot()
                     .with_context(|| "failed to load snapshot")?;
-                return Ok((fst_outcome, Outcome::Skipped));
+                return Ok(DiffOutcome::FirstPanicked {
+                    fs_name: self.fst_fs_name.clone(),
+                });
             }
-            Outcome::TimedOut => return Ok((fst_outcome, Outcome::Skipped)),
-            _ => {}
-        }
+            Outcome::TimedOut => {
+                return Ok(DiffOutcome::FirstTimedOut {
+                    fs_name: self.fst_fs_name.clone(),
+                    timeout: self.config.timeout,
+                });
+            }
+            Outcome::Completed(completed) => completed,
+        };
 
         let snd_outcome = self
             .snd_harness
@@ -199,13 +205,27 @@ impl Runner {
             )
             .with_context(|| format!("failed to run second harness '{}'", self.snd_fs_name))?;
 
-        if let Outcome::Panicked = snd_outcome {
-            self.supervisor
-                .load_snapshot()
-                .with_context(|| "failed to load snapshot")?;
-        }
+        let snd_outcome = match snd_outcome {
+            Outcome::Panicked => {
+                self.supervisor
+                    .load_snapshot()
+                    .with_context(|| "failed to load snapshot")?;
+                return Ok(DiffOutcome::SecondPanicked {
+                    fs_name: self.snd_fs_name.clone(),
+                });
+            }
+            Outcome::TimedOut => {
+                return Ok(DiffOutcome::SecondTimedOut {
+                    fs_name: self.snd_fs_name.clone(),
+                    timeout: self.config.timeout,
+                });
+            }
+            Outcome::Completed(completed) => completed,
+        };
 
-        Ok((fst_outcome, snd_outcome))
+        Ok(DiffOutcome::DiffCompleted(
+            self.diff(fst_outcome, snd_outcome)?,
+        ))
     }
 
     pub fn report_diff(
@@ -214,7 +234,7 @@ impl Runner {
         dir_name: String,
         binary_path: &RemotePath,
         crash_dir: LocalPath,
-        diff: &DiffOutcome,
+        diff: &DiffCompleted,
         reason: String,
     ) -> anyhow::Result<()> {
         debug!("report diff '{}'", dir_name);
@@ -261,11 +281,11 @@ impl Runner {
         Ok(())
     }
 
-    pub fn diff(
+    fn diff(
         &mut self,
         fst_outcome: Completed,
         snd_outcome: Completed,
-    ) -> anyhow::Result<DiffOutcome> {
+    ) -> anyhow::Result<DiffCompleted> {
         let fst_trace =
             parse_trace(&fst_outcome.dir).with_context(|| "failed to parse first trace")?;
         let snd_trace =
@@ -284,7 +304,7 @@ impl Runner {
 
         let trace_diff = self.trace_objective.diff(&fst_trace, &snd_trace);
 
-        Ok(DiffOutcome {
+        Ok(DiffCompleted {
             dash_diff,
             trace_diff,
             fst_outcome,
@@ -310,29 +330,6 @@ impl Stats {
             start: Instant::now(),
             last_time_showed: Instant::now(),
         }
-    }
-}
-
-pub struct DiffOutcome {
-    pub dash_diff: Vec<FileDiff>,
-    pub trace_diff: Vec<TraceDiff>,
-    pub fst_outcome: Completed,
-    pub snd_outcome: Completed,
-    pub fst_trace: Trace,
-    pub snd_trace: Trace,
-}
-
-impl DiffOutcome {
-    pub fn any_interesting(&self) -> bool {
-        self.dash_interesting() || self.trace_interesting()
-    }
-
-    pub fn dash_interesting(&self) -> bool {
-        !self.dash_diff.is_empty()
-    }
-
-    pub fn trace_interesting(&self) -> bool {
-        !self.trace_diff.is_empty()
     }
 }
 
