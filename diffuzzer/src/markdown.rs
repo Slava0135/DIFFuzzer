@@ -22,6 +22,10 @@ impl Markdown {
         self.content
             .push_str(&format!("{}\n{}\n\n", text, underline));
     }
+    pub fn paragraph(&mut self, text: String) {
+        let text = text.trim().replace("\n", "\n\n");
+        self.content.push_str(&format!("{}\n\n", text));
+    }
 }
 
 impl Display for Markdown {
@@ -44,6 +48,23 @@ some title
 
 some heading
 ------------
+
+"#
+        .trim_start();
+        assert_eq!(expected.to_owned(), md.to_string());
+    }
+
+    #[test]
+    fn test_paragraph() {
+        let mut md = Markdown::new("foobar".to_owned());
+        md.paragraph("\nfirst para\nsecond para\n".to_owned());
+        let expected = r#"
+foobar
+======
+
+first para
+
+second para
 
 "#
         .trim_start();
