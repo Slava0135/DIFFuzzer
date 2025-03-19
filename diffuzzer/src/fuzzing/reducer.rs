@@ -2,17 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::collections::{HashMap, VecDeque};
 use std::fs::read_to_string;
 
 use anyhow::{Context, Ok};
-use log::{debug, error, info, warn};
-use thiserror::Error;
+use log::{info, warn};
 
-use crate::fuzzing::outcome::Completed;
-use crate::path::RemotePath;
 use crate::{
-    abstract_fs::{mutator::remove, workload::Workload},
+    abstract_fs::{mutator::remove, trace::TraceDiff, workload::Workload},
     command::CommandInterface,
     config::Config,
     fuzzing::outcome::Outcome,
@@ -25,25 +21,6 @@ use super::runner::{DiffOutcome, Runner};
 
 pub struct Reducer {
     runner: Runner,
-    limit_bugs: usize,
-    limit_counter: usize,
-    bugs: HashMap<DiffOutcome, Bug>,
-    bugs_queue: VecDeque<DiffOutcome>,
-}
-
-#[derive(Error, Debug, PartialEq)]
-pub enum ReducerError {
-    #[error("empty queue of bugs")]
-    EmptyQueue,
-    #[error("hash map does not contain bug")]
-    BugNotExists,
-}
-
-#[derive(Clone)]
-pub struct Bug {
-    name: String,
-    workload: Workload,
-    remove_pointer: usize,
 }
 
 impl Reducer {
@@ -54,7 +31,6 @@ impl Reducer {
         crashes_path: LocalPath,
         cmdi: Box<dyn CommandInterface>,
         supervisor: Box<dyn Supervisor>,
-        limit_bugs: usize,
     ) -> anyhow::Result<Self> {
         let runner = Runner::create(
             fst_mount,
@@ -67,16 +43,10 @@ impl Reducer {
             (vec![], vec![]),
         )
         .with_context(|| "failed to create runner")?;
-        Ok(Self {
-            runner,
-            limit_bugs,
-            limit_counter: 0,
-            bugs: HashMap::new(),
-            bugs_queue: VecDeque::new(),
-        })
+        Ok(Self { runner })
     }
 
-    pub fn run(&mut self, test_path: &LocalPath, save_to_dir: &LocalPath) -> anyhow::Result<()> {
+    pub fn run(&mut self, test_path: &LocalPath, output_dir: &LocalPath) -> anyhow::Result<()> {
         info!("read testcase at '{}'", test_path);
         let input = read_to_string(test_path).with_context(|| "failed to read testcase")?;
         let input: Workload =
@@ -86,172 +56,164 @@ impl Reducer {
 
         match self.runner.run_harness(&binary_path)? {
             (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
-                let diffs = self.runner.get_diffs(&fst_outcome, &snd_outcome)?;
-
-                if diffs.has_some_interesting() {
-                    let remove_pointer = input.ops.len() - 1;
-                    self.bugs.insert(
-                        diffs.clone(),
-                        Bug {
-                            name: "original".to_string(),
-                            workload: input,
-                            remove_pointer,
-                        },
-                    );
-                    self.bugs_queue.push_back(diffs);
-                    self.limit_counter += 1;
-                    self.reduce(save_to_dir)?;
+                let diff = self
+                    .runner
+                    .diff(fst_outcome, snd_outcome)
+                    .with_context(|| "failed to produce diff outcome")?;
+                if diff.any_interesting() {
+                    self.reduce_by_diff(input, output_dir, diff)?;
                 } else {
-                    warn!("crash not detected");
+                    warn!("no diff found");
                 }
             }
             _ => todo!("handle all outcomes"),
         };
-        info!("reduced:");
-        for (diff, bug) in self.bugs.iter() {
-            info!(
-                "name: {}, length: {}, dash?: {}, trace?: {}",
-                bug.name,
-                bug.workload.ops.len(),
-                diff.dash_interesting(),
-                diff.trace_interesting()
-            )
-        }
         Ok(())
     }
 
-    fn reduce(&mut self, output_dir: &LocalPath) -> anyhow::Result<()> {
-        while let Some(bug_diff) = self.bugs_queue.pop_front() {
-            let bug = self
-                .bugs
-                .get(&bug_diff)
-                .ok_or(ReducerError::BugNotExists)?
-                .clone();
-
-            if let Some(reduced) = remove(&bug.workload, bug.remove_pointer) {
+    fn reduce_by_diff(
+        &mut self,
+        mut bugcase: Workload,
+        output_dir: &LocalPath,
+        diff: DiffOutcome,
+    ) -> anyhow::Result<()> {
+        info!("reduce by diff");
+        let mut idx_to_remove = bugcase.ops.len() - 1;
+        let mut last_binary_path = None;
+        let mut last_diff = None;
+        loop {
+            if let Some(reduced) = remove(&bugcase, idx_to_remove) {
                 let binary_path = self.runner.compile_test(&reduced)?;
-
+                let variation_name = format!("variation-{}", idx_to_remove);
                 match self.runner.run_harness(&binary_path)? {
-                    (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => self
-                        .completed_handler(
-                            fst_outcome,
-                            snd_outcome,
-                            &bug,
-                            reduced,
-                            output_dir,
-                            binary_path,
-                        )?,
-                    _ => todo!("handle all outcomes"),
+                    (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
+                        let next_diff = self
+                            .runner
+                            .diff(fst_outcome, snd_outcome)
+                            .with_context(|| "failed to produce diff outcome")?;
+                        if same_diff(&diff, &next_diff) {
+                            bugcase = reduced;
+                            last_binary_path = Some(binary_path);
+                            last_diff = Some(next_diff);
+                        } else {
+                            let reason = format!(
+                                "error detected by: trace?: {}, hash?: {}",
+                                diff.trace_interesting(),
+                                diff.dash_interesting()
+                            );
+                            if diff.any_interesting() {
+                                self.runner
+                                    .report_diff(
+                                        &bugcase,
+                                        variation_name,
+                                        &binary_path,
+                                        output_dir.clone(),
+                                        &next_diff,
+                                        reason,
+                                    )
+                                    .with_context(|| "failed to report bug variation")?;
+                            }
+                        }
+                    }
+                    (Outcome::Panicked, _) => {
+                        self.runner
+                            .report_crash(
+                                &reduced,
+                                variation_name,
+                                output_dir.clone(),
+                                format!("Filesystem '{}' panicked", self.runner.fst_fs_name),
+                            )
+                            .with_context(|| "failed to report bug variation")?;
+                    }
+                    (_, Outcome::Panicked) => {
+                        self.runner
+                            .report_crash(
+                                &reduced,
+                                variation_name,
+                                output_dir.clone(),
+                                format!("Filesystem '{}' panicked", self.runner.snd_fs_name),
+                            )
+                            .with_context(|| "failed to report bug variation")?;
+                    }
+                    (Outcome::TimedOut, _) => {
+                        self.runner
+                            .report_crash(
+                                &reduced,
+                                variation_name,
+                                output_dir.clone(),
+                                format!(
+                                    "Filesystem '{}' timed out after {}s",
+                                    self.runner.fst_fs_name, self.runner.config.timeout
+                                ),
+                            )
+                            .with_context(|| "failed to report bug variation")?;
+                    }
+                    (_, Outcome::TimedOut) => {
+                        self.runner
+                            .report_crash(
+                                &reduced,
+                                variation_name,
+                                output_dir.clone(),
+                                format!(
+                                    "Filesystem '{}' timed out after {}s",
+                                    self.runner.snd_fs_name, self.runner.config.timeout
+                                ),
+                            )
+                            .with_context(|| "failed to report bug variation")?;
+                    }
+                    (Outcome::Skipped, _) => {}
+                    (_, Outcome::Skipped) => {}
                 };
             }
-            if bug.remove_pointer > 0 {
-                self.bugs.get_mut(&bug_diff).unwrap().remove_pointer -= 1;
-                self.bugs_queue.push_back(bug_diff);
+            if idx_to_remove == 0 {
+                break;
             }
+            idx_to_remove -= 1
         }
-        Ok(())
-    }
-
-    fn completed_handler(
-        &mut self,
-        fst_outcome: Completed,
-        snd_outcome: Completed,
-        init_bug: &Bug,
-        reduced_workload: Workload,
-        output_dir: &LocalPath,
-        binary_path: RemotePath,
-    ) -> anyhow::Result<()> {
-        debug!(
-            "reduce case \"{}\" by removing operation {}",
-            init_bug.name, init_bug.remove_pointer
+        let binary_path = last_binary_path.with_context(|| "failed to get bugcase binary path")?;
+        let diff = last_diff.with_context(|| "failed to get bugcase diff")?;
+        let reason = format!(
+            "error detected by: trace?: {}, hash?: {}",
+            diff.trace_interesting(),
+            diff.dash_interesting()
         );
-        let diffs = self.runner.get_diffs(&fst_outcome, &snd_outcome)?;
-        if !diffs.has_some_interesting() {
-            debug!("bugs not found");
-            return Ok(());
-        }
-
-        let matched_bug = self.bugs.get_mut(&diffs);
-
-        let bug_name = match matched_bug {
-            Some(bug) => {
-                debug!(
-                    "already existing bug \"{}\" reduced, length = {}",
-                    bug.name,
-                    reduced_workload.ops.len()
-                );
-                if reduced_workload.ops.len() >= bug.workload.ops.len() {
-                    return Ok(());
-                }
-                bug.workload = reduced_workload.clone();
-                if bug.name != init_bug.name {
-                    if bug.remove_pointer > 0 {
-                        bug.remove_pointer = init_bug.remove_pointer - 1
-                    } else {
-                        Self::remove_from_queue_by_value(&diffs, &mut self.bugs_queue);
-                    };
-                }
-                bug.name.clone()
-            }
-            None => {
-                if self.limit_reached() {
-                    debug!("new bug found but limitation of variations has been reached");
-                    return Ok(());
-                }
-                self.limit_counter += 1;
-                let new_bug = self.create_new_bug(init_bug, &reduced_workload);
-                debug!(
-                    "new bug \"{}\" found, length = {}",
-                    new_bug.name,
-                    reduced_workload.ops.len()
-                );
-                let name = new_bug.name.clone();
-                self.bugs.insert(diffs.clone(), new_bug);
-                self.bugs_queue.push_back(diffs.clone());
-                name
-            }
-        };
-
-        self.runner.report_diff(
-            &reduced_workload,
-            bug_name,
-            &binary_path,
-            output_dir.clone(),
-            diffs.dash_diff,
-            &fst_outcome,
-            &snd_outcome,
-            "".to_owned(),
-        )?;
-
+        self.runner
+            .report_diff(
+                &bugcase,
+                "reduced".to_owned(),
+                &binary_path,
+                output_dir.clone(),
+                &diff,
+                reason,
+            )
+            .with_context(|| "failed to save reduced bugcase")?;
         Ok(())
     }
+}
 
-    fn create_new_bug(&mut self, init_bug: &Bug, reduced_workload: &Workload) -> Bug {
-        let reduced = init_bug.remove_pointer == 0;
-        let remove_pointer = if reduced {
-            0
-        } else {
-            init_bug.remove_pointer - 1
-        };
-
-        Bug {
-            name: format!(
-                "{}-{}",
-                init_bug.name.clone(),
-                init_bug.remove_pointer.clone()
-            ),
-            workload: reduced_workload.clone(),
-            remove_pointer,
+fn same_diff(old: &DiffOutcome, new: &DiffOutcome) -> bool {
+    if old.trace_diff.len() != new.trace_diff.len() {
+        return false;
+    }
+    for i in 0..old.trace_diff.len() {
+        match (&old.trace_diff[i], &new.trace_diff[i]) {
+            (TraceDiff::DifferentLength, TraceDiff::DifferentLength) => {}
+            (
+                TraceDiff::TraceRowIsDifferent {
+                    fst: old_fst,
+                    snd: old_snd,
+                },
+                TraceDiff::TraceRowIsDifferent {
+                    fst: new_fst,
+                    snd: new_snd,
+                },
+            ) => {
+                if !(old_fst.ignore_index_equal(new_fst) && old_snd.ignore_index_equal(new_snd)) {
+                    return false;
+                }
+            }
+            _ => return false,
         }
     }
-
-    fn limit_reached(&self) -> bool {
-        self.limit_bugs != 0 && self.limit_counter >= self.limit_bugs
-    }
-
-    fn remove_from_queue_by_value(diffs: &DiffOutcome, bugs_queue: &mut VecDeque<DiffOutcome>) {
-        if let Some(diff_index) = bugs_queue.iter().position(|d| *d == *diffs) {
-            bugs_queue.remove(diff_index);
-        }
-    }
+    old.dash_diff == new.dash_diff
 }
