@@ -238,22 +238,27 @@ impl Fuzzer for GreyBoxFuzzer {
 
         match self.runner().run_harness(&binary_path)? {
             (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
-                if self.detect_errors(&input, &binary_path, &fst_outcome, &snd_outcome)? {
+                let diff = self
+                    .runner
+                    .diff(fst_outcome, snd_outcome)
+                    .with_context(|| "failed to produce diff outcome")?;
+
+                if self.detect_errors(&input, &binary_path, &diff)? {
                     return Ok(());
                 }
 
-                if self.do_objective(&input, &binary_path, &fst_outcome, &snd_outcome)? {
+                if self.do_objective(&input, &binary_path, &diff)? {
                     return Ok(());
                 }
 
                 debug!("get feedback");
                 let fst_opinion = self
                     .fst_coverage_feedback
-                    .opinion(&fst_outcome)
+                    .opinion(&diff.fst_outcome)
                     .with_context(|| "failed to get first coverage feedback")?;
                 let snd_opinion = self
                     .snd_coverage_feedback
-                    .opinion(&snd_outcome)
+                    .opinion(&diff.snd_outcome)
                     .with_context(|| "failed to get second coverage feedback")?;
 
                 if fst_opinion.is_interesting() || snd_opinion.is_interesting() {
@@ -264,7 +269,7 @@ impl Fuzzer for GreyBoxFuzzer {
                     );
                     self.show_stats();
                     if self.corpus_path.is_some() {
-                        self.save_input(input, &binary_path, &fst_outcome, &snd_outcome)
+                        self.save_input(input, &binary_path, &diff.fst_outcome, &diff.snd_outcome)
                             .with_context(|| "failed to save input")?;
                     }
                     return Ok(());

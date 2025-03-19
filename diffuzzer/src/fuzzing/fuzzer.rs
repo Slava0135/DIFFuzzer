@@ -7,9 +7,11 @@ use std::time::Instant;
 use anyhow::Context;
 use log::{debug, error, info, warn};
 
-use crate::{abstract_fs::workload::Workload, fuzzing::runner::parse_trace, path::RemotePath};
+use crate::{abstract_fs::workload::Workload, path::RemotePath};
 
-use super::{outcome::Completed, runner::Runner};
+use super::
+    runner::{DiffOutcome, Runner}
+;
 
 pub trait Fuzzer {
     fn run(&mut self, test_count: Option<u64>) {
@@ -55,17 +57,15 @@ pub trait Fuzzer {
         &mut self,
         input: &Workload,
         binary_path: &RemotePath,
-        fst_outcome: &Completed,
-        snd_outcome: &Completed,
+        diff: &DiffOutcome,
     ) -> anyhow::Result<bool> {
         let runner = self.runner();
         debug!("do objectives");
-        let diffs = runner.get_diffs(fst_outcome, snd_outcome)?;
-        if diffs.has_some_interesting() {
+        if diff.any_interesting() {
             let reason = format!(
                 "error detected by: trace?: {}, hash?: {}",
-                diffs.trace_interesting(),
-                diffs.dash_interesting()
+                diff.trace_interesting(),
+                diff.dash_interesting()
             );
             debug!("{}", reason);
 
@@ -76,9 +76,7 @@ pub trait Fuzzer {
                     dir_name,
                     binary_path,
                     runner.crashes_path.clone(),
-                    diffs.dash_diff,
-                    fst_outcome,
-                    snd_outcome,
+                    diff,
                     reason,
                 )
                 .with_context(|| "failed to report crash")?;
@@ -94,32 +92,17 @@ pub trait Fuzzer {
         &mut self,
         input: &Workload,
         binary_path: &RemotePath,
-        fst_outcome: &Completed,
-        snd_outcome: &Completed,
+        diff: &DiffOutcome,
     ) -> anyhow::Result<bool> {
         debug!("detect errors");
 
-        let fst_trace =
-            parse_trace(&fst_outcome.dir).with_context(|| "failed to parse first trace")?;
-        let snd_trace =
-            parse_trace(&snd_outcome.dir).with_context(|| "failed to parse second trace")?;
-
-        if fst_trace.has_errors() && snd_trace.has_errors() {
+        if diff.fst_trace.has_errors() && diff.snd_trace.has_errors() {
             let reason = "both traces contain errors, potential bug in model".to_owned();
             warn!("{}", reason);
             let accidents_path = self.runner().accidents_path.clone();
             let dir_name = input.generate_name();
             self.runner()
-                .report_diff(
-                    input,
-                    dir_name,
-                    binary_path,
-                    accidents_path,
-                    vec![],
-                    fst_outcome,
-                    snd_outcome,
-                    reason,
-                )
+                .report_diff(input, dir_name, binary_path, accidents_path, diff, reason)
                 .with_context(|| "failed to report accident")?;
             Ok(true)
         } else {

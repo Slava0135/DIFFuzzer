@@ -147,7 +147,6 @@ fn run() -> anyhow::Result<()> {
             path_to_test,
             first_filesystem,
             second_filesystem,
-            limit_bugs,
         } => {
             info!(
                 "reduce test ('{}' + '{}')",
@@ -160,7 +159,6 @@ fn run() -> anyhow::Result<()> {
                 LocalPath::new(Path::new(&output_dir)),
                 cmdi,
                 supervisor,
-                limit_bugs,
             )?
             .run(
                 &LocalPath::new(Path::new(&path_to_test)),

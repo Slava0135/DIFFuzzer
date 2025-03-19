@@ -40,7 +40,7 @@ impl DashObjective {
         Ok(self.fst_observer.borrow().hash() != self.snd_observer.borrow().hash())
     }
 
-    pub fn get_diff(&self) -> Vec<FileDiff> {
+    pub fn diff(&self) -> Vec<FileDiff> {
         get_diff(
             self.fst_observer.borrow().fs_state(),
             self.snd_observer.borrow().fs_state(),

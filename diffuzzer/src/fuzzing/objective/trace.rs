@@ -14,7 +14,7 @@ impl TraceObjective {
 }
 
 impl TraceObjective {
-    pub fn get_diff(&mut self, fst_trace: &Trace, snd_trace: &Trace) -> Vec<TraceDiff> {
+    pub fn diff(&mut self, fst_trace: &Trace, snd_trace: &Trace) -> Vec<TraceDiff> {
         let mut trace_diff: Vec<TraceDiff> = vec![];
 
         if fst_trace.rows.len() != snd_trace.rows.len() {

@@ -59,11 +59,16 @@ impl Fuzzer for DuoSingleFuzzer {
 
         match self.runner().run_harness(&binary_path)? {
             (Outcome::Completed(fst_outcome), Outcome::Completed(snd_outcome)) => {
-                if self.detect_errors(&input, &binary_path, &fst_outcome, &snd_outcome)? {
+                let diff = self
+                    .runner
+                    .diff(fst_outcome, snd_outcome)
+                    .with_context(|| "failed to produce diff outcome")?;
+
+                if self.detect_errors(&input, &binary_path, &diff)? {
                     return Ok(());
                 }
 
-                self.do_objective(&input, &binary_path, &fst_outcome, &snd_outcome)?;
+                self.do_objective(&input, &binary_path, &diff)?;
             }
             (Outcome::Panicked, _) => {
                 self.report_crash(

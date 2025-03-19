@@ -15,10 +15,10 @@ use anyhow::{Context, Ok};
 use dash::FileDiff;
 use log::{debug, info};
 use std::cell::RefCell;
-use std::fs;
 use std::path::Path;
 use std::rc::Rc;
 use std::time::Instant;
+use std::fs;
 
 use super::harness::Harness;
 use super::objective::dash::DashObjective;
@@ -214,9 +214,7 @@ impl Runner {
         dir_name: String,
         binary_path: &RemotePath,
         crash_dir: LocalPath,
-        hash_diff: Vec<FileDiff>,
-        fst_outcome: &Completed,
-        snd_outcome: &Completed,
+        diff: &DiffOutcome,
         reason: String,
     ) -> anyhow::Result<()> {
         debug!("report diff '{}'", dir_name);
@@ -227,12 +225,13 @@ impl Runner {
 
         save_testcase(self.cmdi.as_ref(), &crash_dir, Some(binary_path), input)
             .with_context(|| "failed to save testcase")?;
-        save_completed(&crash_dir, &self.fst_fs_name, fst_outcome)
+        save_completed(&crash_dir, &self.fst_fs_name, &diff.fst_outcome)
             .with_context(|| "failed to save first outcome")?;
-        save_completed(&crash_dir, &self.snd_fs_name, snd_outcome)
+        save_completed(&crash_dir, &self.snd_fs_name, &diff.snd_outcome)
             .with_context(|| "failed to save second outcome")?;
 
-        save_diff(&crash_dir, hash_diff).with_context(|| "failed to save hash differences")?;
+        save_diff(&crash_dir, diff.dash_diff.clone())
+            .with_context(|| "failed to save dash diff")?;
         save_reason(&crash_dir, reason).with_context(|| "failed to save reason")?;
 
         info!("diff saved at '{}'", crash_dir);
@@ -262,10 +261,10 @@ impl Runner {
         Ok(())
     }
 
-    pub fn get_diffs(
+    pub fn diff(
         &mut self,
-        fst_outcome: &Completed,
-        snd_outcome: &Completed,
+        fst_outcome: Completed,
+        snd_outcome: Completed,
     ) -> anyhow::Result<DiffOutcome> {
         let fst_trace =
             parse_trace(&fst_outcome.dir).with_context(|| "failed to parse first trace")?;
@@ -278,16 +277,20 @@ impl Runner {
             .with_context(|| "failed to do dash objective")?;
 
         let dash_diff = if dash_interesting {
-            self.dash_objective.get_diff()
+            self.dash_objective.diff()
         } else {
             vec![]
         };
 
-        let trace_diff = self.trace_objective.get_diff(&fst_trace, &snd_trace);
+        let trace_diff = self.trace_objective.diff(&fst_trace, &snd_trace);
 
         Ok(DiffOutcome {
             dash_diff,
             trace_diff,
+            fst_outcome,
+            snd_outcome,
+            fst_trace,
+            snd_trace,
         })
     }
 }
@@ -310,14 +313,17 @@ impl Stats {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct DiffOutcome {
     pub dash_diff: Vec<FileDiff>,
     pub trace_diff: Vec<TraceDiff>,
+    pub fst_outcome: Completed,
+    pub snd_outcome: Completed,
+    pub fst_trace: Trace,
+    pub snd_trace: Trace,
 }
 
 impl DiffOutcome {
-    pub fn has_some_interesting(&self) -> bool {
+    pub fn any_interesting(&self) -> bool {
         self.dash_interesting() || self.trace_interesting()
     }
 

@@ -8,6 +8,7 @@
 /crashes
 /accidents
 /corpus
+/reduce*
 
 # QEMU
 *.img
