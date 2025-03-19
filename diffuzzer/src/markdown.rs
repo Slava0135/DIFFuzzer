@@ -8,6 +8,14 @@ pub struct Markdown {
     content: String,
 }
 
+pub struct Language(String);
+
+impl Language {
+    pub fn of(lang: &str) -> Self {
+        Self(lang.replace('`', "?"))
+    }
+}
+
 impl Markdown {
     pub fn new(title: String) -> Self {
         let text = title.replace("\n", " ");
@@ -25,6 +33,12 @@ impl Markdown {
     pub fn paragraph(&mut self, text: String) {
         let text = text.trim().replace("\n", "\n\n");
         self.content.push_str(&format!("{}\n\n", text));
+    }
+
+    pub fn codeblock(&mut self, lang: Language, code: String) {
+        let code = code.replace("```", "???");
+        self.content
+            .push_str(&format!("```{}\n{}\n```\n\n", lang.0, code));
     }
 }
 
@@ -65,6 +79,30 @@ foobar
 first para
 
 second para
+
+"#
+        .trim_start();
+        assert_eq!(expected.to_owned(), md.to_string());
+    }
+
+    #[test]
+    fn test_codeblock() {
+        let mut md = Markdown::new("foobar".to_owned());
+        md.codeblock(
+            Language::of("python````"),
+            "fizz()\n````\nbuzz()\n\n".to_owned(),
+        );
+        let expected = r#"
+foobar
+======
+
+```python????
+fizz()
+???`
+buzz()
+
+
+```
 
 "#
         .trim_start();
