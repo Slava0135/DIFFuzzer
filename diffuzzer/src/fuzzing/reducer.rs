@@ -91,6 +91,9 @@ impl Reducer {
                             .runner
                             .diff(fst_outcome, snd_outcome)
                             .with_context(|| "failed to produce diff outcome")?;
+                        if !diff.any_interesting() {
+                            continue;
+                        }
                         if same_diff(&diff, &next_diff) {
                             bugcase = reduced;
                             last_binary_path = Some(binary_path);
@@ -101,18 +104,16 @@ impl Reducer {
                                 diff.trace_interesting(),
                                 diff.dash_interesting()
                             );
-                            if diff.any_interesting() {
-                                self.runner
-                                    .report_diff(
-                                        &bugcase,
-                                        variation_name,
-                                        &binary_path,
-                                        output_dir.clone(),
-                                        &next_diff,
-                                        reason,
-                                    )
-                                    .with_context(|| "failed to report bug variation")?;
-                            }
+                            self.runner
+                                .report_diff(
+                                    &bugcase,
+                                    variation_name,
+                                    &binary_path,
+                                    output_dir.clone(),
+                                    &next_diff,
+                                    reason,
+                                )
+                                .with_context(|| "failed to report bug variation")?;
                         }
                     }
                     (Outcome::Panicked, _) => {
