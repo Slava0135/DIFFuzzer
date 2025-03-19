@@ -15,6 +15,7 @@ use crate::fuzzing::outcome::DiffOutcome;
 use crate::fuzzing::runner::Runner;
 use crate::mount::FileSystemMount;
 use crate::path::LocalPath;
+use crate::reason::Reason;
 use crate::supervisor::Supervisor;
 
 pub struct DuoSingleFuzzer {
@@ -66,22 +67,34 @@ impl Fuzzer for DuoSingleFuzzer {
                 self.do_objective(&input, &binary_path, &diff)?;
             }
             DiffOutcome::FirstPanicked { fs_name } => {
-                self.report_crash(&input, format!("Filesystem '{}' panicked", fs_name))?;
+                let mut reason = Reason::new();
+                reason
+                    .md
+                    .heading(format!("Filesystem '{}' panicked", fs_name));
+                self.report_crash(&input, reason)?;
             }
             DiffOutcome::SecondPanicked { fs_name } => {
-                self.report_crash(&input, format!("Filesystem '{}' panicked", fs_name))?;
+                let mut reason = Reason::new();
+                reason
+                    .md
+                    .heading(format!("Filesystem '{}' panicked", fs_name));
+                self.report_crash(&input, reason)?;
             }
             DiffOutcome::FirstTimedOut { fs_name, timeout } => {
-                self.report_crash(
-                    &input,
-                    format!("Filesystem '{}' timed out after {}s", fs_name, timeout),
-                )?;
+                let mut reason = Reason::new();
+                reason.md.heading(format!(
+                    "Filesystem '{}' timed out after {}s",
+                    fs_name, timeout
+                ));
+                self.report_crash(&input, reason)?;
             }
             DiffOutcome::SecondTimedOut { fs_name, timeout } => {
-                self.report_crash(
-                    &input,
-                    format!("Filesystem '{}' timed out after {}s", fs_name, timeout),
-                )?;
+                let mut reason = Reason::new();
+                reason.md.heading(format!(
+                    "Filesystem '{}' timed out after {}s",
+                    fs_name, timeout
+                ));
+                self.report_crash(&input, reason)?;
             }
         };
 

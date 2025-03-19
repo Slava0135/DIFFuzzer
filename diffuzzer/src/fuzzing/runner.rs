@@ -9,7 +9,8 @@ use crate::command::CommandInterface;
 use crate::config::Config;
 use crate::mount::FileSystemMount;
 use crate::path::{LocalPath, RemotePath};
-use crate::save::{save_completed, save_dash, save_reason, save_testcase};
+use crate::reason::Reason;
+use crate::save::{save_completed, save_reason, save_testcase};
 use crate::supervisor::Supervisor;
 use anyhow::{Context, Ok};
 use log::{debug, info};
@@ -235,7 +236,7 @@ impl Runner {
         binary_path: &RemotePath,
         crash_dir: LocalPath,
         diff: &DiffCompleted,
-        reason: String,
+        reason: Reason,
     ) -> anyhow::Result<()> {
         debug!("report diff '{}'", dir_name);
 
@@ -250,8 +251,6 @@ impl Runner {
         save_completed(&crash_dir, &self.snd_fs_name, &diff.snd_outcome)
             .with_context(|| "failed to save second outcome")?;
 
-        save_dash(&crash_dir, diff.dash_diff.clone())
-            .with_context(|| "failed to save dash diff")?;
         save_reason(&crash_dir, reason).with_context(|| "failed to save reason")?;
 
         info!("diff saved at '{}'", crash_dir);
@@ -264,7 +263,7 @@ impl Runner {
         input: &Workload,
         dir_name: String,
         crash_dir: LocalPath,
-        reason: String,
+        reason: Reason,
     ) -> anyhow::Result<()> {
         debug!("report panic '{}'", dir_name);
 

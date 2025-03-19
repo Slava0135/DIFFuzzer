@@ -17,6 +17,7 @@ use crate::{
     fuzzing::{harness::Harness, outcome::Outcome},
     mount::FileSystemMount,
     path::{LocalPath, RemotePath},
+    reason::Reason,
     save::{save_completed, save_reason, save_testcase},
     supervisor::Supervisor,
 };
@@ -74,29 +75,30 @@ pub fn run(
                 .with_context(|| "failed to save testcase")?;
             save_completed(output_dir, &fs_str, &completed)
                 .with_context(|| "failed to save outcome")?;
-            save_reason(
-                output_dir,
-                format!("Filesystem '{}' completed workload", fs_str),
-            )
-            .with_context(|| "failed to save reason")?;
+            let mut reason = Reason::new();
+            reason
+                .md
+                .heading(format!("Filesystem '{}' completed workload", fs_str));
+            save_reason(output_dir, reason).with_context(|| "failed to save reason")?;
         }
         Outcome::Panicked => {
             save_testcase(cmdi.as_ref(), output_dir, None, &input)
                 .with_context(|| "failed to save testcase")?;
-            save_reason(output_dir, format!("Filesystem '{}' panicked", fs_str))
-                .with_context(|| "failed to save reason")?;
+            let mut reason = Reason::new();
+            reason
+                .md
+                .heading(format!("Filesystem '{}' panicked", fs_str));
+            save_reason(output_dir, reason).with_context(|| "failed to save reason")?;
         }
         Outcome::TimedOut => {
             save_testcase(cmdi.as_ref(), output_dir, None, &input)
                 .with_context(|| "failed to save testcase")?;
-            save_reason(
-                output_dir,
-                format!(
-                    "Filesystem '{}' timed out after {}s",
-                    fs_str, config.timeout
-                ),
-            )
-            .with_context(|| "failed to save reason")?;
+            let mut reason = Reason::new();
+            reason.md.heading(format!(
+                "Filesystem '{}' timed out after {}s",
+                fs_str, config.timeout
+            ));
+            save_reason(output_dir, reason).with_context(|| "failed to save reason")?;
         }
     };
 

@@ -4,22 +4,23 @@
 
 use std::num::ParseIntError;
 
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Stores results of executing test workload operations.
-#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Trace {
     pub rows: Vec<TraceRow>,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Deserialize, Serialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct TraceRow {
     index: u32,
     command: String,
     return_code: i32,
     errno: Errno,
     extra: String,
+    /// Original text of csv file corresponding to row
+    source: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -28,7 +29,7 @@ pub enum TraceDiff {
     DifferentLength,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Deserialize, Serialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Errno {
     name: String,
     code: i32,
@@ -95,13 +96,22 @@ impl Trace {
                 return_code,
                 errno: Errno { name, code },
                 extra,
+                source: line.trim_end().to_owned(),
             });
         }
         Ok(trace)
     }
 
-    pub fn has_errors(&self) -> bool {
-        self.rows.iter().any(|row| row.errno.code != 0)
+    pub fn errors(&self) -> Vec<TraceRow> {
+        self.rows
+            .iter()
+            .filter(|row| row.errno.code != 0)
+            .cloned()
+            .collect()
+    }
+
+    pub fn header() -> String {
+        "Index,Command,ReturnCode,Errno,Extra".to_owned()
     }
 }
 
@@ -111,6 +121,9 @@ impl TraceRow {
             && self.return_code == other.return_code
             && self.extra == other.extra
             && self.errno == other.errno
+    }
+    pub fn source(&self) -> String {
+        self.source.clone()
     }
 }
 
@@ -165,6 +178,7 @@ Index,Command,ReturnCode,Errno,Extra
                             code: 0,
                         },
                         extra: "a=1".to_owned(),
+                        source: "    1,    Foo,        42,Success(0),a=1".to_owned()
                     },
                     TraceRow {
                         index: 2,
@@ -175,6 +189,7 @@ Index,Command,ReturnCode,Errno,Extra
                             code: 42,
                         },
                         extra: "b=2".to_owned(),
+                        source: "    2,    Bar,        -1,Error(42),b=2".to_owned()
                     },
                 ]
             }),
