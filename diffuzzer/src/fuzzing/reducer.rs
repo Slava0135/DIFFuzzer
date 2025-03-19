@@ -117,7 +117,7 @@ impl Reducer {
                                 }
                                 self.runner
                                     .report_diff(
-                                        &bugcase,
+                                        &reduced,
                                         variation_name,
                                         &binary_path,
                                         output_dir.clone(),
