@@ -64,6 +64,40 @@ pub enum OperationKind {
     FSync,
 }
 
+impl From<&Operation> for OperationKind {
+    fn from(value: &Operation) -> Self {
+        match value {
+            Operation::MkDir { .. } => Self::MkDir,
+            Operation::Create { .. } => Self::Create,
+            Operation::Remove { .. } => Self::Remove,
+            Operation::Hardlink { .. } => Self::Hardlink,
+            Operation::Rename { .. } => Self::Rename,
+            Operation::Open { .. } => Self::Open,
+            Operation::Close { .. } => Self::Close,
+            Operation::Read { .. } => Self::Read,
+            Operation::Write { .. } => Self::Write,
+            Operation::FSync { .. } => Self::FSync,
+        }
+    }
+}
+
+impl From<Operation> for OperationKind {
+    fn from(value: Operation) -> Self {
+        match value {
+            Operation::MkDir { .. } => Self::MkDir,
+            Operation::Create { .. } => Self::Create,
+            Operation::Remove { .. } => Self::Remove,
+            Operation::Hardlink { .. } => Self::Hardlink,
+            Operation::Rename { .. } => Self::Rename,
+            Operation::Open { .. } => Self::Open,
+            Operation::Close { .. } => Self::Close,
+            Operation::Read { .. } => Self::Read,
+            Operation::Write { .. } => Self::Write,
+            Operation::FSync { .. } => Self::FSync,
+        }
+    }
+}
+
 /// Weights determine the likelihood of operation to be picked.
 /// Weight is only considered if operation can be applied.
 #[derive(Serialize, Deserialize, Clone)]

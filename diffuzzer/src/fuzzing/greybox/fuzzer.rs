@@ -14,6 +14,7 @@ use log::{debug, info, warn};
 use rand::{SeedableRng, rngs::StdRng};
 use walkdir::WalkDir;
 
+use crate::abstract_fs::operation::OperationKind;
 use crate::command::CommandInterface;
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::observer::ObserverList;
@@ -76,8 +77,19 @@ impl GreyBoxFuzzer {
                 .filter(|e| e.file_name() == TEST_FILE_NAME)
             {
                 match fs::read_to_string(entry.path()) {
-                    Ok(data) => match serde_json::from_str(&data) {
-                        Ok(workload) => initial_corpus.push(workload),
+                    Ok(data) => match serde_json::from_str::<Workload>(&data) {
+                        Ok(workload) => {
+                            // Ignore workload if any operation in it has 0 weight or is not present at all
+                            if workload.ops.iter().map(OperationKind::from).all(|op| {
+                                config
+                                    .operation_weights
+                                    .weights
+                                    .iter()
+                                    .any(|(kind, w)| op == *kind && *w > 0)
+                            }) {
+                                initial_corpus.push(workload)
+                            }
+                        }
                         Err(err) => {
                             warn!(
                                 "failed to parse seed at '{}':\n{}",
