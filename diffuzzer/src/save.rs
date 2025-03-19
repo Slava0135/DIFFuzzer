@@ -3,21 +3,18 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use std::fs;
-use std::fs::OpenOptions;
-use std::io::Write;
 
 use anyhow::Context;
-use dash::{DIFF_FILENAME, FileDiff};
 
 use crate::command::CommandInterface;
 use crate::compile::{TEST_EXE_FILENAME, TEST_SOURCE_FILENAME};
 use crate::fuzzing::outcome::Completed;
 use crate::path::LocalPath;
+use crate::reason::Reason;
 use crate::{
     abstract_fs::{trace::TRACE_FILENAME, workload::Workload},
     path::RemotePath,
 };
-use dash::FileDiff::{FileIsDifferent, OnlyOneExists};
 
 pub const TEST_FILE_NAME: &str = "test.json";
 
@@ -75,29 +72,8 @@ pub fn save_completed(
     Ok(())
 }
 
-pub fn save_dash(output_dir: &LocalPath, dash_diff: Vec<FileDiff>) -> anyhow::Result<()> {
-    let diff_hash_path = output_dir.join(DIFF_FILENAME);
-    fs::write(&diff_hash_path, "").with_context(|| "failed to init diff file")?;
-    let mut file = OpenOptions::new()
-        .append(true)
-        .open(&diff_hash_path)
-        .with_context(|| format!("failed to save hash difference at '{}'", diff_hash_path))?;
-
-    for diff in dash_diff {
-        let txt = match diff {
-            FileIsDifferent { fst, snd } => {
-                format!("File with different hash:\n\t{}\n\t{}\n\n", fst, snd)
-            }
-            OnlyOneExists(f) => format!("File exists only in one FS:\n\t{}\n\n", f),
-        };
-        file.write(txt.as_bytes())
-            .with_context(|| format!("failed to save source file to '{}'", diff_hash_path))?;
-    }
-    Ok(())
-}
-
-pub fn save_reason(output_dir: &LocalPath, reason: String) -> anyhow::Result<()> {
+pub fn save_reason(output_dir: &LocalPath, reason: Reason) -> anyhow::Result<()> {
     let reason_path = output_dir.join("reason.md");
-    fs::write(&reason_path, reason)
+    fs::write(&reason_path, reason.to_string())
         .with_context(|| format!("failed to save source file to '{}'", reason_path))
 }

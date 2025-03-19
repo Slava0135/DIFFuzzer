@@ -14,6 +14,7 @@ use crate::{
     fuzzing::outcome::DiffOutcome,
     mount::FileSystemMount,
     path::LocalPath,
+    reason::Reason,
     supervisor::Supervisor,
 };
 
@@ -85,11 +86,15 @@ impl Reducer {
                         if next_diff.any_interesting() {
                             if same_diff(&diff, &next_diff) {
                                 bugcase = reduced;
-                                let reason = format!(
-                                    "error detected by: trace?: {}, hash?: {}",
-                                    next_diff.trace_interesting(),
-                                    next_diff.dash_interesting()
-                                );
+                                let mut reason = Reason::new();
+                                if diff.trace_interesting() {
+                                    reason.md.heading("Trace Difference Found".to_owned());
+                                    reason.add_trace_diff(&diff.trace_diff);
+                                }
+                                if diff.dash_interesting() {
+                                    reason.md.heading("Dash Difference Found".to_owned());
+                                    reason.add_dash_diff(&diff.dash_diff);
+                                }
                                 self.runner
                                     .report_diff(
                                         &bugcase,
@@ -101,11 +106,15 @@ impl Reducer {
                                     )
                                     .with_context(|| "failed to save reduced bugcase")?;
                             } else {
-                                let reason = format!(
-                                    "error detected by: trace?: {}, hash?: {}",
-                                    next_diff.trace_interesting(),
-                                    next_diff.dash_interesting()
-                                );
+                                let mut reason = Reason::new();
+                                if diff.trace_interesting() {
+                                    reason.md.heading("Trace Difference Found".to_owned());
+                                    reason.add_trace_diff(&diff.trace_diff);
+                                }
+                                if diff.dash_interesting() {
+                                    reason.md.heading("Dash Difference Found".to_owned());
+                                    reason.add_dash_diff(&diff.dash_diff);
+                                }
                                 self.runner
                                     .report_diff(
                                         &bugcase,
@@ -120,43 +129,41 @@ impl Reducer {
                         }
                     }
                     DiffOutcome::FirstPanicked { fs_name } => {
+                        let mut reason = Reason::new();
+                        reason
+                            .md
+                            .heading(format!("Filesystem '{}' panicked", fs_name));
                         self.runner
-                            .report_crash(
-                                &reduced,
-                                variation_name,
-                                output_dir.clone(),
-                                format!("Filesystem '{}' panicked", fs_name),
-                            )
+                            .report_crash(&reduced, variation_name, output_dir.clone(), reason)
                             .with_context(|| "failed to report bug variation")?;
                     }
                     DiffOutcome::SecondPanicked { fs_name } => {
+                        let mut reason = Reason::new();
+                        reason
+                            .md
+                            .heading(format!("Filesystem '{}' panicked", fs_name));
                         self.runner
-                            .report_crash(
-                                &reduced,
-                                variation_name,
-                                output_dir.clone(),
-                                format!("Filesystem '{}' panicked", fs_name),
-                            )
+                            .report_crash(&reduced, variation_name, output_dir.clone(), reason)
                             .with_context(|| "failed to report bug variation")?;
                     }
                     DiffOutcome::FirstTimedOut { fs_name, timeout } => {
+                        let mut reason = Reason::new();
+                        reason.md.heading(format!(
+                            "Filesystem '{}' timed out after {}s",
+                            fs_name, timeout
+                        ));
                         self.runner
-                            .report_crash(
-                                &reduced,
-                                variation_name,
-                                output_dir.clone(),
-                                format!("Filesystem '{}' timed out after {}s", fs_name, timeout),
-                            )
+                            .report_crash(&reduced, variation_name, output_dir.clone(), reason)
                             .with_context(|| "failed to report bug variation")?;
                     }
                     DiffOutcome::SecondTimedOut { fs_name, timeout } => {
+                        let mut reason = Reason::new();
+                        reason.md.heading(format!(
+                            "Filesystem '{}' timed out after {}s",
+                            fs_name, timeout
+                        ));
                         self.runner
-                            .report_crash(
-                                &reduced,
-                                variation_name,
-                                output_dir.clone(),
-                                format!("Filesystem '{}' timed out after {}s", fs_name, timeout),
-                            )
+                            .report_crash(&reduced, variation_name, output_dir.clone(), reason)
                             .with_context(|| "failed to report bug variation")?;
                     }
                 };

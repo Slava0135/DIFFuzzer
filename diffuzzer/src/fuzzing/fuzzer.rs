@@ -7,12 +7,9 @@ use std::time::Instant;
 use anyhow::Context;
 use log::{debug, error, info, warn};
 
-use crate::{abstract_fs::workload::Workload, path::RemotePath};
+use crate::{abstract_fs::workload::Workload, path::RemotePath, reason::Reason};
 
-use super::{
-    outcome::DiffCompleted,
-    runner::Runner,
-};
+use super::{outcome::DiffCompleted, runner::Runner};
 
 pub trait Fuzzer {
     fn run(&mut self, test_count: Option<u64>) {
@@ -63,13 +60,15 @@ pub trait Fuzzer {
         let runner = self.runner();
         debug!("do objectives");
         if diff.any_interesting() {
-            let reason = format!(
-                "error detected by: trace?: {}, hash?: {}",
-                diff.trace_interesting(),
-                diff.dash_interesting()
-            );
-            debug!("{}", reason);
-
+            let mut reason = Reason::new();
+            if diff.trace_interesting() {
+                reason.md.heading("Trace Difference Found".to_owned());
+                reason.add_trace_diff(&diff.trace_diff);
+            }
+            if diff.dash_interesting() {
+                reason.md.heading("Dash Difference Found".to_owned());
+                reason.add_dash_diff(&diff.dash_diff);
+            }
             let dir_name = input.generate_name();
             runner
                 .report_diff(
@@ -97,9 +96,16 @@ pub trait Fuzzer {
     ) -> anyhow::Result<bool> {
         debug!("detect errors");
 
-        if diff.fst_trace.has_errors() && diff.snd_trace.has_errors() {
-            let reason = "both traces contain errors, potential bug in model".to_owned();
-            warn!("{}", reason);
+        let fst_errors = diff.fst_trace.errors();
+        let snd_errors = diff.snd_trace.errors();
+
+        if !fst_errors.is_empty() && !snd_errors.is_empty() {
+            let reason_str = "Both traces contain errors, potential bug in model".to_owned();
+            let mut reason = Reason::new();
+            warn!("{}", reason_str.to_lowercase());
+            reason.md.heading(reason_str);
+            reason.add_trace_rows(&fst_errors);
+            reason.add_trace_rows(&snd_errors);
             let accidents_path = self.runner().accidents_path.clone();
             let dir_name = input.generate_name();
             self.runner()
@@ -111,7 +117,7 @@ pub trait Fuzzer {
         }
     }
 
-    fn report_crash(&mut self, input: &Workload, reason: String) -> anyhow::Result<()> {
+    fn report_crash(&mut self, input: &Workload, reason: Reason) -> anyhow::Result<()> {
         let dir_name = input.generate_name();
         let crashes_dir = self.runner().crashes_path.clone();
         self.runner()
