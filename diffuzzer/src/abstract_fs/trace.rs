@@ -96,7 +96,7 @@ impl Trace {
                 return_code,
                 errno: Errno { name, code },
                 extra,
-                source: line.trim().to_owned(),
+                source: line.trim_end().to_owned(),
             });
         }
         Ok(trace)
