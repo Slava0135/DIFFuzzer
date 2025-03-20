@@ -89,6 +89,11 @@ impl Workload {
                 Operation::FSync { des } => {
                     result.push_str(format!("do_fsync({});\n", descriptor_to_var(des)).as_str());
                 }
+                Operation::Symlink { target, linkpath } => {
+                    result.push_str(
+                        format!("do_symlink(\"{}\", \"{}\");\n", target, linkpath).as_str(),
+                    );
+                }
             }
         }
         result.push('}');
@@ -147,6 +152,7 @@ do_read(fd_1, 1024);
 do_fsync(fd_1);
 do_close(fd_1);
 do_rename("/baz", "/gaz");
+do_symlink("/foo", "/moo");
 do_remove("/foo");
 }
 "#
@@ -200,6 +206,10 @@ do_remove("/foo");
                 Operation::Rename {
                     old_path: "/baz".into(),
                     new_path: "/gaz".into(),
+                },
+                Operation::Symlink {
+                    target: "/foo".into(),
+                    linkpath: "/moo".into(),
                 },
                 Operation::Remove {
                     path: "/foo".into(),

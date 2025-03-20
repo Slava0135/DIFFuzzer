@@ -47,6 +47,10 @@ pub enum Operation {
     FSync {
         des: FileDescriptorIndex,
     },
+    Symlink {
+        target: PathName,
+        linkpath: PathName,
+    },
 }
 
 #[derive(PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Copy)]
@@ -62,6 +66,7 @@ pub enum OperationKind {
     Read,
     Write,
     FSync,
+    Symlink,
 }
 
 impl From<&Operation> for OperationKind {
@@ -77,24 +82,14 @@ impl From<&Operation> for OperationKind {
             Operation::Read { .. } => Self::Read,
             Operation::Write { .. } => Self::Write,
             Operation::FSync { .. } => Self::FSync,
+            Operation::Symlink { .. } => Self::Symlink,
         }
     }
 }
 
 impl From<Operation> for OperationKind {
     fn from(value: Operation) -> Self {
-        match value {
-            Operation::MkDir { .. } => Self::MkDir,
-            Operation::Create { .. } => Self::Create,
-            Operation::Remove { .. } => Self::Remove,
-            Operation::Hardlink { .. } => Self::Hardlink,
-            Operation::Rename { .. } => Self::Rename,
-            Operation::Open { .. } => Self::Open,
-            Operation::Close { .. } => Self::Close,
-            Operation::Read { .. } => Self::Read,
-            Operation::Write { .. } => Self::Write,
-            Operation::FSync { .. } => Self::FSync,
-        }
+        (&value).into()
     }
 }
 
@@ -124,6 +119,7 @@ impl OperationWeights {
                 (OperationKind::Read, 100),
                 (OperationKind::Write, 100),
                 (OperationKind::FSync, 100),
+                (OperationKind::Symlink, 100),
             ],
         }
     }

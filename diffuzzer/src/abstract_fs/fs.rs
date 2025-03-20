@@ -9,7 +9,10 @@ use thiserror::Error;
 use super::{
     content::{Content, ContentError},
     flags::Mode,
-    node::{Dir, DirIndex, File, FileDescriptor, FileDescriptorIndex, FileIndex, Node},
+    node::{
+        Dir, DirIndex, File, FileDescriptor, FileDescriptorIndex, FileIndex, Node, Symlink,
+        SymlinkIndex,
+    },
     operation::Operation,
     pathname::{Name, PathName},
     workload::Workload,
@@ -52,6 +55,7 @@ pub enum FsError {
 pub struct AbstractFS {
     pub dirs: Vec<Dir>,
     pub files: Vec<File>,
+    pub symlinks: Vec<Symlink>,
     pub descriptors: Vec<FileDescriptor>,
     /// Every succesful operation is recorded and can be replayed from scratch.
     pub recording: Workload,
@@ -60,8 +64,9 @@ pub struct AbstractFS {
 /// File nodes that are accessible from root (not deleted).
 #[derive(Debug, PartialEq, Eq)]
 pub struct AliveNodes {
-    pub dirs: Vec<PathName>,
+    pub dirs: Vec<(DirIndex, PathName)>,
     pub files: Vec<(FileIndex, PathName)>,
+    pub symlinks: Vec<PathName>,
 }
 
 impl AbstractFS {
@@ -72,6 +77,7 @@ impl AbstractFS {
             }],
             files: vec![],
             descriptors: vec![],
+            symlinks: vec![],
             recording: Workload::new(),
         }
     }
@@ -147,6 +153,24 @@ impl AbstractFS {
         self.recording
             .push(Operation::Hardlink { old_path, new_path });
         Ok(old_file.to_owned())
+    }
+
+    pub fn symlink(&mut self, target: PathName, linkpath: PathName) -> Result<()> {
+        let (parent_path, name) = linkpath.split();
+        let parent = self.resolve_dir(parent_path.to_owned())?;
+        if self.name_exists(&parent, &name) {
+            return Err(FsError::NameAlreadyExists(linkpath));
+        }
+        let symlink = Symlink {
+            target: target.clone(),
+        };
+        let sym_idx = SymlinkIndex(self.symlinks.len());
+        self.symlinks.push(symlink);
+        self.dir_mut(&parent)
+            .children
+            .insert(name.clone(), Node::Symlink(sym_idx));
+        self.recording.push(Operation::Symlink { target, linkpath });
+        Ok(())
     }
 
     /// Renames a file, moving it between directories if required, similar to `rename`.
@@ -309,6 +333,9 @@ impl AbstractFS {
                 Operation::FSync { des } => {
                     self.fsync(*des)?;
                 }
+                Operation::Symlink { target, linkpath } => {
+                    self.symlink(target.clone(), linkpath.clone())?;
+                }
             };
         }
         Ok(())
@@ -332,6 +359,10 @@ impl AbstractFS {
 
     fn file_mut(&mut self, idx: &FileIndex) -> &mut File {
         self.files.get_mut(idx.0).unwrap()
+    }
+
+    fn sym(&self, idx: &SymlinkIndex) -> &Symlink {
+        self.symlinks.get(idx.0).unwrap()
     }
 
     #[allow(dead_code)]
@@ -399,28 +430,62 @@ impl AbstractFS {
         let mut alive = AliveNodes {
             dirs: vec![],
             files: vec![],
+            symlinks: vec![],
         };
-        let mut queue: VecDeque<(PathName, &DirIndex)> = VecDeque::new();
-        queue.push_back(("/".into(), &root));
-        alive.dirs.push("/".into());
+        let mut queue = VecDeque::new();
+        queue.push_back(("/".into(), root));
+        alive.dirs.push((Self::root_index(), "/".into()));
+
+        // Because symbolic links can loop back, we only follow them only a few times.
+        for _ in 1..=3 {
+            let follow_queue = self.alive_follow_once(&mut alive, queue);
+            queue = follow_queue;
+        }
+
+        alive.dirs.sort();
+        alive.files.sort();
+        alive.symlinks.sort();
+        alive
+    }
+
+    /// Breadth-first search, follow symbolic links once
+    fn alive_follow_once(
+        &self,
+        alive: &mut AliveNodes,
+        mut queue: VecDeque<(PathName, DirIndex)>,
+    ) -> VecDeque<(PathName, DirIndex)> {
+        let mut follow_next = VecDeque::new();
         while let Some((path, idx)) = queue.pop_front() {
-            let dir = self.dir(idx);
+            let dir = self.dir(&idx);
             for (name, node) in dir.children.iter() {
                 match node {
                     Node::Dir(idx) => {
                         let path = path.join(name.to_owned());
-                        queue.push_back((path.clone(), idx));
-                        alive.dirs.push(path.clone());
+                        queue.push_back((path.clone(), *idx));
+                        alive.dirs.push((idx.clone(), path.clone()));
                     }
                     Node::File(idx) => {
                         alive.files.push((*idx, path.join(name.to_owned())));
                     }
+                    Node::Symlink(idx) => {
+                        alive.symlinks.push(path.join(name.to_owned()));
+                        let follow_path = self.sym(idx).target.clone();
+                        match self.resolve_node(follow_path) {
+                            Ok(Node::File(idx)) => {
+                                alive.files.push((idx, path.join(name.to_owned())));
+                            }
+                            Ok(Node::Dir(idx)) => {
+                                let path = path.join(name.to_owned());
+                                follow_next.push_back((path.clone(), idx));
+                                alive.dirs.push((idx, path.clone()));
+                            }
+                            _ => {}
+                        }
+                    }
                 }
             }
         }
-        alive.dirs.sort();
-        alive.files.sort();
-        alive
+        follow_next
     }
 }
 
@@ -435,8 +500,9 @@ mod tests {
         let fs = AbstractFS::new();
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".into()],
-                files: vec![]
+                dirs: vec![(AbstractFS::root_index(), "/".into())],
+                files: vec![],
+                symlinks: vec![],
             },
             fs.alive()
         )
@@ -464,8 +530,12 @@ mod tests {
         );
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".into(), "/foobar".into()],
-                files: vec![]
+                dirs: vec![
+                    (AbstractFS::root_index(), "/".into()),
+                    (foo, "/foobar".into())
+                ],
+                files: vec![],
+                symlinks: vec![],
             },
             fs.alive()
         );
@@ -489,8 +559,9 @@ mod tests {
         assert_eq!(Node::File(foo), *fs.root().children.get("foobar").unwrap());
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".into()],
-                files: vec![(foo, "/foobar".into())]
+                dirs: vec![(AbstractFS::root_index(), "/".into())],
+                files: vec![(foo, "/foobar".into())],
+                symlinks: vec![],
             },
             fs.alive()
         );
@@ -524,8 +595,9 @@ mod tests {
 
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".into()],
-                files: vec![(foo, "/foobar".into()), (boo, "/boo".into())]
+                dirs: vec![(AbstractFS::root_index(), "/".into())],
+                files: vec![(foo, "/foobar".into()), (boo, "/boo".into())],
+                symlinks: vec![],
             },
             fs.alive()
         );
@@ -536,8 +608,9 @@ mod tests {
         assert_eq!(Node::File(boo), *fs.root().children.get("boo").unwrap());
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".into()],
-                files: vec![(boo, "/boo".into())]
+                dirs: vec![(AbstractFS::root_index(), "/".into())],
+                files: vec![(boo, "/boo".into())],
+                symlinks: vec![],
             },
             fs.alive()
         );
@@ -572,8 +645,9 @@ mod tests {
         assert_eq!(foo, boo);
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".into(), "/bar".into()],
-                files: vec![(boo, "/bar/boo".into()), (foo, "/foo".into())]
+                dirs: vec![(AbstractFS::root_index(), "/".into()), (bar, "/bar".into())],
+                files: vec![(boo, "/bar/boo".into()), (foo, "/foo".into())],
+                symlinks: vec![],
             },
             fs.alive()
         );
@@ -618,8 +692,9 @@ mod tests {
 
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".into()],
-                files: vec![(foo, "/foo".into())]
+                dirs: vec![(AbstractFS::root_index(), "/".into())],
+                files: vec![(foo, "/foo".into())],
+                symlinks: vec![],
             },
             fs.alive()
         );
@@ -677,13 +752,18 @@ mod tests {
     #[test]
     fn test_remove_dir() {
         let mut fs = AbstractFS::new();
-        fs.mkdir("/foobar".into(), vec![]).unwrap();
+        let foo = fs.mkdir("/foobar".into(), vec![]).unwrap();
         let boo = fs.mkdir("/boo".into(), vec![]).unwrap();
 
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".into(), "/boo".into(), "/foobar".into()],
-                files: vec![]
+                dirs: vec![
+                    (AbstractFS::root_index(), "/".into()),
+                    (foo, "/foobar".into()),
+                    (boo, "/boo".into()),
+                ],
+                files: vec![],
+                symlinks: vec![],
             },
             fs.alive()
         );
@@ -694,8 +774,9 @@ mod tests {
         assert_eq!(Node::Dir(boo), *fs.root().children.get("boo").unwrap());
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".into(), "/boo".into()],
-                files: vec![]
+                dirs: vec![(AbstractFS::root_index(), "/".into()), (boo, "/boo".into())],
+                files: vec![],
+                symlinks: vec![],
             },
             fs.alive()
         );
@@ -735,8 +816,9 @@ mod tests {
         fs.rename("/foo".into(), "/bar".into()).unwrap();
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".into()],
-                files: vec![(foo, "/bar".into())]
+                dirs: vec![(AbstractFS::root_index(), "/".into())],
+                files: vec![(foo, "/bar".into())],
+                symlinks: vec![],
             },
             fs.alive()
         );
@@ -761,12 +843,13 @@ mod tests {
     #[test]
     fn test_rename_dir() {
         let mut fs = AbstractFS::new();
-        fs.mkdir("/foo".into(), vec![]).unwrap();
+        let foo = fs.mkdir("/foo".into(), vec![]).unwrap();
         fs.rename("/foo".into(), "/bar".into()).unwrap();
         assert_eq!(
             AliveNodes {
-                dirs: vec!["/".into(), "/bar".into()],
-                files: vec![]
+                dirs: vec![(AbstractFS::root_index(), "/".into()), (foo, "/bar".into())],
+                files: vec![],
+                symlinks: vec![],
             },
             fs.alive()
         );
@@ -1165,6 +1248,82 @@ mod tests {
             fs.recording
         );
         test_replay(fs.recording);
+    }
+
+    #[test]
+    fn test_symlink() {
+        let mut fs = AbstractFS::new();
+        let foo = fs.mkdir("/foo".into(), vec![]).unwrap();
+        let bar = fs.create("/foo/bar".into(), vec![]).unwrap();
+        fs.symlink("/foo".into(), "/baz".into()).unwrap();
+        assert_eq!(
+            AliveNodes {
+                dirs: vec![
+                    (AbstractFS::root_index(), "/".into()),
+                    (foo, "/baz".into()),
+                    (foo, "/foo".into())
+                ],
+                files: vec![(bar, "/baz/bar".into()), (bar, "/foo/bar".into())],
+                symlinks: vec!["/baz".into()],
+            },
+            fs.alive()
+        );
+        assert_eq!(
+            Workload {
+                ops: vec![
+                    Operation::MkDir {
+                        path: "/foo".into(),
+                        mode: vec![]
+                    },
+                    Operation::Create {
+                        path: "/foo/bar".into(),
+                        mode: vec![]
+                    },
+                    Operation::Symlink {
+                        target: "/foo".into(),
+                        linkpath: "/baz".into(),
+                    }
+                ]
+            },
+            fs.recording
+        );
+        test_replay(fs.recording);
+    }
+
+    #[test]
+    fn test_symlink_name_exists() {
+        let mut fs = AbstractFS::new();
+        fs.create("/foo".into(), vec![]).unwrap();
+        fs.create("/bar".into(), vec![]).unwrap();
+        assert_eq!(
+            Err(FsError::NameAlreadyExists("/bar".into())),
+            fs.symlink("/foo".into(), "/bar".into()),
+        );
+    }
+
+    #[test]
+    fn test_symlink_recursion() {
+        let mut fs = AbstractFS::new();
+        let foo = fs.mkdir("/foo".into(), vec![]).unwrap();
+        fs.symlink("/foo".into(), "/foo/bar".into()).unwrap();
+        assert_eq!(
+            AliveNodes {
+                dirs: vec![
+                    (AbstractFS::root_index(), "/".into()),
+                    (foo, "/foo".into()),
+                    (foo, "/foo/bar".into()),
+                    (foo, "/foo/bar/bar".into()),
+                    (foo, "/foo/bar/bar/bar".into())
+                ],
+                files: vec![],
+                symlinks: vec![
+                    "/foo/bar".into(),
+                    "/foo/bar/bar".into(),
+                    "/foo/bar/bar/bar".into(),
+                ]
+            },
+            fs.alive()
+        );
     }
 
     #[test]
