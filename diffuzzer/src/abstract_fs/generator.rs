@@ -136,10 +136,12 @@ pub fn append_one(
             .choose(rng)
             .unwrap()
             .to_owned();
+
+            let name = gen_name();
             loop {
                 let new_path = alive.dirs.choose(rng).unwrap().1.to_owned();
                 if let Err(FsError::RenameToSubdirectoryError(..)) =
-                    fs.rename(old_path.clone(), new_path.join(gen_name()))
+                    fs.rename(old_path.clone(), new_path.join(name.clone()))
                 {
                     continue;
                 }
