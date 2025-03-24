@@ -1376,6 +1376,57 @@ mod tests {
     }
 
     #[test]
+    fn test_remove_symlink() {
+        let mut fs = AbstractFS::new();
+        let foo = fs.create("/foo".into(), vec![]).unwrap();
+        fs.symlink("/foo".into(), "/bar".into()).unwrap();
+        fs.remove("/bar".into()).unwrap();
+        assert_eq!(
+            AliveNodes {
+                dirs: vec![(AbstractFS::root_index(), "/".into())],
+                files: vec![(foo, "/foo".into())],
+                symlinks: vec![],
+            },
+            fs.alive()
+        );
+        test_replay(fs.recording);
+    }
+
+    #[test]
+    fn test_rename_symlink() {
+        let mut fs = AbstractFS::new();
+        let foo = fs.create("/foo".into(), vec![]).unwrap();
+        fs.symlink("/foo".into(), "/bar".into()).unwrap();
+        fs.rename("/bar".into(), "/baz".into()).unwrap();
+        assert_eq!(
+            AliveNodes {
+                dirs: vec![(AbstractFS::root_index(), "/".into())],
+                files: vec![(foo, "/baz".into()), (foo, "/foo".into())],
+                symlinks: vec!["/baz".into()],
+            },
+            fs.alive()
+        );
+        test_replay(fs.recording);
+    }
+
+    #[test]
+    fn test_rename_symlink_overwrite() {
+        let mut fs = AbstractFS::new();
+        let foo = fs.create("/foo".into(), vec![]).unwrap();
+        fs.symlink("/foo".into(), "/bar".into()).unwrap();
+        fs.rename("/foo".into(), "/bar".into()).unwrap();
+        assert_eq!(
+            AliveNodes {
+                dirs: vec![(AbstractFS::root_index(), "/".into())],
+                files: vec![(foo, "/bar".into())],
+                symlinks: vec![],
+            },
+            fs.alive()
+        );
+        test_replay(fs.recording);
+    }
+
+    #[test]
     fn test_resolve_node() {
         let mut fs = AbstractFS::new();
         assert_eq!(
