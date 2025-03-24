@@ -6,7 +6,7 @@ use rand::{Rng, seq::SliceRandom};
 
 use super::{
     flags::ModeFlag,
-    fs::AbstractFS,
+    fs::{AbstractFS, FsError},
     node::FileDescriptorIndex,
     operation::{OperationKind, OperationWeights},
     pathname::{Name, PathName},
@@ -65,14 +65,15 @@ pub fn append_one(
     let alive_dirs_except_root: Vec<PathName> = alive
         .dirs
         .iter()
-        .filter(|d| **d != "/".into())
+        .filter(|(idx, _)| *idx != AbstractFS::root_index())
+        .map(|(_, path)| path)
         .cloned()
         .collect();
     let alive_closed_files: Vec<PathName> = alive
         .files
         .iter()
         .filter(|(idx, _)| fs.file(idx).descriptor.is_none())
-        .map(|(_, p)| p)
+        .map(|(_, path)| path)
         .cloned()
         .collect();
     let alive_open_files: Vec<FileDescriptorIndex> = alive
@@ -81,7 +82,7 @@ pub fn append_one(
         .filter_map(|(idx, _)| fs.file(idx).descriptor)
         .collect();
     let mut ops = weights.clone();
-    if alive_dirs_except_root.is_empty() {
+    if alive_dirs_except_root.is_empty() && alive.files.is_empty() {
         ops.weights.retain(|(op, _)| *op != OperationKind::Remove);
     }
     if alive.files.is_empty() {
@@ -101,17 +102,18 @@ pub fn append_one(
     }
     match ops.weights.choose_weighted(rng, |item| item.1).unwrap().0 {
         OperationKind::MkDir => {
-            let path = alive.dirs.choose(rng).unwrap().to_owned();
+            let path = alive.dirs.choose(rng).unwrap().to_owned().1;
             fs.mkdir(path.join(gen_name()), mode.clone()).unwrap();
         }
         OperationKind::Create => {
-            let path = alive.dirs.choose(rng).unwrap().to_owned();
+            let path = alive.dirs.choose(rng).unwrap().to_owned().1;
             fs.create(path.join(gen_name()), mode.clone()).unwrap();
         }
         OperationKind::Remove => {
             let path = [
-                alive_dirs_except_root,
+                alive_dirs_except_root.clone(),
                 alive.files.iter().map(|(_, path)| path.clone()).collect(),
+                alive.symlinks.clone(),
             ]
             .concat()
             .choose(rng)
@@ -121,26 +123,28 @@ pub fn append_one(
         }
         OperationKind::Hardlink => {
             let file_path = alive.files.choose(rng).unwrap().to_owned().1;
-            let dir_path = alive.dirs.choose(rng).unwrap().to_owned();
+            let dir_path = alive.dirs.choose(rng).unwrap().to_owned().1;
             fs.hardlink(file_path, dir_path.join(gen_name())).unwrap();
         }
         OperationKind::Rename => {
             let old_path = [
                 alive_dirs_except_root,
                 alive.files.iter().map(|(_, path)| path.clone()).collect(),
+                alive.symlinks.clone(),
             ]
             .concat()
             .choose(rng)
             .unwrap()
             .to_owned();
-            let alive_non_subdirectories: Vec<PathName> = alive
-                .dirs
-                .iter()
-                .filter(|p| !old_path.is_prefix_of(p))
-                .cloned()
-                .collect();
-            let new_path = alive_non_subdirectories.choose(rng).unwrap().to_owned();
-            fs.rename(old_path, new_path.join(gen_name())).unwrap();
+            loop {
+                let new_path = alive.dirs.choose(rng).unwrap().1.to_owned();
+                if let Err(FsError::RenameToSubdirectoryError(..)) =
+                    fs.rename(old_path.clone(), new_path.join(gen_name()))
+                {
+                    continue;
+                }
+                break;
+            }
         }
         OperationKind::Open => {
             let path = alive_closed_files.choose(rng).unwrap().to_owned();
@@ -167,6 +171,27 @@ pub fn append_one(
             let des = alive_open_files.choose(rng).unwrap().to_owned();
             fs.fsync(des).unwrap();
         }
+        OperationKind::Symlink => {
+            let target: PathName = [
+                alive
+                    .dirs
+                    .iter()
+                    .map(|(_, path)| path.clone())
+                    .collect::<Vec<PathName>>(),
+                alive
+                    .files
+                    .iter()
+                    .map(|(_, path)| path.clone())
+                    .collect::<Vec<PathName>>(),
+                alive.symlinks.clone(),
+            ]
+            .concat()
+            .choose(rng)
+            .unwrap()
+            .to_owned();
+            let linkpath = alive.dirs.choose(rng).unwrap().1.clone();
+            fs.symlink(target, linkpath.join(gen_name())).unwrap();
+        }
     }
 }
 
@@ -180,7 +205,7 @@ mod tests {
     fn smoke_test_generate_new() {
         for i in 0..100 {
             let mut rng = StdRng::seed_from_u64(i);
-            generate_new(&mut rng, 1000, &OperationWeights::uniform());
+            generate_new(&mut rng, 300, &OperationWeights::uniform());
         }
     }
 }

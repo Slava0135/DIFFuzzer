@@ -96,6 +96,14 @@ pub fn insert(
                 size: _,
             } => {}
             Operation::FSync { des: _ } => {}
+            Operation::Symlink { target, linkpath } => {
+                for segment in target.segments() {
+                    used_names.insert(segment);
+                }
+                for segment in linkpath.segments() {
+                    used_names.insert(segment);
+                }
+            }
         }
     }
 
