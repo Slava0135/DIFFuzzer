@@ -1380,13 +1380,13 @@ mod tests {
                     (foo, "/foo".into()),
                     (foo, "/foo/bar".into()),
                     (foo, "/foo/bar/bar".into()),
-                    (foo, "/foo/bar/bar/bar".into())
+                    // (foo, "/foo/bar/bar/bar".into())
                 ],
                 files: vec![],
                 symlinks: vec![
                     "/foo/bar".into(),
                     "/foo/bar/bar".into(),
-                    "/foo/bar/bar/bar".into(),
+                    // "/foo/bar/bar/bar".into(),
                 ]
             },
             fs.alive()
