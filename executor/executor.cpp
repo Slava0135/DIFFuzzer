@@ -72,6 +72,7 @@ const char *CLOSE = "CLOSE";
 const char *UNLINK = "UNLINK";
 const char *STAT = "STAT";
 const char *HARDLINK = "HARDLINK";
+const char *SYMLINK = "SYMLINK";
 const char *RENAME = "RENAME";
 const char *OPEN = "OPEN";
 const char *WRITE = "WRITE";
@@ -407,6 +408,18 @@ int do_hardlink(const char *old_path, const char *new_path) {
     failure2(status, HARDLINK, old_path, new_path, "");
   } else {
     success(status, HARDLINK, "");
+  }
+  return status;
+}
+
+int do_symlink(const char *target, const char *linkpath) {
+  idx++;
+  int status =
+      symlink(patch_path(target).c_str(), patch_path(linkpath).c_str());
+  if (status == -1) {
+    failure2(status, SYMLINK, target, linkpath, "");
+  } else {
+    success(status, SYMLINK, "");
   }
   return status;
 }

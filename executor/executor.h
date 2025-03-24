@@ -23,6 +23,8 @@ int do_create(const char *path, mode_t param);
 int do_remove(const char *path);
 /// `link` operation.
 int do_hardlink(const char *old_path, const char *new_path);
+/// `symlink` operation.
+int do_symlink(const char *target, const char *linkpath);
 /// `rename` operation.
 int do_rename(const char *old_path, const char *new_path);
 /// `open` operation. TODO: flags
