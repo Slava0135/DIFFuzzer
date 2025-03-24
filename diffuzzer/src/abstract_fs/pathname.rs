@@ -10,6 +10,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Hash, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathName(String);
 
+/// Abstract filesystem file name.
+pub type Name = String;
+
 impl Display for PathName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
@@ -58,37 +61,5 @@ impl PathName {
 
     pub fn is_root(&self) -> bool {
         self.0 == "/"
-    }
-
-    pub fn is_prefix_of(&self, other: &PathName) -> bool {
-        let segments = self.segments();
-        let other_segments = other.segments();
-        if other_segments.len() < segments.len() {
-            false
-        } else {
-            for i in 0..segments.len() {
-                if segments[i] != other_segments[i] {
-                    return false;
-                }
-            }
-            true
-        }
-    }
-}
-
-/// Abstract filesystem file name.
-pub type Name = String;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_is_prefix_of() {
-        assert!(PathName::from("/1/2").is_prefix_of(&PathName::from("/1/2/3")));
-        assert!(!PathName::from("/1/2").is_prefix_of(&PathName::from("/1/20/3")));
-        assert!(!PathName::from("/1/2").is_prefix_of(&PathName::from("/1")));
-        assert!(PathName::from("/").is_prefix_of(&PathName::from("/1")));
-        assert!(PathName::from("/1").is_prefix_of(&PathName::from("/1")));
     }
 }

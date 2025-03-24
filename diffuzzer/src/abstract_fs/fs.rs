@@ -71,7 +71,7 @@ pub struct AliveNodes {
     pub symlinks: Vec<PathName>,
 }
 
-const MAX_SYMLINK_FOLLOW: u8 = 3;
+const MAX_SYMLINK_FOLLOW: u8 = 2;
 
 impl AbstractFS {
     pub fn new() -> Self {
@@ -396,20 +396,17 @@ impl AbstractFS {
         path: PathName,
         follow_symlinks: bool,
     ) -> Result<(Vec<DirIndex>, Node)> {
-        self.resolve_node_rec(path, follow_symlinks, 1)
+        self.resolve_node_rec(path, follow_symlinks, vec![])
     }
 
     pub fn resolve_node_rec(
         &self,
         path: PathName,
         follow_symlinks: bool,
-        follow_depth: u8,
+        mut visited_symlinks: Vec<SymlinkIndex>,
     ) -> Result<(Vec<DirIndex>, Node)> {
         if !path.is_valid() {
             return Err(FsError::InvalidPath(path));
-        }
-        if follow_depth > MAX_SYMLINK_FOLLOW {
-            return Err(FsError::LoopExists(path));
         }
         let mut dirs = vec![];
         let segments = path.segments();
@@ -440,9 +437,13 @@ impl AbstractFS {
         }
         match last {
             Node::Symlink(idx) if follow_symlinks => {
+                if visited_symlinks.contains(&idx) {
+                    return Err(FsError::LoopExists(path.into()));
+                }
                 let target = self.sym(&idx).target.clone();
+                visited_symlinks.push(idx);
                 let (mut rec_dirs, last) =
-                    self.resolve_node_rec(target, follow_symlinks, follow_depth + 1)?;
+                    self.resolve_node_rec(target, follow_symlinks, visited_symlinks)?;
                 dirs.append(&mut rec_dirs);
                 Ok((dirs, last))
             }

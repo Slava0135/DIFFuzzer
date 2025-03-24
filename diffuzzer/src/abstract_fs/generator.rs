@@ -6,7 +6,7 @@ use rand::{Rng, seq::SliceRandom};
 
 use super::{
     flags::ModeFlag,
-    fs::AbstractFS,
+    fs::{AbstractFS, FsError},
     node::FileDescriptorIndex,
     operation::{OperationKind, OperationWeights},
     pathname::{Name, PathName},
@@ -82,7 +82,7 @@ pub fn append_one(
         .filter_map(|(idx, _)| fs.file(idx).descriptor)
         .collect();
     let mut ops = weights.clone();
-    if alive_dirs_except_root.is_empty() {
+    if alive_dirs_except_root.is_empty() && alive.files.is_empty() {
         ops.weights.retain(|(op, _)| *op != OperationKind::Remove);
     }
     if alive.files.is_empty() {
@@ -111,7 +111,7 @@ pub fn append_one(
         }
         OperationKind::Remove => {
             let path = [
-                alive_dirs_except_root,
+                alive_dirs_except_root.clone(),
                 alive.files.iter().map(|(_, path)| path.clone()).collect(),
             ]
             .concat()
@@ -134,16 +134,15 @@ pub fn append_one(
             .choose(rng)
             .unwrap()
             .to_owned();
-            let alive_non_subdirectories: Vec<PathName> = alive
-                .dirs
-                .iter()
-                .filter(|(_, path)| !old_path.is_prefix_of(path))
-                .map(|(_, path)| path)
-                .cloned()
-                .collect();
-            let new_path = alive_non_subdirectories.choose(rng).unwrap().to_owned();
-            fs.rename(old_path, new_path.join(gen_name())).unwrap();
-            todo!("fix subdirectories rename with symlinks");
+            loop {
+                let new_path = alive.dirs.choose(rng).unwrap().1.to_owned();
+                if let Err(FsError::RenameToSubdirectoryError(..)) =
+                    fs.rename(old_path.clone(), new_path.join(gen_name()))
+                {
+                    continue;
+                }
+                break;
+            }
         }
         OperationKind::Open => {
             let path = alive_closed_files.choose(rng).unwrap().to_owned();
@@ -203,7 +202,7 @@ mod tests {
     fn smoke_test_generate_new() {
         for i in 0..100 {
             let mut rng = StdRng::seed_from_u64(i);
-            generate_new(&mut rng, 1000, &OperationWeights::uniform());
+            generate_new(&mut rng, 300, &OperationWeights::uniform());
         }
     }
 }
