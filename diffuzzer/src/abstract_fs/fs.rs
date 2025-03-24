@@ -44,6 +44,8 @@ pub enum FsError {
     FileAlreadyOpened(PathName),
     #[error("tried to rename '{0}' into subdirectory of itself '{1}'")]
     RenameToSubdirectoryError(PathName, PathName),
+    #[error("loop exists in symbolic links encountered during path resolution")]
+    LoopExists(PathName),
     #[error(transparent)]
     ContentError(#[from] ContentError),
 }
@@ -68,6 +70,8 @@ pub struct AliveNodes {
     pub files: Vec<(FileIndex, PathName)>,
     pub symlinks: Vec<PathName>,
 }
+
+const MAX_SYMLINK_FOLLOW: u8 = 3;
 
 impl AbstractFS {
     pub fn new() -> Self {
@@ -155,7 +159,7 @@ impl AbstractFS {
         Ok(old_file.to_owned())
     }
 
-    pub fn symlink(&mut self, target: PathName, linkpath: PathName) -> Result<()> {
+    pub fn symlink(&mut self, target: PathName, linkpath: PathName) -> Result<SymlinkIndex> {
         let (parent_path, name) = linkpath.split();
         let parent = self.resolve_dir(parent_path.to_owned())?;
         if self.name_exists(&parent, &name) {
@@ -170,7 +174,7 @@ impl AbstractFS {
             .children
             .insert(name.clone(), Node::Symlink(sym_idx));
         self.recording.push(Operation::Symlink { target, linkpath });
-        Ok(())
+        Ok(sym_idx)
     }
 
     /// Renames a file, moving it between directories if required, similar to `rename`.
@@ -183,7 +187,7 @@ impl AbstractFS {
                 return Err(FsError::DirNotEmpty(new_path));
             }
         }
-        let node = self.resolve_node(old_path.clone())?;
+        let node = self.resolve_node(old_path.clone(), false)?;
 
         let (parent_path, name) = new_path.split();
         let parent = self.resolve_dir(parent_path.to_owned())?;
@@ -383,18 +387,35 @@ impl AbstractFS {
             .ok_or(FsError::BadDescriptor(*idx, len))
     }
 
-    pub fn resolve_node(&self, path: PathName) -> Result<Node> {
+    pub fn resolve_node(&self, path: PathName, follow_symlinks: bool) -> Result<Node> {
+        self.resolve_node_rec(path, follow_symlinks, 1)
+    }
+
+    pub fn resolve_node_rec(
+        &self,
+        path: PathName,
+        follow_symlinks: bool,
+        follow_depth: u8,
+    ) -> Result<Node> {
         if !path.is_valid() {
             return Err(FsError::InvalidPath(path));
         }
-        let segments: Vec<&str> = path.segments();
+        if follow_depth > MAX_SYMLINK_FOLLOW {
+            return Err(FsError::LoopExists(path));
+        }
+        let segments = path.segments();
         let mut last = Node::Dir(AbstractFS::root_index());
         let mut path = String::new();
         for segment in &segments {
             path.push('/');
             path.push_str(segment);
             let dir = match last {
-                Node::Dir(dir_index) => self.dir(&dir_index),
+                Node::Dir(idx) => self.dir(&idx),
+                Node::Symlink(idx) => {
+                    let target = self.sym(&idx).target.clone();
+                    let dir_index = self.resolve_dir(target)?;
+                    self.dir(&dir_index)
+                }
                 _ => return Err(FsError::NotADir(path.into())),
             };
             last = dir
@@ -403,18 +424,24 @@ impl AbstractFS {
                 .ok_or(FsError::NotFound(path.clone().into()))?
                 .clone();
         }
-        Ok(last)
+        match last {
+            Node::Symlink(idx) if follow_symlinks => {
+                let target = self.sym(&idx).target.clone();
+                self.resolve_node_rec(target, follow_symlinks, follow_depth + 1)
+            }
+            _ => Ok(last),
+        }
     }
 
     pub fn resolve_file(&self, path: PathName) -> Result<FileIndex> {
-        match self.resolve_node(path.clone())? {
+        match self.resolve_node(path.clone(), true)? {
             Node::File(idx) => Ok(idx),
             _ => Err(FsError::NotAFile(path)),
         }
     }
 
     pub fn resolve_dir(&self, path: PathName) -> Result<DirIndex> {
-        match self.resolve_node(path.clone())? {
+        match self.resolve_node(path.clone(), true)? {
             Node::Dir(idx) => Ok(idx),
             _ => Err(FsError::NotADir(path)),
         }
@@ -437,7 +464,7 @@ impl AbstractFS {
         alive.dirs.push((Self::root_index(), "/".into()));
 
         // Because symbolic links can loop back, we follow them only a few times.
-        for _ in 1..=3 {
+        for _ in 1..=MAX_SYMLINK_FOLLOW {
             let follow_queue = self.alive_follow_once(&mut alive, queue);
             queue = follow_queue;
         }
@@ -471,29 +498,19 @@ impl AbstractFS {
                     }
                     Node::Symlink(idx) => {
                         alive.symlinks.push(dir_path.join(child_name.to_owned()));
-                        let mut follow_idx = idx.clone();
-                        // Because symbolic links can loop back, we follow them only a few times.
-                        // Can probably track indices here instead.
-                        for _ in 1..=3 {
-                            let follow_path = self.sym(&follow_idx).target.clone();
-                            match self.resolve_node(follow_path) {
-                                Ok(Node::Symlink(idx)) => {
-                                    follow_idx = idx;
-                                }
-                                Ok(Node::File(idx)) => {
-                                    alive
-                                        .files
-                                        .push((idx, dir_path.join(child_name.to_owned())));
-                                    break;
-                                }
-                                Ok(Node::Dir(idx)) => {
-                                    let path = dir_path.join(child_name.to_owned());
-                                    follow_next.push_back((path.clone(), idx));
-                                    alive.dirs.push((idx, path.clone()));
-                                    break;
-                                }
-                                Err(_) => {}
+                        let follow_path = self.sym(&idx).target.clone();
+                        match self.resolve_node(follow_path, true) {
+                            Ok(Node::File(idx)) => {
+                                alive
+                                    .files
+                                    .push((idx, dir_path.join(child_name.to_owned())));
                             }
+                            Ok(Node::Dir(idx)) => {
+                                let path = dir_path.join(child_name.to_owned());
+                                follow_next.push_back((path.clone(), idx));
+                                alive.dirs.push((idx, path.clone()));
+                            }
+                            _ => {}
                         }
                     }
                 }
@@ -1431,28 +1448,68 @@ mod tests {
         let mut fs = AbstractFS::new();
         assert_eq!(
             Node::Dir(AbstractFS::root_index()),
-            fs.resolve_node("/".into()).unwrap()
+            fs.resolve_node("/".into(), true).unwrap()
         );
         let foo = fs.mkdir("/foo".into(), vec![]).unwrap();
         let bar = fs.mkdir("/foo/bar".into(), vec![]).unwrap();
         let boo = fs.create("/foo/bar/boo".into(), vec![]).unwrap();
         assert_eq!(
             Err(FsError::InvalidPath("".into())),
-            fs.resolve_node("".into())
+            fs.resolve_node("".into(), true)
         );
         assert_eq!(
             Err(FsError::InvalidPath("foo".into())),
-            fs.resolve_node("foo".into())
+            fs.resolve_node("foo".into(), true)
         );
         assert_eq!(
             Err(FsError::InvalidPath("/foo/".into())),
-            fs.resolve_node("/foo/".into())
+            fs.resolve_node("/foo/".into(), true)
         );
-        assert_eq!(Node::Dir(foo), fs.resolve_node("/foo".into()).unwrap());
-        assert_eq!(Node::Dir(bar), fs.resolve_node("/foo/bar".into()).unwrap());
+        assert_eq!(
+            Node::Dir(foo),
+            fs.resolve_node("/foo".into(), true).unwrap()
+        );
+        assert_eq!(
+            Node::Dir(bar),
+            fs.resolve_node("/foo/bar".into(), true).unwrap()
+        );
         assert_eq!(
             Node::File(boo),
-            fs.resolve_node("/foo/bar/boo".into()).unwrap()
+            fs.resolve_node("/foo/bar/boo".into(), true).unwrap()
+        );
+        test_replay(fs.recording);
+    }
+
+    #[test]
+    fn test_resolve_node_symlinks() {
+        let mut fs = AbstractFS::new();
+        let foo = fs.mkdir("/foo".into(), vec![]).unwrap();
+        let bar = fs.create("/foo/bar".into(), vec![]).unwrap();
+        let foos = fs.symlink("/foo".into(), "/foos".into()).unwrap();
+        assert_eq!(
+            Node::Dir(foo),
+            fs.resolve_node("/foo".into(), true).unwrap()
+        );
+        assert_eq!(
+            Node::Dir(foo),
+            fs.resolve_node("/foos".into(), true).unwrap()
+        );
+        assert_eq!(
+            Node::Symlink(foos),
+            fs.resolve_node("/foos".into(), false).unwrap()
+        );
+        assert_eq!(
+            Node::File(bar),
+            fs.resolve_node("/foo/bar".into(), true).unwrap()
+        );
+        assert_eq!(
+            Node::File(bar),
+            fs.resolve_node("/foos/bar".into(), true).unwrap()
+        );
+        // Always follow symlinks in dirname part of the path.
+        assert_eq!(
+            Node::File(bar),
+            fs.resolve_node("/foos/bar".into(), false).unwrap()
         );
         test_replay(fs.recording);
     }
