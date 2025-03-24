@@ -113,6 +113,7 @@ pub fn append_one(
             let path = [
                 alive_dirs_except_root.clone(),
                 alive.files.iter().map(|(_, path)| path.clone()).collect(),
+                alive.symlinks.clone(),
             ]
             .concat()
             .choose(rng)
@@ -129,6 +130,7 @@ pub fn append_one(
             let old_path = [
                 alive_dirs_except_root,
                 alive.files.iter().map(|(_, path)| path.clone()).collect(),
+                alive.symlinks.clone(),
             ]
             .concat()
             .choose(rng)
@@ -181,6 +183,7 @@ pub fn append_one(
                     .iter()
                     .map(|(_, path)| path.clone())
                     .collect::<Vec<PathName>>(),
+                alive.symlinks.clone(),
             ]
             .concat()
             .choose(rng)
