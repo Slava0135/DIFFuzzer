@@ -455,31 +455,39 @@ impl AbstractFS {
         mut queue: VecDeque<(PathName, DirIndex)>,
     ) -> VecDeque<(PathName, DirIndex)> {
         let mut follow_next = VecDeque::new();
-        while let Some((path, idx)) = queue.pop_front() {
+        while let Some((dir_path, idx)) = queue.pop_front() {
             let dir = self.dir(&idx);
-            for (name, node) in dir.children.iter() {
+            for (child_name, node) in dir.children.iter() {
                 match node {
                     Node::Dir(idx) => {
-                        let path = path.join(name.to_owned());
+                        let path = dir_path.join(child_name.to_owned());
                         queue.push_back((path.clone(), *idx));
                         alive.dirs.push((idx.clone(), path.clone()));
                     }
                     Node::File(idx) => {
-                        alive.files.push((*idx, path.join(name.to_owned())));
+                        alive.files.push((*idx, dir_path.join(child_name.to_owned())));
                     }
                     Node::Symlink(idx) => {
-                        alive.symlinks.push(path.join(name.to_owned()));
-                        let follow_path = self.sym(idx).target.clone();
-                        match self.resolve_node(follow_path) {
-                            Ok(Node::File(idx)) => {
-                                alive.files.push((idx, path.join(name.to_owned())));
+                        alive.symlinks.push(dir_path.join(child_name.to_owned()));
+                        let mut follow_idx = idx.clone();
+                        loop {
+                            let follow_path = self.sym(&follow_idx).target.clone();
+                            match self.resolve_node(follow_path) {
+                                Ok(Node::Symlink(idx)) => {
+                                    follow_idx = idx;
+                                }
+                                Ok(Node::File(idx)) => {
+                                    alive.files.push((idx, dir_path.join(child_name.to_owned())));
+                                    break;
+                                }
+                                Ok(Node::Dir(idx)) => {
+                                    let path = dir_path.join(child_name.to_owned());
+                                    follow_next.push_back((path.clone(), idx));
+                                    alive.dirs.push((idx, path.clone()));
+                                    break;
+                                }
+                                Err(_) => {}
                             }
-                            Ok(Node::Dir(idx)) => {
-                                let path = path.join(name.to_owned());
-                                follow_next.push_back((path.clone(), idx));
-                                alive.dirs.push((idx, path.clone()));
-                            }
-                            _ => {}
                         }
                     }
                 }
@@ -1321,6 +1329,26 @@ mod tests {
                     "/foo/bar/bar".into(),
                     "/foo/bar/bar/bar".into(),
                 ]
+            },
+            fs.alive()
+        );
+    }
+
+    #[test]
+    fn test_symlink_to_symlink() {
+        let mut fs = AbstractFS::new();
+        let foo = fs.create("/foo".into(), vec![]).unwrap();
+        fs.symlink("/foo".into(), "/bar".into()).unwrap();
+        fs.symlink("/bar".into(), "/boo".into()).unwrap();
+        assert_eq!(
+            AliveNodes {
+                dirs: vec![(AbstractFS::root_index(), "/".into()),],
+                files: vec![
+                    (foo, "/bar".into()),
+                    (foo, "/boo".into()),
+                    (foo, "/foo".into()),
+                ],
+                symlinks: vec!["/bar".into(), "/boo".into()]
             },
             fs.alive()
         );
