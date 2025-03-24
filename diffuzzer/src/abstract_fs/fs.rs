@@ -436,7 +436,7 @@ impl AbstractFS {
         queue.push_back(("/".into(), root));
         alive.dirs.push((Self::root_index(), "/".into()));
 
-        // Because symbolic links can loop back, we only follow them only a few times.
+        // Because symbolic links can loop back, we follow them only a few times.
         for _ in 1..=3 {
             let follow_queue = self.alive_follow_once(&mut alive, queue);
             queue = follow_queue;
@@ -465,19 +465,25 @@ impl AbstractFS {
                         alive.dirs.push((idx.clone(), path.clone()));
                     }
                     Node::File(idx) => {
-                        alive.files.push((*idx, dir_path.join(child_name.to_owned())));
+                        alive
+                            .files
+                            .push((*idx, dir_path.join(child_name.to_owned())));
                     }
                     Node::Symlink(idx) => {
                         alive.symlinks.push(dir_path.join(child_name.to_owned()));
                         let mut follow_idx = idx.clone();
-                        loop {
+                        // Because symbolic links can loop back, we follow them only a few times.
+                        // Can probably track indices here instead.
+                        for _ in 1..=3 {
                             let follow_path = self.sym(&follow_idx).target.clone();
                             match self.resolve_node(follow_path) {
                                 Ok(Node::Symlink(idx)) => {
                                     follow_idx = idx;
                                 }
                                 Ok(Node::File(idx)) => {
-                                    alive.files.push((idx, dir_path.join(child_name.to_owned())));
+                                    alive
+                                        .files
+                                        .push((idx, dir_path.join(child_name.to_owned())));
                                     break;
                                 }
                                 Ok(Node::Dir(idx)) => {
@@ -1349,6 +1355,21 @@ mod tests {
                     (foo, "/foo".into()),
                 ],
                 symlinks: vec!["/bar".into(), "/boo".into()]
+            },
+            fs.alive()
+        );
+    }
+
+    #[test]
+    fn test_symlink_to_symlink_recursive() {
+        let mut fs = AbstractFS::new();
+        fs.symlink("/foo".into(), "/bar".into()).unwrap();
+        fs.symlink("/bar".into(), "/foo".into()).unwrap();
+        assert_eq!(
+            AliveNodes {
+                dirs: vec![(AbstractFS::root_index(), "/".into()),],
+                files: vec![],
+                symlinks: vec!["/bar".into(), "/foo".into()]
             },
             fs.alive()
         );
