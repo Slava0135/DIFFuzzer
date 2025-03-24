@@ -69,8 +69,8 @@ pub fn append_one(
         .map(|(_, path)| path)
         .cloned()
         .collect();
-    let alive_closed_files: Vec<PathName> = alive
-        .files
+    let alive_closed_files: Vec<PathName> = [alive.files.clone(), alive.files_symlinked.clone()]
+        .concat()
         .iter()
         .filter(|(idx, _)| fs.file(idx).descriptor.is_none())
         .map(|(_, path)| path)
