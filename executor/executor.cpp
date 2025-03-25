@@ -67,6 +67,7 @@ const size_t RANDOM_SEED = 123;
 
 const char *MKDIR = "MKDIR";
 const char *RMDIR = "RMDIR";
+const char *REALPATH = "REALPATH";
 const char *CREATE = "CREATE";
 const char *CLOSE = "CLOSE";
 const char *UNLINK = "UNLINK";
@@ -383,11 +384,25 @@ int do_remove(const char *p) {
   }
 
   if (S_ISDIR(file_stat.st_mode)) {
-    status = remove_dir(path.c_str());
-    if (status) {
-      failure(status, RMDIR, path.c_str(), "");
+    // Given symlink:
+    // `/dir/symlink -> /`
+    // Path can contain a symbolic link stored inside directory that resolves to same directory:
+    // `/dir/symlink/dir`
+    // Symlink has to be unlinked before directory is removed, which makes path invalid.
+    // For this reason we resolve path first.
+    //
+    // Maybe this should be forbidden when generating workloads, instead of doing it here.
+    char *real_path = realpath(path.c_str(), nullptr);
+    if (real_path) {
+      status = remove_dir(real_path);
+      if (status) {
+        failure(status, RMDIR, path.c_str(), "");
+      } else {
+        success(status, RMDIR, "");
+      }
+      free(real_path);
     } else {
-      success(status, RMDIR, "");
+      failure(0, REALPATH, path.c_str(), "");
     }
   } else {
     status = unlink(path.c_str());
