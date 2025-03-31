@@ -9,7 +9,6 @@ use rand::prelude::StdRng;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
-use crate::command::CommandInterface;
 use crate::config::Config;
 
 use crate::fuzzing::fuzzer::Fuzzer;
@@ -18,7 +17,7 @@ use crate::fuzzing::runner::Runner;
 use crate::mount::FileSystemMount;
 use crate::path::LocalPath;
 use crate::reason::Reason;
-use crate::supervisor::Supervisor;
+use crate::supervisor::launch_cmdi_and_supervisor;
 
 pub struct BlackBoxFuzzer {
     runner: Runner,
@@ -31,9 +30,10 @@ impl BlackBoxFuzzer {
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
-        cmdi: Box<dyn CommandInterface>,
-        supervisor: Box<dyn Supervisor>,
+        no_qemu: bool,
     ) -> anyhow::Result<Self> {
+        let (cmdi, supervisor) = launch_cmdi_and_supervisor(no_qemu, &config)?;
+
         let runner = Runner::create(
             fst_mount,
             snd_mount,

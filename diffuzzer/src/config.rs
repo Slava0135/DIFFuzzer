@@ -47,18 +47,12 @@ pub struct QemuConfig {
     pub launch_script: String,
     /// Private key used to connect to VM instance using SSH
     pub ssh_private_key_path: String,
-    /// Port for SSH connection
-    pub ssh_port: u16,
     /// Path to OS image
     pub os_image: String,
     /// Time to wait until OS is considered booted
     pub boot_wait_time: u8,
     /// Path to QEMU log file
     pub log_path: String,
-    /// Path to (human) monitor unix socket
-    pub monitor_socket_path: String,
-    /// Path to QMP unix socket
-    pub qmp_socket_path: String,
     /// Run QEMU direct boot with custom kernel and command line arguments
     /// This is required for fuzzing with KASAN
     pub direct_boot: bool,

@@ -15,7 +15,6 @@ use rand::{SeedableRng, rngs::StdRng};
 use walkdir::WalkDir;
 
 use crate::abstract_fs::operation::OperationKind;
-use crate::command::CommandInterface;
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::observer::ObserverList;
 use crate::fuzzing::observer::lcov::LCovObserver;
@@ -24,7 +23,7 @@ use crate::fuzzing::runner::Runner;
 use crate::path::{LocalPath, RemotePath};
 use crate::reason::Reason;
 use crate::save::{TEST_FILE_NAME, save_completed, save_testcase};
-use crate::supervisor::Supervisor;
+use crate::supervisor::launch_cmdi_and_supervisor;
 use crate::{abstract_fs::workload::Workload, config::Config, mount::FileSystemMount};
 
 use super::feedback::kcov::KCovCoverageFeedback;
@@ -58,9 +57,10 @@ impl GreyBoxFuzzer {
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
         corpus_path: Option<String>,
-        cmdi: Box<dyn CommandInterface>,
-        supervisor: Box<dyn Supervisor>,
+        no_qemu: bool,
     ) -> anyhow::Result<Self> {
+        let (cmdi, supervisor) = launch_cmdi_and_supervisor(no_qemu, &config)?;
+
         let mutator = Mutator::new(
             StdRng::seed_from_u64(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64),
             config.operation_weights.clone(),

@@ -2,9 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
- use std::{
+use std::{
     ffi::OsStr,
     fs,
+    net::TcpListener,
     path::Path,
     process::{Command, Output, Stdio},
 };
@@ -14,7 +15,7 @@ use log::info;
 use thiserror::Error;
 
 use crate::{
-    config::QemuConfig,
+    config::{Config, QemuConfig},
     path::{LocalPath, RemotePath},
 };
 
@@ -30,6 +31,15 @@ pub enum ExecError {
     IoError(String),
     #[error("timed out: {0}")]
     TimedOut(String),
+}
+
+pub struct RemoteCommandInterfaceOptions {
+    pub ssh_port: u16,
+}
+
+pub enum CommandInterfaceOptions {
+    Local,
+    Remote(RemoteCommandInterfaceOptions),
 }
 
 /// Send commands and transfer files to guest (remote) machine where tests are executed.
@@ -273,14 +283,16 @@ impl CommandInterface for LocalCommandInterface {
 /// and SCP to copy files between host and guest
 pub struct RemoteCommandInterface {
     config: QemuConfig,
+    options: RemoteCommandInterfaceOptions,
     tmp_file: LocalPath,
 }
 
 impl RemoteCommandInterface {
-    pub fn new(config: &QemuConfig) -> Self {
+    pub fn new(config: &QemuConfig, options: RemoteCommandInterfaceOptions) -> Self {
         RemoteCommandInterface {
             config: config.clone(),
             tmp_file: LocalPath::new_tmp("ssh-tmp"),
+            options,
         }
     }
 }
@@ -432,7 +444,7 @@ impl RemoteCommandInterface {
         scp.arg("-o").arg("ControlPath /tmp/diffuzzer-ssh-%r@%h:%p");
         scp.arg("-o").arg("ControlPersist 1m");
         // not a typo
-        scp.arg("-P").arg(self.config.ssh_port.to_string());
+        scp.arg("-P").arg(self.options.ssh_port.to_string());
         scp
     }
     fn exec_common(&self) -> CommandWrapper {
@@ -444,8 +456,28 @@ impl RemoteCommandInterface {
         ssh.arg("-o").arg("ControlMaster auto");
         ssh.arg("-o").arg("ControlPath /tmp/diffuzzer-ssh-%r@%h:%p");
         ssh.arg("-o").arg("ControlPersist 1m");
-        ssh.arg("-p").arg(self.config.ssh_port.to_string());
+        ssh.arg("-p").arg(self.options.ssh_port.to_string());
         ssh.arg("root@localhost");
         ssh
+    }
+}
+
+pub fn launch_cmdi(config: &Config, options: CommandInterfaceOptions) -> Box<dyn CommandInterface> {
+    if let CommandInterfaceOptions::Remote(options) = options {
+        Box::new(RemoteCommandInterface::new(&config.qemu, options))
+    } else {
+        Box::new(LocalCommandInterface::new())
+    }
+}
+
+pub fn fresh_tcp_port() -> anyhow::Result<u16> {
+    // Binding with a port number of 0 will request that the OS assigns a port to this listener.
+    let listener = TcpListener::bind("127.0.0.1:0").with_context(|| "failed to bind TCP port")?;
+    match listener
+        .local_addr()
+        .with_context(|| "failed to get listener local address")?
+    {
+        std::net::SocketAddr::V4(socket_addr_v4) => Ok(socket_addr_v4.port()),
+        std::net::SocketAddr::V6(socket_addr_v6) => Ok(socket_addr_v6.port()),
     }
 }

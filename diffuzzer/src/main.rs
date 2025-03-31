@@ -8,7 +8,6 @@ use crate::fuzzing::duo_single::DuoSingleFuzzer;
 use anyhow::{Context, Ok};
 use args::Args;
 use clap::Parser;
-use command::{CommandInterface, LocalCommandInterface, RemoteCommandInterface};
 use config::Config;
 use fuzzing::{
     blackbox::fuzzer::BlackBoxFuzzer, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
@@ -16,7 +15,6 @@ use fuzzing::{
 };
 use log::{error, info};
 use path::LocalPath;
-use supervisor::{NativeSupervisor, QemuSupervisor, Supervisor};
 
 mod abstract_fs;
 mod args;
@@ -25,12 +23,12 @@ mod compile;
 mod config;
 mod filesystems;
 mod fuzzing;
+mod markdown;
 mod mount;
 mod path;
+mod reason;
 mod save;
 mod supervisor;
-mod markdown;
-mod reason;
 
 fn main() {
     let status = run();
@@ -51,18 +49,6 @@ fn run() -> anyhow::Result<()> {
     let config: Config =
         toml::from_str(&config).with_context(|| "failed to parse configuration")?;
 
-    let supervisor: Box<dyn Supervisor> = if args.no_qemu {
-        Box::new(NativeSupervisor::new())
-    } else {
-        Box::new(QemuSupervisor::launch(&config.qemu).unwrap())
-    };
-
-    let cmdi: Box<dyn CommandInterface> = if args.no_qemu {
-        Box::new(LocalCommandInterface::new())
-    } else {
-        Box::new(RemoteCommandInterface::new(&config.qemu))
-    };
-
     match args.mode {
         args::Mode::Greybox {
             first_filesystem,
@@ -80,8 +66,7 @@ fn run() -> anyhow::Result<()> {
                 second_filesystem.into(),
                 LocalPath::new(Path::new("./crashes")),
                 corpus_path,
-                cmdi,
-                supervisor,
+                args.no_qemu,
             )?
             .run(test_count);
         }
@@ -99,8 +84,7 @@ fn run() -> anyhow::Result<()> {
                 first_filesystem.into(),
                 second_filesystem.into(),
                 LocalPath::new(Path::new("./crashes")),
-                cmdi,
-                supervisor,
+                args.no_qemu,
             )?
             .run(test_count);
         }
@@ -117,8 +101,7 @@ fn run() -> anyhow::Result<()> {
                 keep_fs,
                 filesystem.into(),
                 config,
-                cmdi,
-                supervisor,
+                args.no_qemu,
             )?
         }
         args::Mode::DuoSingle {
@@ -139,8 +122,7 @@ fn run() -> anyhow::Result<()> {
                 LocalPath::new(Path::new(&output_dir)),
                 LocalPath::new(Path::new(&path_to_test)),
                 keep_fs,
-                cmdi,
-                supervisor,
+                args.no_qemu,
             )?
             .run(Some(1u64));
         }
@@ -159,8 +141,7 @@ fn run() -> anyhow::Result<()> {
                 first_filesystem.into(),
                 second_filesystem.into(),
                 LocalPath::new(Path::new(&output_dir)),
-                cmdi,
-                supervisor,
+                args.no_qemu,
             )?
             .run(
                 &LocalPath::new(Path::new(&path_to_test)),

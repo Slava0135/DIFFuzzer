@@ -6,13 +6,21 @@ use std::{
     fs::OpenOptions,
     io::Write,
     os::unix::net::UnixStream,
+    path::Path,
     process::{Command, Stdio},
     sync::mpsc::{self, Receiver, Sender, TryRecvError},
     thread::{self, JoinHandle, sleep},
     time::Duration,
 };
 
-use crate::command::CommandWrapper;
+use crate::{
+    command::{
+        CommandInterface, CommandInterfaceOptions, CommandWrapper, RemoteCommandInterfaceOptions,
+        fresh_tcp_port, launch_cmdi,
+    },
+    config::Config,
+    path::LocalPath,
+};
 use anyhow::{Context, bail};
 use log::{debug, error, info};
 use serde::Deserialize;
@@ -55,14 +63,14 @@ impl Supervisor for NativeSupervisor {
 }
 
 pub struct QemuSupervisor {
-    config: QemuConfig,
+    options: QemuSupervisorOptions,
     _qemu_thread: JoinHandle<()>,
     event_handler: EventHandler,
     id: u32,
 }
 
 impl QemuSupervisor {
-    pub fn launch(config: &QemuConfig) -> anyhow::Result<Self> {
+    pub fn launch(config: &QemuConfig, options: QemuSupervisorOptions) -> anyhow::Result<Self> {
         let console_log = OpenOptions::new()
             .create(true)
             .append(true)
@@ -73,9 +81,9 @@ impl QemuSupervisor {
         let mut launch = Command::new(&config.launch_script);
         launch
             .env("OS_IMAGE", config.os_image.clone())
-            .env("SSH_PORT", config.ssh_port.to_string())
-            .env("QMP_SOCKET_PATH", config.qmp_socket_path.clone())
-            .env("MONITOR_SOCKET_PATH", config.monitor_socket_path.clone())
+            .env("SSH_PORT", options.ssh_port.to_string())
+            .env("QMP_SOCKET_PATH", options.qmp_socket_path.as_ref())
+            .env("MONITOR_SOCKET_PATH", options.monitor_socket_path.as_ref())
             .env("DIRECT_BOOT", config.direct_boot.to_string())
             .env("KERNEL_IMAGE_PATH", &config.kernel_image_path)
             .env("ROOT_DISK_PARTITION", &config.root_disk_partition);
@@ -117,12 +125,12 @@ impl QemuSupervisor {
         info!("wait for VM to init ({}s)", config.boot_wait_time);
         sleep(Duration::from_secs(config.boot_wait_time.into()));
 
-        let event_handler = EventHandler::launch(&config.qmp_socket_path)
+        let event_handler = EventHandler::launch(&options.qmp_socket_path)
             .with_context(|| "failed to launch event handler")?;
 
         let id = rx.try_recv()?;
         Ok(Self {
-            config: config.clone(),
+            options,
             _qemu_thread,
             event_handler,
             id,
@@ -131,10 +139,10 @@ impl QemuSupervisor {
 
     /// Connect to QEMU monitor using QMP protocol
     fn monitor_stream(&self) -> anyhow::Result<UnixStream> {
-        UnixStream::connect(&self.config.monitor_socket_path).with_context(|| {
+        UnixStream::connect(&self.options.monitor_socket_path).with_context(|| {
             format!(
                 "failed to connect to monitor at '{}'",
-                &self.config.monitor_socket_path
+                &self.options.monitor_socket_path
             )
         })
     }
@@ -195,7 +203,7 @@ struct ReturnMessage {
 }
 
 impl EventHandler {
-    fn launch(socket_path: &str) -> anyhow::Result<Self> {
+    fn launch(socket_path: &LocalPath) -> anyhow::Result<Self> {
         debug!("create event handler");
         let mut stream = UnixStream::connect(socket_path)
             .with_context(|| format!("failed to connect to unix socket at '{}'", &socket_path))?;
@@ -251,4 +259,58 @@ impl EventHandler {
         }
         Ok(())
     }
+}
+
+pub struct QemuSupervisorOptions {
+    pub ssh_port: u16,
+    pub qmp_socket_path: LocalPath,
+    pub monitor_socket_path: LocalPath,
+}
+
+pub enum SupervisorOptions {
+    Native,
+    Qemu(QemuSupervisorOptions),
+}
+
+pub fn launch_supervisor(
+    config: &Config,
+    options: SupervisorOptions,
+) -> anyhow::Result<Box<dyn Supervisor>> {
+    if let SupervisorOptions::Qemu(options) = options {
+        Ok(Box::new(
+            QemuSupervisor::launch(&config.qemu, options)
+                .with_context(|| "failed to launch QEMU supervisor")?,
+        ))
+    } else {
+        Ok(Box::new(NativeSupervisor::new()))
+    }
+}
+
+pub fn launch_cmdi_and_supervisor(
+    no_qemu: bool,
+    config: &Config,
+) -> anyhow::Result<(Box<dyn CommandInterface>, Box<dyn Supervisor>)> {
+    let ssh_port =
+        fresh_tcp_port().with_context(|| "failed to get fresh port for SSH connection")?;
+    let monitor_socket_path = LocalPath::new(Path::new("/tmp/diffuzzer-qemu-monitor.sock"));
+    let qmp_socket_path = LocalPath::new(Path::new("/tmp/diffuzzer-qemu-qmp.sock"));
+
+    let cmdi_opts = if no_qemu {
+        CommandInterfaceOptions::Local
+    } else {
+        CommandInterfaceOptions::Remote(RemoteCommandInterfaceOptions { ssh_port })
+    };
+    let cmdi = launch_cmdi(&config, cmdi_opts);
+
+    let supervisor_opts = if no_qemu {
+        SupervisorOptions::Native
+    } else {
+        SupervisorOptions::Qemu(QemuSupervisorOptions {
+            ssh_port,
+            monitor_socket_path,
+            qmp_socket_path,
+        })
+    };
+    let supervisor = launch_supervisor(&config, supervisor_opts)?;
+    Ok((cmdi, supervisor))
 }
