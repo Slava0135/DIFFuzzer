@@ -11,7 +11,6 @@ use std::{
 };
 
 use anyhow::Context;
-use log::info;
 use thiserror::Error;
 
 use crate::{
@@ -82,7 +81,6 @@ pub trait CommandInterface {
     fn setup_remote_dir(&self) -> anyhow::Result<RemotePath> {
         let remote_dir = RemotePath::new_tmp("remote");
 
-        info!("setup remote directory at '{}'", remote_dir.base.display());
         self.remove_dir_all(&remote_dir).unwrap_or(());
         self.create_dir_all(&remote_dir).with_context(|| {
             format!(
@@ -91,7 +89,6 @@ pub trait CommandInterface {
             )
         })?;
 
-        info!("copy executor to remote directory",);
         let executor_dir = LocalPath::new(Path::new(EXECUTOR_SOURCE_DIR));
         self.copy_to_remote(
             &executor_dir.join(MAKEFILE_NAME),
@@ -111,7 +108,6 @@ pub trait CommandInterface {
         )?;
         self.copy_to_remote(&executor_dir.join(TEST_NAME), &remote_dir.join(TEST_NAME))?;
 
-        info!("make test binary");
         let mut make = CommandWrapper::new("make");
         make.arg("-C").arg(remote_dir.base.as_ref());
         self.exec(make, None)
