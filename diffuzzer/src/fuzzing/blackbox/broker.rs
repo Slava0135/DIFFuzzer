@@ -6,9 +6,11 @@ use std::{
     fs,
     sync::mpsc::{self, Receiver, Sender},
     thread::{self, JoinHandle},
+    time::Instant,
 };
 
 use anyhow::{Context, bail};
+use log::info;
 
 use crate::{
     config::Config, fuzzing::fuzzer::Fuzzer, mount::FileSystemMount, path::LocalPath,
@@ -18,7 +20,15 @@ use crate::{
 use super::fuzzer::BlackBoxFuzzer;
 
 pub enum BrokerMessage {
-    Error { id: u8, err: anyhow::Error },
+    Error {
+        id: u8,
+        err: anyhow::Error,
+    },
+    Stats {
+        id: u8,
+        executions: u64,
+        crashes: u64,
+    },
 }
 
 pub enum InstanceMessage {
@@ -26,13 +36,16 @@ pub enum InstanceMessage {
 }
 
 pub struct Instance {
-    handle: JoinHandle<()>,
+    _handle: JoinHandle<()>,
     tx: Sender<InstanceMessage>,
+    executions: u64,
+    crashes: u64,
 }
 
 pub struct BlackBoxBroker {
     instances: Vec<Instance>,
     rx: Receiver<BrokerMessage>,
+    start: Instant,
 }
 
 impl BlackBoxBroker {
@@ -49,7 +62,7 @@ impl BlackBoxBroker {
         }
         let mut instances = Vec::new();
         let (broker_tx, broker_rx) = mpsc::channel();
-        for id in 1..=instances_n {
+        for id in 0..instances_n {
             let broker_tx = broker_tx.clone();
             let (instance_tx, instance_rx) = mpsc::channel();
             let config = config.clone();
@@ -86,6 +99,7 @@ impl BlackBoxBroker {
                                         cmdi,
                                         supervisor,
                                         local_tmp_dir,
+                                        broker_tx.clone(),
                                     )
                                     .with_context(|| {
                                         format!("failed to launch fuzzer instance {}", id)
@@ -112,17 +126,72 @@ impl BlackBoxBroker {
                 })
                 .with_context(|| format!("failed to create instance {}", id))?;
             instances.push(Instance {
-                handle,
+                _handle: handle,
                 tx: instance_tx,
+                executions: 0,
+                crashes: 0,
             });
         }
         Ok(Self {
             instances,
             rx: broker_rx,
+            start: Instant::now(),
         })
     }
 
     pub fn run(&mut self, test_count: Option<u64>) -> anyhow::Result<()> {
-        Ok(())
+        self.start = Instant::now();
+        for i in self.instances.iter() {
+            i.tx.send(InstanceMessage::Run { test_count })
+                .with_context(|| "failed to run instance")?;
+        }
+        loop {
+            match self
+                .rx
+                .recv()
+                .with_context(|| "failed to receive broker message")?
+            {
+                BrokerMessage::Error { id, err } => {
+                    return Err(err.context(format!("error inside instance {}", id)));
+                }
+                BrokerMessage::Stats {
+                    id,
+                    executions,
+                    crashes,
+                } => {
+                    let instance = self
+                        .instances
+                        .get_mut(id as usize)
+                        .with_context(|| format!("failed to get instance {}", id))?;
+                    instance.executions = executions;
+                    instance.crashes = crashes;
+                    let global_executions =
+                        self.instances.iter().fold(0, |acc, i| acc + i.executions);
+                    let global_crashes = self.instances.iter().fold(0, |acc, i| acc + i.crashes);
+                    let secs = self.start.elapsed().as_secs();
+
+                    let instance_stats = format!(
+                        "crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
+                        crashes,
+                        executions,
+                        (executions as f64) / (secs as f64),
+                        secs / (60 * 60),
+                        (secs / (60)) % 60,
+                        secs % 60,
+                    );
+                    let global_stats = format!(
+                        "crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
+                        global_crashes,
+                        global_executions,
+                        (global_executions as f64) / (secs as f64),
+                        secs / (60 * 60),
+                        (secs / (60)) % 60,
+                        secs % 60,
+                    );
+                    info!("{}", global_stats);
+                    info!("(instance {}) {}", id, instance_stats);
+                }
+            }
+        }
     }
 }

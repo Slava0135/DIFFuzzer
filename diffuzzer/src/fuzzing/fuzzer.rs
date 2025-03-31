@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::time::Instant;
-
 use anyhow::Context;
 use log::warn;
 
@@ -13,7 +11,6 @@ use super::{outcome::DiffCompleted, runner::Runner};
 
 pub trait Fuzzer {
     fn run(&mut self, test_count: Option<u64>) -> anyhow::Result<()> {
-        self.runner().stats.start = Instant::now();
         match test_count {
             None => loop {
                 self.runs()?
@@ -29,14 +26,8 @@ pub trait Fuzzer {
 
     fn runs(&mut self) -> anyhow::Result<()> {
         self.fuzz_one()?;
-        self.runner().stats.executions += 1;
-        if Instant::now()
-            .duration_since(self.runner().stats.last_time_showed)
-            .as_secs()
-            > self.runner().config.heartbeat_interval.into()
-        {
-            self.show_stats();
-        }
+        self.runner().executions += 1;
+        self.send_stats(true)?;
         Ok(())
     }
 
@@ -70,8 +61,8 @@ pub trait Fuzzer {
                     reason,
                 )
                 .with_context(|| "failed to report crash")?;
-            self.runner().stats.crashes += 1;
-            self.show_stats();
+            self.runner().crashes += 1;
+            self.send_stats(false)?;
             Ok(true)
         } else {
             Ok(false)
@@ -111,12 +102,12 @@ pub trait Fuzzer {
         self.runner()
             .report_crash(input, dir_name, crashes_dir, reason)
             .with_context(|| "failed to report panic")?;
-        self.runner().stats.crashes += 1;
-        self.show_stats();
+        self.runner().crashes += 1;
+        self.send_stats(false)?;
         Ok(())
     }
 
-    fn show_stats(&mut self);
+    fn send_stats(&mut self, lazy: bool) -> anyhow::Result<()>;
 
     fn runner(&mut self) -> &mut Runner;
 }

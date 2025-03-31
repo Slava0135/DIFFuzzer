@@ -18,7 +18,6 @@ use std::cell::RefCell;
 use std::fs;
 use std::path::Path;
 use std::rc::Rc;
-use std::time::Instant;
 
 use super::harness::Harness;
 use super::objective::dash::DashObjective;
@@ -50,7 +49,8 @@ pub struct Runner {
     pub fst_harness: Harness,
     pub snd_harness: Harness,
 
-    pub stats: Stats,
+    pub executions: u64,
+    pub crashes: u64,
 }
 
 impl Runner {
@@ -147,7 +147,8 @@ impl Runner {
             fst_harness,
             snd_harness,
 
-            stats: Stats::new(),
+            executions: 0,
+            crashes: 0,
         };
 
         runner
@@ -304,24 +305,6 @@ impl Runner {
             fst_trace,
             snd_trace,
         })
-    }
-}
-
-pub struct Stats {
-    pub executions: usize,
-    pub crashes: usize,
-    pub start: Instant,
-    pub last_time_showed: Instant,
-}
-
-impl Stats {
-    fn new() -> Self {
-        Stats {
-            executions: 0,
-            crashes: 0,
-            start: Instant::now(),
-            last_time_showed: Instant::now(),
-        }
     }
 }
 

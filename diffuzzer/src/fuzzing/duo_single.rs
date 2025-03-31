@@ -104,7 +104,9 @@ impl Fuzzer for DuoSingleFuzzer {
         Ok(())
     }
 
-    fn show_stats(&mut self) {}
+    fn send_stats(&mut self, _lazy: bool) -> anyhow::Result<()> {
+        Ok(())
+    }
 
     fn runner(&mut self) -> &mut Runner {
         &mut self.runner

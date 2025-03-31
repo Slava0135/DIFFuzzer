@@ -48,6 +48,10 @@ pub struct GreyBoxFuzzer {
     mutator: Mutator,
 
     corpus_path: Option<LocalPath>,
+
+    start: Instant,
+    last_time_stats_sent: Instant,
+    heartbeat_interval: u16,
 }
 
 impl GreyBoxFuzzer {
@@ -160,7 +164,7 @@ impl GreyBoxFuzzer {
             fst_mount,
             snd_mount,
             crashes_path,
-            config,
+            config.clone(),
             false,
             cmdi,
             supervisor,
@@ -184,6 +188,10 @@ impl GreyBoxFuzzer {
             mutator,
 
             corpus_path,
+
+            start: Instant::now(),
+            last_time_stats_sent: Instant::now(),
+            heartbeat_interval: config.heartbeat_interval,
         })
     }
 
@@ -274,7 +282,7 @@ impl Fuzzer for GreyBoxFuzzer {
                         fst_opinion.coverage(),
                         snd_opinion.coverage(),
                     );
-                    self.show_stats();
+                    self.send_stats(false)?;
                     if self.corpus_path.is_some() {
                         self.save_input(input, &binary_path, &diff.fst_outcome, &diff.snd_outcome)
                             .with_context(|| "failed to save input")?;
@@ -317,24 +325,27 @@ impl Fuzzer for GreyBoxFuzzer {
         Ok(())
     }
 
-    fn show_stats(&mut self) {
-        self.runner.stats.last_time_showed = Instant::now();
-        let since_start = Instant::now().duration_since(self.runner.stats.start);
-        let secs = since_start.as_secs();
-        info!(
-            "corpus: {}, coverage: {} ({}) + {} ({}), crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
-            self.corpus.len(),
-            self.fst_coverage_feedback.map().len(),
-            self.fst_coverage_feedback.coverage_type(),
-            self.snd_coverage_feedback.map().len(),
-            self.snd_coverage_feedback.coverage_type(),
-            self.runner.stats.crashes,
-            self.runner.stats.executions,
-            (self.runner.stats.executions as f64) / (secs as f64),
-            secs / (60 * 60),
-            (secs / (60)) % 60,
-            secs % 60,
-        );
+    fn send_stats(&mut self, lazy: bool) -> anyhow::Result<()> {
+        if !lazy || self.last_time_stats_sent.elapsed().as_secs() >= self.heartbeat_interval as u64
+        {
+            self.last_time_stats_sent = Instant::now();
+            let secs = self.start.elapsed().as_secs();
+            info!(
+                "corpus: {}, coverage: {} ({}) + {} ({}), crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
+                self.corpus.len(),
+                self.fst_coverage_feedback.map().len(),
+                self.fst_coverage_feedback.coverage_type(),
+                self.snd_coverage_feedback.map().len(),
+                self.snd_coverage_feedback.coverage_type(),
+                self.runner.crashes,
+                self.runner.executions,
+                (self.runner.executions as f64) / (secs as f64),
+                secs / (60 * 60),
+                (secs / (60)) % 60,
+                secs % 60,
+            );
+        }
+        Ok(())
     }
 
     fn runner(&mut self) -> &mut Runner {
