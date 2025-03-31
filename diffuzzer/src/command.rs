@@ -35,6 +35,7 @@ pub enum ExecError {
 
 pub struct RemoteCommandInterfaceOptions {
     pub ssh_port: u16,
+    pub tmp_dir: LocalPath,
 }
 
 pub enum CommandInterfaceOptions {
@@ -291,7 +292,7 @@ impl RemoteCommandInterface {
     pub fn new(config: &QemuConfig, options: RemoteCommandInterfaceOptions) -> Self {
         RemoteCommandInterface {
             config: config.clone(),
-            tmp_file: LocalPath::new_tmp("ssh-tmp"),
+            tmp_file: options.tmp_dir.join("ssh-tmp"),
             options,
         }
     }

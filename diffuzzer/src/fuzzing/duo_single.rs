@@ -15,9 +15,7 @@ use crate::fuzzing::runner::Runner;
 use crate::mount::FileSystemMount;
 use crate::path::LocalPath;
 use crate::reason::Reason;
-use crate::supervisor::
-    launch_cmdi_and_supervisor
-;
+use crate::supervisor::launch_cmdi_and_supervisor;
 
 pub struct DuoSingleFuzzer {
     runner: Runner,
@@ -34,7 +32,9 @@ impl DuoSingleFuzzer {
         keep_fs: bool,
         no_qemu: bool,
     ) -> anyhow::Result<Self> {
-        let (cmdi, supervisor) = launch_cmdi_and_supervisor(no_qemu, &config)?;
+        let local_tmp_dir = LocalPath::new_tmp("duo-single");
+
+        let (cmdi, supervisor) = launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir)?;
 
         let runner = Runner::create(
             fst_mount,
@@ -44,6 +44,7 @@ impl DuoSingleFuzzer {
             keep_fs,
             cmdi,
             supervisor,
+            local_tmp_dir,
             (vec![], vec![]),
         )
         .with_context(|| "failed to create runner")?;

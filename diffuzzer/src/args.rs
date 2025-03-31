@@ -54,6 +54,9 @@ pub enum Mode {
         /// Test count
         #[arg(short, long)]
         test_count: Option<u64>,
+        /// Number of fuzzer instances running in parallel
+        #[arg(short, long, default_value_t = 1)]
+        instances: u8,
     },
     /// Run single test
     SoloSingle {

@@ -10,7 +10,7 @@ use args::Args;
 use clap::Parser;
 use config::Config;
 use fuzzing::{
-    blackbox::fuzzer::BlackBoxFuzzer, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
+    blackbox::broker::BlackBoxBroker, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
     reducer::Reducer, solo_single,
 };
 use log::{error, info};
@@ -68,25 +68,27 @@ fn run() -> anyhow::Result<()> {
                 corpus_path,
                 args.no_qemu,
             )?
-            .run(test_count);
+            .run(test_count)?;
         }
         args::Mode::Blackbox {
             first_filesystem,
             second_filesystem,
             test_count,
+            instances,
         } => {
             info!(
                 "start blackbox fuzzing ('{}' + '{}')",
                 first_filesystem, second_filesystem
             );
-            BlackBoxFuzzer::create(
+            BlackBoxBroker::create(
                 config,
                 first_filesystem.into(),
                 second_filesystem.into(),
                 LocalPath::new(Path::new("./crashes")),
                 args.no_qemu,
+                instances,
             )?
-            .run(test_count);
+            .run(test_count)?;
         }
         args::Mode::SoloSingle {
             output_dir,
@@ -124,7 +126,7 @@ fn run() -> anyhow::Result<()> {
                 keep_fs,
                 args.no_qemu,
             )?
-            .run(Some(1u64));
+            .run(Some(1u64))?;
         }
         args::Mode::Reduce {
             output_dir,

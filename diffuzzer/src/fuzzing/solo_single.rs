@@ -29,7 +29,9 @@ pub fn run(
     config: Config,
     no_qemu: bool,
 ) -> anyhow::Result<()> {
-    let (cmdi, mut supervisor) = launch_cmdi_and_supervisor(no_qemu, &config)?;
+    let local_tmp_dir = LocalPath::new_tmp("solo-single");
+
+    let (cmdi, mut supervisor) = launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir)?;
 
     info!("read testcase at '{}'", test_path);
     let input = read_to_string(test_path).with_context(|| "failed to read testcase")?;
@@ -55,7 +57,7 @@ pub fn run(
         mount,
         fs_dir,
         exec_dir,
-        LocalPath::new_tmp("outcome-single"),
+        local_tmp_dir.join("outcome-single"),
         config.timeout,
         vec![],
     );

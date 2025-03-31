@@ -62,15 +62,15 @@ impl Runner {
         keep_fs: bool,
         cmdi: Box<dyn CommandInterface>,
         supervisor: Box<dyn Supervisor>,
+        local_tmp_dir: LocalPath,
         mut observers: (ObserverList, ObserverList),
     ) -> anyhow::Result<Self> {
-        let temp_dir = cmdi
+        let remote_tmp_dir = cmdi
             .setup_remote_dir()
-            .with_context(|| "failed to setup temp dir")?;
+            .with_context(|| "failed to setup remote temporary dir")?;
 
-        info!("init runner components");
-        let test_dir = temp_dir.clone();
-        let exec_dir = temp_dir.join("exec");
+        let test_dir = remote_tmp_dir.clone();
+        let exec_dir = remote_tmp_dir.join("exec");
 
         fs::create_dir_all(&crashes_path)?;
 
@@ -115,7 +115,7 @@ impl Runner {
             fst_mount,
             fst_fs_dir.clone(),
             exec_dir.clone(),
-            LocalPath::new_tmp("outcome-1"),
+            local_tmp_dir.join("outcome-1"),
             config.timeout,
             observers.0,
         );
@@ -123,7 +123,7 @@ impl Runner {
             snd_mount,
             snd_fs_dir.clone(),
             exec_dir.clone(),
-            LocalPath::new_tmp("outcome-2"),
+            local_tmp_dir.join("outcome-2"),
             config.timeout,
             observers.1,
         );

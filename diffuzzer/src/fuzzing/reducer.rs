@@ -31,7 +31,9 @@ impl Reducer {
         crashes_path: LocalPath,
         no_qemu: bool,
     ) -> anyhow::Result<Self> {
-        let (cmdi, supervisor) = launch_cmdi_and_supervisor(no_qemu, &config)?;
+        let local_tmp_dir = LocalPath::new_tmp("reducer");
+
+        let (cmdi, supervisor) = launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir)?;
 
         let runner = Runner::create(
             fst_mount,
@@ -41,6 +43,7 @@ impl Reducer {
             false,
             cmdi,
             supervisor,
+            local_tmp_dir,
             (vec![], vec![]),
         )
         .with_context(|| "failed to create runner")?;

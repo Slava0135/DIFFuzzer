@@ -59,7 +59,9 @@ impl GreyBoxFuzzer {
         corpus_path: Option<String>,
         no_qemu: bool,
     ) -> anyhow::Result<Self> {
-        let (cmdi, supervisor) = launch_cmdi_and_supervisor(no_qemu, &config)?;
+        let local_tmp_dir = LocalPath::new_tmp("greybox");
+
+        let (cmdi, supervisor) = launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir)?;
 
         let mutator = Mutator::new(
             StdRng::seed_from_u64(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64),
@@ -162,6 +164,7 @@ impl GreyBoxFuzzer {
             false,
             cmdi,
             supervisor,
+            local_tmp_dir,
             observers,
         )
         .with_context(|| "failed to create runner")?;

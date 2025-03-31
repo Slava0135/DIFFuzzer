@@ -6,7 +6,6 @@ use std::{
     fs::OpenOptions,
     io::Write,
     os::unix::net::UnixStream,
-    path::Path,
     process::{Command, Stdio},
     sync::mpsc::{self, Receiver, Sender, TryRecvError},
     thread::{self, JoinHandle, sleep},
@@ -282,16 +281,20 @@ pub fn launch_supervisor(
 pub fn launch_cmdi_and_supervisor(
     no_qemu: bool,
     config: &Config,
+    tmp_dir: &LocalPath,
 ) -> anyhow::Result<(Box<dyn CommandInterface>, Box<dyn Supervisor>)> {
     let ssh_port =
         fresh_tcp_port().with_context(|| "failed to get fresh port for SSH connection")?;
-    let monitor_socket_path = LocalPath::new(Path::new("/tmp/diffuzzer-qemu-monitor.sock"));
-    let qmp_socket_path = LocalPath::new(Path::new("/tmp/diffuzzer-qemu-qmp.sock"));
+    let monitor_socket_path = tmp_dir.join("qemu-monitor.sock");
+    let qmp_socket_path = tmp_dir.join("qemu-qmp.sock");
 
     let cmdi_opts = if no_qemu {
         CommandInterfaceOptions::Local
     } else {
-        CommandInterfaceOptions::Remote(RemoteCommandInterfaceOptions { ssh_port })
+        CommandInterfaceOptions::Remote(RemoteCommandInterfaceOptions {
+            ssh_port,
+            tmp_dir: tmp_dir.clone(),
+        })
     };
     let cmdi = launch_cmdi(&config, cmdi_opts);
 

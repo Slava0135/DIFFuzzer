@@ -5,40 +5,31 @@
 use std::time::Instant;
 
 use anyhow::Context;
-use log::{error, info, warn};
+use log::warn;
 
 use crate::{abstract_fs::workload::Workload, path::RemotePath, reason::Reason};
 
 use super::{outcome::DiffCompleted, runner::Runner};
 
 pub trait Fuzzer {
-    fn run(&mut self, test_count: Option<u64>) {
-        info!("start fuzzing loop");
+    fn run(&mut self, test_count: Option<u64>) -> anyhow::Result<()> {
         self.runner().stats.start = Instant::now();
         match test_count {
             None => loop {
-                if self.runs() {
-                    return;
-                }
+                self.runs()?
             },
             Some(count) => {
                 for _ in 0..count {
-                    if self.runs() {
-                        return;
-                    }
+                    self.runs()?;
                 }
             }
         }
+        Ok(())
     }
 
-    fn runs(&mut self) -> bool {
-        match self.fuzz_one() {
-            Err(err) => {
-                error!("{:?}", err);
-                return true;
-            }
-            _ => self.runner().stats.executions += 1,
-        }
+    fn runs(&mut self) -> anyhow::Result<()> {
+        self.fuzz_one()?;
+        self.runner().stats.executions += 1;
         if Instant::now()
             .duration_since(self.runner().stats.last_time_showed)
             .as_secs()
@@ -46,7 +37,7 @@ pub trait Fuzzer {
         {
             self.show_stats();
         }
-        false
+        Ok(())
     }
 
     fn fuzz_one(&mut self) -> anyhow::Result<()>;

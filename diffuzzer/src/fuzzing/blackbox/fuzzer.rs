@@ -9,6 +9,7 @@ use rand::prelude::StdRng;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
+use crate::command::CommandInterface;
 use crate::config::Config;
 
 use crate::fuzzing::fuzzer::Fuzzer;
@@ -17,23 +18,25 @@ use crate::fuzzing::runner::Runner;
 use crate::mount::FileSystemMount;
 use crate::path::LocalPath;
 use crate::reason::Reason;
-use crate::supervisor::launch_cmdi_and_supervisor;
+use crate::supervisor::Supervisor;
 
 pub struct BlackBoxFuzzer {
+    id: u8,
     runner: Runner,
     rng: StdRng,
 }
 
 impl BlackBoxFuzzer {
     pub fn create(
+        id: u8,
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
-        no_qemu: bool,
+        cmdi: Box<dyn CommandInterface>,
+        supervisor: Box<dyn Supervisor>,
+        local_tmp_dir: LocalPath,
     ) -> anyhow::Result<Self> {
-        let (cmdi, supervisor) = launch_cmdi_and_supervisor(no_qemu, &config)?;
-
         let runner = Runner::create(
             fst_mount,
             snd_mount,
@@ -42,10 +45,12 @@ impl BlackBoxFuzzer {
             false,
             cmdi,
             supervisor,
+            local_tmp_dir,
             (vec![], vec![]),
         )
         .with_context(|| "failed to create runner")?;
         Ok(Self {
+            id,
             runner,
             rng: StdRng::seed_from_u64(
                 SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64

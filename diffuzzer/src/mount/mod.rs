@@ -23,7 +23,7 @@ use crate::{
 const RAM_DISK_SIZE: usize = 1_000_000;
 const DEVICE: &str = "/dev/ram0";
 
-pub trait FileSystemMount: Display {
+pub trait FileSystemMount: Display + Sync {
     fn setup(&self, cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<()> {
         cmdi.create_dir_all(path)
             .with_context(|| "failed to create mountpoint")?;
