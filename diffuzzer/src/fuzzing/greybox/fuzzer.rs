@@ -10,7 +10,7 @@ use std::rc::Rc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
-use log::{debug, info, warn};
+use log::{info, warn};
 use rand::{SeedableRng, rngs::StdRng};
 use walkdir::WalkDir;
 
@@ -209,7 +209,6 @@ impl GreyBoxFuzzer {
         fst_coverage: InputCoverage,
         snd_coverage: InputCoverage,
     ) {
-        debug!("add new input to corpus");
         let seed = Seed::new(input, fst_coverage, snd_coverage);
         self.corpus.push(seed);
     }
@@ -222,7 +221,6 @@ impl GreyBoxFuzzer {
         snd_outcome: &Completed,
     ) -> anyhow::Result<()> {
         let name = input.generate_name();
-        debug!("save corpus input '{}'", name);
 
         let corpus_dir = self.corpus_path.clone().unwrap().join(name);
         fs::create_dir_all(&corpus_dir)
@@ -244,7 +242,6 @@ impl GreyBoxFuzzer {
 
 impl Fuzzer for GreyBoxFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
-        debug!("pick input");
         let input = self.pick_input()?;
 
         let binary_path = self.runner().compile_test(&input)?;
@@ -259,7 +256,6 @@ impl Fuzzer for GreyBoxFuzzer {
                     return Ok(());
                 }
 
-                debug!("get feedback");
                 let fst_opinion = self
                     .fst_coverage_feedback
                     .opinion(&diff.fst_outcome)

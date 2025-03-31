@@ -13,7 +13,7 @@ use crate::reason::Reason;
 use crate::save::{save_completed, save_reason, save_testcase};
 use crate::supervisor::Supervisor;
 use anyhow::{Context, Ok};
-use log::{debug, info};
+use log::info;
 use std::cell::RefCell;
 use std::fs;
 use std::path::Path;
@@ -159,7 +159,6 @@ impl Runner {
     }
 
     pub fn compile_test(&mut self, input: &Workload) -> anyhow::Result<RemotePath> {
-        debug!("compile test at '{}'", self.test_dir);
         let binary_path = input
             .compile(self.cmdi.as_ref(), &self.test_dir)
             .with_context(|| "failed to compile test")?;
@@ -167,8 +166,6 @@ impl Runner {
     }
 
     pub fn run_harness(&mut self, binary_path: &RemotePath) -> anyhow::Result<DiffOutcome> {
-        debug!("run harness at '{}'", binary_path);
-
         let fst_outcome = self
             .fst_harness
             .run(
@@ -238,8 +235,6 @@ impl Runner {
         diff: &DiffCompleted,
         reason: Reason,
     ) -> anyhow::Result<()> {
-        debug!("report diff '{}'", dir_name);
-
         let crash_dir = crash_dir.join(dir_name);
         fs::create_dir_all(&crash_dir)
             .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
@@ -265,8 +260,6 @@ impl Runner {
         crash_dir: LocalPath,
         reason: Reason,
     ) -> anyhow::Result<()> {
-        debug!("report panic '{}'", dir_name);
-
         let crash_dir = crash_dir.join(dir_name);
         fs::create_dir_all(&crash_dir)
             .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;

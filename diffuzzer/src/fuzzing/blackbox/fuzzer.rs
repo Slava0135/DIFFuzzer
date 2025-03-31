@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use anyhow::{Context, Ok};
-use log::{debug, info};
+use log::info;
 use rand::SeedableRng;
 use rand::prelude::StdRng;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -56,7 +56,6 @@ impl BlackBoxFuzzer {
 
 impl Fuzzer for BlackBoxFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
-        debug!("generate input");
         let input = generate_new(
             &mut self.rng,
             self.runner.config.max_workload_length.into(),

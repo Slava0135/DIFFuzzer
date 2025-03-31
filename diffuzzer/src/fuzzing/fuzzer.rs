@@ -5,7 +5,7 @@
 use std::time::Instant;
 
 use anyhow::Context;
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 
 use crate::{abstract_fs::workload::Workload, path::RemotePath, reason::Reason};
 
@@ -58,7 +58,6 @@ pub trait Fuzzer {
         diff: &DiffCompleted,
     ) -> anyhow::Result<bool> {
         let runner = self.runner();
-        debug!("do objectives");
         if diff.any_interesting() {
             let mut reason = Reason::new();
             if diff.trace_interesting() {
@@ -94,8 +93,6 @@ pub trait Fuzzer {
         binary_path: &RemotePath,
         diff: &DiffCompleted,
     ) -> anyhow::Result<bool> {
-        debug!("detect errors");
-
         let fst_errors = diff.fst_trace.errors();
         let snd_errors = diff.snd_trace.errors();
 

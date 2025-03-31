@@ -22,7 +22,7 @@ use crate::{
     path::LocalPath,
 };
 use anyhow::{Context, bail};
-use log::{debug, error, info};
+use log::{error, info};
 use serde::Deserialize;
 use serde_json::{Deserializer, Value};
 
@@ -204,19 +204,13 @@ struct ReturnMessage {
 
 impl EventHandler {
     fn launch(socket_path: &LocalPath) -> anyhow::Result<Self> {
-        debug!("create event handler");
         let mut stream = UnixStream::connect(socket_path)
             .with_context(|| format!("failed to connect to unix socket at '{}'", &socket_path))?;
         let mut de = Deserializer::from_reader(stream.try_clone()?);
-        debug!("read greeting message:");
-        let value =
-            Value::deserialize(&mut de).with_context(|| "failed to deserialize response")?;
-        debug!("{}", value);
+        Value::deserialize(&mut de).with_context(|| "failed to deserialize response")?;
         stream.write_all(b"{ \"execute\": \"qmp_capabilities\" }")?;
-        debug!("read response (deserialized):");
-        let return_msg = ReturnMessage::deserialize(&mut de)
+        ReturnMessage::deserialize(&mut de)
             .with_context(|| "failed to deserialize return message")?;
-        debug!("{:?}", return_msg);
 
         let (tx, rx): (Sender<()>, Receiver<()>) = mpsc::channel();
 
@@ -225,7 +219,6 @@ impl EventHandler {
                 let value = Value::deserialize(&mut de)
                     .with_context(|| "failed to deserialize response")
                     .unwrap();
-                debug!("received QMP message:\n{}", value);
                 if let Value::Object(map) = value {
                     if map.contains_key("event") {
                         tx.send(()).unwrap();

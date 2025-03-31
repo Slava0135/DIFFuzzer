@@ -7,8 +7,6 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
 };
 
-use log::debug;
-
 use crate::fuzzing::{observer::lcov::LCovObserver, outcome::Completed};
 
 use super::{CoverageFeedback, CoverageMap, CoverageType, FeedbackOpinion};
@@ -33,7 +31,6 @@ impl CoverageFeedback for LCovCoverageFeedback {
         &self.map
     }
     fn opinion(&mut self, outcome: &Completed) -> anyhow::Result<FeedbackOpinion> {
-        debug!("do lcov feedback");
         let data = LCovObserver::read_lcov(outcome)?;
         let trace = LCovTrace::parse_from(&data);
         let new_coverage = trace.map();
