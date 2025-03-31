@@ -36,6 +36,7 @@ pub enum InstanceMessage {
 }
 
 pub struct Instance {
+    id: u8,
     _handle: JoinHandle<()>,
     tx: Sender<InstanceMessage>,
     executions: u64,
@@ -126,6 +127,7 @@ impl BlackBoxBroker {
                 })
                 .with_context(|| format!("failed to create instance {}", id))?;
             instances.push(Instance {
+                id,
                 _handle: handle,
                 tx: instance_tx,
                 executions: 0,
@@ -142,6 +144,7 @@ impl BlackBoxBroker {
     pub fn run(&mut self, test_count: Option<u64>) -> anyhow::Result<()> {
         self.start = Instant::now();
         for i in self.instances.iter() {
+            info!("run fuzzer instance {}", i.id);
             i.tx.send(InstanceMessage::Run { test_count })
                 .with_context(|| "failed to run instance")?;
         }
