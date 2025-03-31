@@ -64,6 +64,13 @@ impl GreyBoxFuzzer {
         no_qemu: bool,
     ) -> anyhow::Result<Self> {
         let local_tmp_dir = LocalPath::new_tmp("greybox");
+        fs::remove_dir(local_tmp_dir.as_ref()).unwrap_or(());
+        fs::create_dir_all(local_tmp_dir.as_ref()).with_context(|| {
+            format!(
+                "failed to create local temporary directory at '{}'",
+                local_tmp_dir,
+            )
+        })?;
 
         let (cmdi, supervisor) = launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir)?;
 

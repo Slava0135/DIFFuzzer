@@ -192,7 +192,7 @@ impl BlackBoxBroker {
                         secs % 60,
                     );
                     info!("{}", global_stats);
-                    info!("(instance {}) {}", id, instance_stats);
+                    info!("{} (instance {})", instance_stats, id);
                 }
             }
         }

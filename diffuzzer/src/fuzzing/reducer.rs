@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::fs::read_to_string;
+use std::fs::{self, read_to_string};
 
 use anyhow::{Context, Ok};
 use log::{info, warn};
@@ -32,6 +32,13 @@ impl Reducer {
         no_qemu: bool,
     ) -> anyhow::Result<Self> {
         let local_tmp_dir = LocalPath::new_tmp("reducer");
+        fs::remove_dir(local_tmp_dir.as_ref()).unwrap_or(());
+        fs::create_dir_all(local_tmp_dir.as_ref()).with_context(|| {
+            format!(
+                "failed to create local temporary directory at '{}'",
+                local_tmp_dir,
+            )
+        })?;
 
         let (cmdi, supervisor) = launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir)?;
 
