@@ -65,7 +65,7 @@ pub struct QemuSupervisor {
     options: QemuSupervisorOptions,
     _qemu_thread: JoinHandle<()>,
     event_handler: EventHandler,
-    id: u32,
+    process_id: u32,
 }
 
 impl QemuSupervisor {
@@ -127,12 +127,12 @@ impl QemuSupervisor {
         let event_handler = EventHandler::launch(&options.qmp_socket_path)
             .with_context(|| "failed to launch event handler")?;
 
-        let id = rx.try_recv()?;
+        let process_id = rx.try_recv()?;
         Ok(Self {
             options,
             _qemu_thread,
             event_handler,
-            id,
+            process_id,
         })
     }
 
@@ -148,7 +148,7 @@ impl QemuSupervisor {
 
     fn check_pid_match(&self) -> bool {
         let mut ps = CommandWrapper::new("ps");
-        ps.args(["-p", self.id.to_string().as_str(), "-o", "comm="]);
+        ps.args(["-p", self.process_id.to_string().as_str(), "-o", "comm="]);
         let p_name: String = ps
             .exec_local(None)
             .and_then(|output| Ok(String::from_utf8(output.stdout).unwrap_or(String::from(""))))
@@ -185,7 +185,7 @@ impl Drop for QemuSupervisor {
             return;
         }
         let mut kill = CommandWrapper::new("kill");
-        kill.arg(self.id.to_string());
+        kill.arg(self.process_id.to_string());
         let _ = kill.exec_local(None);
     }
 }
