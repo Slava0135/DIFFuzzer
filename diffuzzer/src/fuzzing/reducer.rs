@@ -2,10 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::{
-    fs::{self, read_to_string},
-    time::Instant,
-};
+use std::{fs::read_to_string, time::Instant};
 
 use anyhow::{Context, Ok};
 use log::{info, warn};
@@ -34,14 +31,7 @@ impl Reducer {
         crashes_path: LocalPath,
         no_qemu: bool,
     ) -> anyhow::Result<Self> {
-        let local_tmp_dir = LocalPath::new_tmp("reducer");
-        fs::remove_dir(local_tmp_dir.as_ref()).unwrap_or(());
-        fs::create_dir_all(local_tmp_dir.as_ref()).with_context(|| {
-            format!(
-                "failed to create local temporary directory at '{}'",
-                local_tmp_dir,
-            )
-        })?;
+        let local_tmp_dir = LocalPath::create_new_tmp("reducer")?;
 
         let broker = BrokerHandle::Stub {
             start: Instant::now(),

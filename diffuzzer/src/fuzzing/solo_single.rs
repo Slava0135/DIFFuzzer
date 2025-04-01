@@ -30,14 +30,7 @@ pub fn run(
     config: Config,
     no_qemu: bool,
 ) -> anyhow::Result<()> {
-    let local_tmp_dir = LocalPath::new_tmp("solo-single");
-    fs::remove_dir(local_tmp_dir.as_ref()).unwrap_or(());
-    fs::create_dir_all(local_tmp_dir.as_ref()).with_context(|| {
-        format!(
-            "failed to create local temporary directory at '{}'",
-            local_tmp_dir,
-        )
-    })?;
+    let local_tmp_dir = LocalPath::create_new_tmp("solo-single")?;
 
     let broker = BrokerHandle::Stub {
         start: Instant::now(),

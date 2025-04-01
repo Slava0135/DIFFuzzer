@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use std::{
-    fs,
     sync::mpsc::{self, Receiver, Sender},
     thread::{self, JoinHandle},
     time::Instant,
@@ -129,16 +128,9 @@ impl BlackBoxBroker {
             let handle = builder
                 .name(name.clone())
                 .spawn(move || {
-                    let local_tmp_dir = LocalPath::new_tmp(&name);
-                    fs::remove_dir(local_tmp_dir.as_ref()).unwrap_or(());
-                    match fs::create_dir_all(local_tmp_dir.as_ref()).with_context(|| {
-                        format!(
-                            "failed to create local temporary directory for instance {} at '{}'",
-                            id, local_tmp_dir
-                        )
-                    }) {
+                    match LocalPath::create_new_tmp(&name) {
                         Err(err) => broker.error(err).unwrap(),
-                        Ok(_) => {
+                        Ok(local_tmp_dir) => {
                             match launch_cmdi_and_supervisor(
                                 no_qemu,
                                 &config,
