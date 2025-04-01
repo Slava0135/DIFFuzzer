@@ -19,9 +19,12 @@ pub struct Args {
     /// Include total size of files in bytes when calculating hash
     #[arg(short, long, default_value_t = false)]
     pub size: bool,
-    /// Include number of hard links pointing to files when calculating hash
+    /// Include number of hard links pointing to files when calculating hash (for files)
     #[arg(short, long, default_value_t = false)]
-    pub nlink: bool,
+    pub f_nlink: bool,
+    /// Include number of hard links pointing to files when calculating hash (for dirs)
+    #[arg(short, long, default_value_t = false)]
+    pub d_nlink: bool,
     /// Include rights applied to files when calculating hash
     #[arg(short, long, default_value_t = false)]
     pub mode: bool,

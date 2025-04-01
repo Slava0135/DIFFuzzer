@@ -21,6 +21,7 @@ pub struct DashObserver {
     dash_path: Option<RemotePath>,
     fs_dir: RemotePath,
     fs_internal: RegexSet,
+    flags: Vec<String>,
 
     hash: u64,
     fs_state: Vec<FileInfo>,
@@ -37,6 +38,7 @@ impl Observer for DashObserver {
             let mut dash = CommandWrapper::new(dash_path.base.as_ref());
             dash.arg("-t").arg(self.fs_dir.base.as_ref());
             dash.arg("-o").arg(output_path.base.as_ref());
+            dash.args(&self.flags);
             for pat in self.fs_internal.patterns() {
                 dash.arg("-e").arg(pat);
             }
@@ -81,10 +83,18 @@ impl DashObserver {
             warn!("dash (differential abstract state hash) observer is disabled");
             None
         };
+
+        let mut flags = vec![];
+        if config.dash.permission { flags.push("m".to_string()) }
+        if config.dash.size { flags.push("s".to_string()) }
+        if config.dash.dir_hardlink { flags.push("n".to_string()) }
+        if config.dash.file_hardlink { flags.push("n".to_string()) }
+
         Ok(Self {
             dash_path,
             fs_dir,
             fs_internal,
+            flags,
             fs_state: vec![],
             hash: 0,
         })

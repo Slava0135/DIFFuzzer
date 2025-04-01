@@ -22,7 +22,8 @@ fn main() {
 
     let hasher_options = HasherOptions {
         size: args.size,
-        nlink: args.nlink,
+        f_nlink: args.f_nlink,
+        d_nlink: args.d_nlink,
         mode: args.mode,
     };
 
