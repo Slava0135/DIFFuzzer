@@ -5,7 +5,6 @@
 use anyhow::{Context, Ok};
 use rand::SeedableRng;
 use rand::prelude::StdRng;
-use std::sync::mpsc::Sender;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::abstract_fs::generator::generate_new;
@@ -20,20 +19,18 @@ use crate::path::LocalPath;
 use crate::reason::Reason;
 use crate::supervisor::Supervisor;
 
-use super::broker::BrokerMessage;
+use super::broker::BrokerHandle;
 
 pub struct BlackBoxFuzzer {
-    id: u8,
     runner: Runner,
     rng: StdRng,
     last_time_stats_sent: Instant,
     heartbeat_interval: u16,
-    broker_tx: Sender<BrokerMessage>,
+    broker: BrokerHandle,
 }
 
 impl BlackBoxFuzzer {
     pub fn create(
-        id: u8,
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
@@ -41,7 +38,7 @@ impl BlackBoxFuzzer {
         cmdi: Box<dyn CommandInterface>,
         supervisor: Box<dyn Supervisor>,
         local_tmp_dir: LocalPath,
-        broker_tx: Sender<BrokerMessage>,
+        broker: BrokerHandle,
     ) -> anyhow::Result<Self> {
         let heartbeat_interval = config.heartbeat_interval;
         let runner = Runner::create(
@@ -53,18 +50,18 @@ impl BlackBoxFuzzer {
             cmdi,
             supervisor,
             local_tmp_dir,
+            broker.clone(),
             (vec![], vec![]),
         )
         .with_context(|| "failed to create runner")?;
         Ok(Self {
-            id,
             runner,
             rng: StdRng::seed_from_u64(
                 SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64
             ),
             last_time_stats_sent: Instant::now(),
             heartbeat_interval,
-            broker_tx,
+            broker,
         })
     }
 }
@@ -125,13 +122,9 @@ impl Fuzzer for BlackBoxFuzzer {
         if !lazy || self.last_time_stats_sent.elapsed().as_secs() >= self.heartbeat_interval as u64
         {
             self.last_time_stats_sent = Instant::now();
-            self.broker_tx
-                .send(BrokerMessage::Stats {
-                    id: self.id,
-                    executions: self.runner.executions,
-                    crashes: self.runner.crashes,
-                })
-                .with_context(|| "failed to send broker message")?
+            self.broker
+                .stats(self.runner.crashes, self.runner.executions)
+                .unwrap();
         }
         Ok(())
     }

@@ -13,12 +13,12 @@ use crate::reason::Reason;
 use crate::save::{save_completed, save_reason, save_testcase};
 use crate::supervisor::Supervisor;
 use anyhow::{Context, Ok};
-use log::info;
 use std::cell::RefCell;
 use std::fs;
 use std::path::Path;
 use std::rc::Rc;
 
+use super::blackbox::broker::BrokerHandle;
 use super::harness::Harness;
 use super::objective::dash::DashObjective;
 use super::objective::trace::TraceObjective;
@@ -51,6 +51,8 @@ pub struct Runner {
 
     pub executions: u64,
     pub crashes: u64,
+
+    pub broker: BrokerHandle,
 }
 
 impl Runner {
@@ -63,6 +65,7 @@ impl Runner {
         cmdi: Box<dyn CommandInterface>,
         supervisor: Box<dyn Supervisor>,
         local_tmp_dir: LocalPath,
+        broker: BrokerHandle,
         mut observers: (ObserverList, ObserverList),
     ) -> anyhow::Result<Self> {
         let remote_tmp_dir = cmdi
@@ -149,6 +152,8 @@ impl Runner {
 
             executions: 0,
             crashes: 0,
+
+            broker,
         };
 
         runner
@@ -249,7 +254,7 @@ impl Runner {
 
         save_reason(&crash_dir, reason).with_context(|| "failed to save reason")?;
 
-        info!("diff saved at '{}'", crash_dir);
+        self.broker.info(format!("diff saved at '{}'", crash_dir))?;
 
         Ok(())
     }
@@ -269,7 +274,8 @@ impl Runner {
             .with_context(|| "failed to save testcase")?;
         save_reason(&crash_dir, reason).with_context(|| "failed to save reason")?;
 
-        info!("crash saved at '{}'", crash_dir);
+        self.broker
+            .info(format!("crash saved at '{}'", crash_dir))?;
 
         Ok(())
     }

@@ -5,6 +5,7 @@
 use std::{
     fs::{self, read_to_string},
     path::Path,
+    time::Instant,
 };
 
 use anyhow::Context;
@@ -13,7 +14,7 @@ use log::info;
 use crate::{
     abstract_fs::workload::Workload,
     config::Config,
-    fuzzing::{harness::Harness, outcome::Outcome},
+    fuzzing::{blackbox::broker::BrokerHandle, harness::Harness, outcome::Outcome},
     mount::FileSystemMount,
     path::{LocalPath, RemotePath},
     reason::Reason,
@@ -38,7 +39,11 @@ pub fn run(
         )
     })?;
 
-    let (cmdi, mut supervisor) = launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir)?;
+    let broker = BrokerHandle::Stub {
+        start: Instant::now(),
+    };
+    let (cmdi, mut supervisor) =
+        launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir, broker.clone())?;
 
     info!("read testcase at '{}'", test_path);
     let input = read_to_string(test_path).with_context(|| "failed to read testcase")?;

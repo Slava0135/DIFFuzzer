@@ -2,7 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::fs::{self, read_to_string};
+use std::{
+    fs::{self, read_to_string},
+    time::Instant,
+};
 
 use anyhow::{Context, Ok};
 use log::{info, warn};
@@ -17,7 +20,7 @@ use crate::{
     supervisor::launch_cmdi_and_supervisor,
 };
 
-use super::{outcome::DiffCompleted, runner::Runner};
+use super::{blackbox::broker::BrokerHandle, outcome::DiffCompleted, runner::Runner};
 
 pub struct Reducer {
     runner: Runner,
@@ -40,7 +43,11 @@ impl Reducer {
             )
         })?;
 
-        let (cmdi, supervisor) = launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir)?;
+        let broker = BrokerHandle::Stub {
+            start: Instant::now(),
+        };
+        let (cmdi, supervisor) =
+            launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir, broker.clone())?;
 
         let runner = Runner::create(
             fst_mount,
@@ -51,6 +58,7 @@ impl Reducer {
             cmdi,
             supervisor,
             local_tmp_dir,
+            broker,
             (vec![], vec![]),
         )
         .with_context(|| "failed to create runner")?;

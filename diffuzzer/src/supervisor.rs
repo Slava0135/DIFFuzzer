@@ -18,10 +18,10 @@ use crate::{
         fresh_tcp_port, launch_cmdi,
     },
     config::Config,
+    fuzzing::blackbox::broker::BrokerHandle,
     path::LocalPath,
 };
-use anyhow::{Context, bail};
-use log::{error, info};
+use anyhow::{Context, anyhow, bail};
 use serde::Deserialize;
 use serde_json::{Deserializer, Value};
 
@@ -66,10 +66,15 @@ pub struct QemuSupervisor {
     _qemu_thread: JoinHandle<()>,
     event_handler: EventHandler,
     process_id: u32,
+    broker: BrokerHandle,
 }
 
 impl QemuSupervisor {
-    pub fn launch(config: &QemuConfig, options: QemuSupervisorOptions) -> anyhow::Result<Self> {
+    pub fn launch(
+        config: &QemuConfig,
+        options: QemuSupervisorOptions,
+        broker: BrokerHandle,
+    ) -> anyhow::Result<Self> {
         let console_log = OpenOptions::new()
             .create(true)
             .append(true)
@@ -95,33 +100,44 @@ impl QemuSupervisor {
 
         let script = config.launch_script.clone();
         let log_path = config.log_path.clone();
-        let _qemu_thread = thread::spawn(move || {
-            match launch
-                .spawn()
-                .with_context(|| format!("failed to run qemu vm from script '{}'", script))
-            {
-                Ok(mut child) => {
-                    tx.send(child.id()).unwrap();
-                    match child.wait() {
-                        Ok(status) => {
-                            error!(
-                                "qemu finished unexpectedly ({}), check log at '{}'",
-                                status, log_path
-                            );
-                        }
-                        Err(err) => {
-                            error!(
-                                "qemu finished with error, check log at '{}':\n{}",
-                                log_path, err
-                            )
-                        }
-                    };
-                }
-                Err(err) => error!("{:?}", err),
-            };
-        });
+        let builder = thread::Builder::new().name(format!("qemu-process-instance-{}", broker.id()));
+        let broker_copy = broker.clone();
+        let _qemu_thread = builder
+            .spawn(move || {
+                match launch
+                    .spawn()
+                    .with_context(|| format!("failed to run qemu vm from script '{}'", script))
+                {
+                    Ok(mut child) => {
+                        tx.send(child.id()).unwrap();
+                        match child.wait() {
+                            Ok(status) => {
+                                broker
+                                    .error(anyhow!(
+                                        "qemu finished unexpectedly ({}), check log at '{}'",
+                                        status,
+                                        log_path
+                                    ))
+                                    .unwrap();
+                            }
+                            Err(err) => {
+                                broker
+                                    .error(anyhow!(
+                                        "qemu finished with error, check log at '{}':\n{}",
+                                        log_path,
+                                        err
+                                    ))
+                                    .unwrap();
+                            }
+                        };
+                    }
+                    Err(err) => broker.error(err).unwrap(),
+                };
+            })
+            .with_context(|| "failed to create qemu thread")?;
+        let broker = broker_copy;
 
-        info!("wait for VM to init ({}s)", config.boot_wait_time);
+        broker.info(format!("wait for VM to init ({}s)", config.boot_wait_time))?;
         sleep(Duration::from_secs(config.boot_wait_time.into()));
 
         let event_handler = EventHandler::launch(&options.qmp_socket_path)
@@ -133,6 +149,7 @@ impl QemuSupervisor {
             _qemu_thread,
             event_handler,
             process_id,
+            broker,
         })
     }
 
@@ -159,14 +176,14 @@ impl QemuSupervisor {
 
 impl Supervisor for QemuSupervisor {
     fn load_snapshot(&self) -> anyhow::Result<()> {
-        info!("load vm snapshot");
+        self.broker.info("load vm snapshot".into())?;
         let mut stream = self.monitor_stream()?;
         writeln!(stream, "loadvm {}", SNAPSHOT_TAG)?;
         Ok(())
     }
 
     fn save_snapshot(&self) -> anyhow::Result<()> {
-        info!("save vm snapshot");
+        self.broker.info("save vm snapshot".into())?;
         let mut stream = self.monitor_stream()?;
         writeln!(stream, "savevm {}", SNAPSHOT_TAG)?;
         Ok(())
@@ -267,10 +284,11 @@ pub enum SupervisorOptions {
 pub fn launch_supervisor(
     config: &Config,
     options: SupervisorOptions,
+    broker: BrokerHandle,
 ) -> anyhow::Result<Box<dyn Supervisor>> {
     if let SupervisorOptions::Qemu(options) = options {
         Ok(Box::new(
-            QemuSupervisor::launch(&config.qemu, options)
+            QemuSupervisor::launch(&config.qemu, options, broker)
                 .with_context(|| "failed to launch QEMU supervisor")?,
         ))
     } else {
@@ -282,6 +300,7 @@ pub fn launch_cmdi_and_supervisor(
     no_qemu: bool,
     config: &Config,
     tmp_dir: &LocalPath,
+    broker: BrokerHandle,
 ) -> anyhow::Result<(Box<dyn CommandInterface>, Box<dyn Supervisor>)> {
     let ssh_port =
         fresh_tcp_port().with_context(|| "failed to get fresh port for SSH connection")?;
@@ -307,6 +326,6 @@ pub fn launch_cmdi_and_supervisor(
             qmp_socket_path,
         })
     };
-    let supervisor = launch_supervisor(&config, supervisor_opts)?;
+    let supervisor = launch_supervisor(&config, supervisor_opts, broker)?;
     Ok((cmdi, supervisor))
 }

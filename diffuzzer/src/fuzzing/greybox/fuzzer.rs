@@ -15,6 +15,7 @@ use rand::{SeedableRng, rngs::StdRng};
 use walkdir::WalkDir;
 
 use crate::abstract_fs::operation::OperationKind;
+use crate::fuzzing::blackbox::broker::BrokerHandle;
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::observer::ObserverList;
 use crate::fuzzing::observer::lcov::LCovObserver;
@@ -72,7 +73,11 @@ impl GreyBoxFuzzer {
             )
         })?;
 
-        let (cmdi, supervisor) = launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir)?;
+        let broker = BrokerHandle::Stub {
+            start: Instant::now(),
+        };
+        let (cmdi, supervisor) =
+            launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir, broker.clone())?;
 
         let mutator = Mutator::new(
             StdRng::seed_from_u64(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64),
@@ -176,6 +181,7 @@ impl GreyBoxFuzzer {
             cmdi,
             supervisor,
             local_tmp_dir,
+            broker,
             observers,
         )
         .with_context(|| "failed to create runner")?;

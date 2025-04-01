@@ -5,6 +5,7 @@
 use anyhow::{Context, Ok};
 use log::info;
 use std::fs::{self, read_to_string};
+use std::time::Instant;
 
 use crate::abstract_fs::workload::Workload;
 use crate::config::Config;
@@ -16,6 +17,8 @@ use crate::mount::FileSystemMount;
 use crate::path::LocalPath;
 use crate::reason::Reason;
 use crate::supervisor::launch_cmdi_and_supervisor;
+
+use super::blackbox::broker::BrokerHandle;
 
 pub struct DuoSingleFuzzer {
     runner: Runner,
@@ -41,7 +44,11 @@ impl DuoSingleFuzzer {
             )
         })?;
 
-        let (cmdi, supervisor) = launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir)?;
+        let broker = BrokerHandle::Stub {
+            start: Instant::now(),
+        };
+        let (cmdi, supervisor) =
+            launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir, broker.clone())?;
 
         let runner = Runner::create(
             fst_mount,
@@ -52,6 +59,7 @@ impl DuoSingleFuzzer {
             cmdi,
             supervisor,
             local_tmp_dir,
+            broker,
             (vec![], vec![]),
         )
         .with_context(|| "failed to create runner")?;
