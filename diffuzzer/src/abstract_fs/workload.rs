@@ -27,4 +27,7 @@ impl Workload {
         let hash = hasher.hash(&bytes).as_bytes();
         BASE64_URL_SAFE.encode(hash)
     }
+    pub fn cut(&mut self, index: u32) {
+        self.ops.truncate(index as usize + 1);
+    }
 }
