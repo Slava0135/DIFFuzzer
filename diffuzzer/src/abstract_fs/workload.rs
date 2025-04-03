@@ -4,7 +4,7 @@
 
 use base64::{Engine, prelude::BASE64_URL_SAFE};
 use serde::{Deserialize, Serialize};
-use siphasher::sip128::SipHasher13;
+use twox_hash::XxHash3_128;
 
 use super::operation::Operation;
 
@@ -23,8 +23,9 @@ impl Workload {
     }
     pub fn generate_name(&self) -> String {
         let bytes = bincode::serialize(self).unwrap();
-        let hasher = SipHasher13::new();
-        let hash = hasher.hash(&bytes).as_bytes();
-        BASE64_URL_SAFE.encode(hash)
+        let mut hasher = XxHash3_128::new();
+        hasher.write(&bytes);
+        let hash = hasher.finish_128();
+        BASE64_URL_SAFE.encode(hash.to_le_bytes())
     }
 }
