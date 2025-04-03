@@ -243,14 +243,14 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(123);
         let mut w = generate_new(&mut rng, 100, &OperationWeights::uniform());
         for _ in 0..1000 {
-            let p: f64 = rng.r#gen();
+            let p: f64 = rng.random();
             if w.ops.is_empty() || p >= 0.5 {
-                let index = rng.gen_range(0..=w.ops.len());
+                let index = rng.random_range(0..=w.ops.len());
                 if let Some(workload) = insert(&mut rng, &w, index, &OperationWeights::uniform()) {
                     w = workload;
                 }
             } else {
-                let index = rng.gen_range(0..w.ops.len());
+                let index = rng.random_range(0..w.ops.len());
                 if let Some(workload) = remove(&w, index) {
                     w = workload;
                 }

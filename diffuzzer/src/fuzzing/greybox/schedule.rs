@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use anyhow::Context;
-use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
+use rand::{rngs::StdRng, seq::IndexedMutRandom, SeedableRng};
 
 use crate::abstract_fs::workload::Workload;
 
@@ -82,7 +82,7 @@ pub struct FastPowerScheduler {
 impl FastPowerScheduler {
     pub fn new(m: u64) -> Self {
         Self {
-            rng: StdRng::from_entropy(),
+            rng: StdRng::from_os_rng(),
             m: m as f64,
         }
     }

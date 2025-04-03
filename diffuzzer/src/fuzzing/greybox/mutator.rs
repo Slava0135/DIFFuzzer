@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use rand::{Rng, rngs::StdRng, seq::SliceRandom};
+use rand::{rngs::StdRng, seq::IndexedRandom, Rng};
 
 use crate::abstract_fs::{
     mutator::{MutationKind, MutationWeights, insert, remove},
@@ -40,7 +40,7 @@ impl Mutator {
     pub fn mutate(&mut self, input: Workload) -> Workload {
         let mut input = input;
         let mut count = 0;
-        let n = self.rng.gen_range(1..=self.max_mutations);
+        let n = self.rng.random_range(1..=self.max_mutations);
         while count < n {
             if self.mutate_once(&mut input) {
                 count += 1;
@@ -67,7 +67,7 @@ impl Mutator {
             .0
         {
             MutationKind::Insert => {
-                let index = self.rng.gen_range(0..=input.ops.len());
+                let index = self.rng.random_range(0..=input.ops.len());
                 if let Some(workload) = insert(&mut self.rng, input, index, &self.operation_weights)
                 {
                     *input = workload;
@@ -77,7 +77,7 @@ impl Mutator {
                 }
             }
             MutationKind::Remove => {
-                let index = self.rng.gen_range(0..input.ops.len());
+                let index = self.rng.random_range(0..input.ops.len());
                 if let Some(workload) = remove(input, index) {
                     *input = workload;
                     true
