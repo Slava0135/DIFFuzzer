@@ -27,7 +27,7 @@ use super::fuzzer::BlackBoxFuzzer;
 struct BlackBoxInstance {
     _handle: JoinHandle<()>,
     tx: Sender<InstanceMessage>,
-    stats: BlackBoxStats,
+    stats: Option<BlackBoxStats>,
 }
 
 pub struct BlackBoxBroker {
@@ -114,10 +114,10 @@ impl BlackBoxBroker {
                         .instances
                         .get_mut(id as usize)
                         .with_context(|| format!("failed to get instance {}", id))?;
-                    instance.stats = stats.clone();
-                    let aggregated =
-                        BlackBoxStats::aggregate(self.instances.iter().map(|i| &i.stats).collect());
-
+                    instance.stats = Some(stats.clone());
+                    let aggregated = BlackBoxStats::aggregate(
+                        self.instances.iter().flat_map(|i| &i.stats).collect(),
+                    );
                     info!("{}", aggregated.display(&self.start));
                     info!("{} (instance {})", stats.display(&self.start), id);
                 }
