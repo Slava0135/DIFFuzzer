@@ -9,83 +9,20 @@ use std::{
 };
 
 use anyhow::{Context, bail};
-use log::{error, info};
+use log::info;
 
 use crate::{
-    config::Config, fuzzing::fuzzer::Fuzzer, mount::FileSystemMount, path::LocalPath,
+    config::Config,
+    fuzzing::{
+        broker::{stats_string, BrokerHandle, BrokerMessage, InstanceMessage},
+        fuzzer::Fuzzer,
+    },
+    mount::FileSystemMount,
+    path::LocalPath,
     supervisor::launch_cmdi_and_supervisor,
 };
 
 use super::fuzzer::BlackBoxFuzzer;
-
-pub enum BrokerMessage {
-    Error {
-        id: u8,
-        err: anyhow::Error,
-    },
-    Stats {
-        id: u8,
-        crashes: u64,
-        executions: u64,
-    },
-    Info {
-        id: u8,
-        msg: String,
-    },
-}
-
-#[derive(Clone)]
-pub enum BrokerHandle {
-    Stub { start: Instant },
-    Full { id: u8, tx: Sender<BrokerMessage> },
-}
-
-impl BrokerHandle {
-    pub fn error(&self, err: anyhow::Error) -> anyhow::Result<()> {
-        match self {
-            Self::Stub { .. } => {
-                error!("{:?}", err);
-                Ok(())
-            }
-            Self::Full { id, tx } => tx
-                .send(BrokerMessage::Error { id: *id, err })
-                .with_context(|| "failed to send broker message"),
-        }
-    }
-    pub fn info(&self, msg: String) -> anyhow::Result<()> {
-        match self {
-            Self::Stub { .. } => {
-                info!("{}", msg);
-                Ok(())
-            }
-            Self::Full { id, tx } => tx
-                .send(BrokerMessage::Info { id: *id, msg })
-                .with_context(|| "failed to send broker message"),
-        }
-    }
-    pub fn stats(&self, crashes: u64, executions: u64) -> anyhow::Result<()> {
-        match self {
-            Self::Stub { start } => Ok(info!("{}", stats_string(start, crashes, executions))),
-            Self::Full { id, tx } => tx
-                .send(BrokerMessage::Stats {
-                    id: *id,
-                    executions,
-                    crashes,
-                })
-                .with_context(|| "failed to send broker message"),
-        }
-    }
-    pub fn id(&self) -> u8 {
-        match self {
-            Self::Stub { .. } => 0,
-            Self::Full { id, .. } => *id,
-        }
-    }
-}
-
-pub enum InstanceMessage {
-    Run { test_count: Option<u64> },
-}
 
 pub struct Instance {
     _handle: JoinHandle<()>,
@@ -231,17 +168,4 @@ impl BlackBoxBroker {
             }
         }
     }
-}
-
-fn stats_string(start: &Instant, crashes: u64, executions: u64) -> String {
-    let secs = start.elapsed().as_secs();
-    format!(
-        "crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
-        crashes,
-        executions,
-        (executions as f64) / (secs as f64),
-        secs / (60 * 60),
-        (secs / (60)) % 60,
-        secs % 60,
-    )
 }

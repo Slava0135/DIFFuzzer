@@ -18,7 +18,7 @@ use crate::path::LocalPath;
 use crate::reason::Reason;
 use crate::supervisor::launch_cmdi_and_supervisor;
 
-use super::blackbox::broker::BrokerHandle;
+use super::broker::BrokerHandle;
 
 pub struct DuoSingleFuzzer {
     runner: Runner,

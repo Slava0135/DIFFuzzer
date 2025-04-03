@@ -18,7 +18,7 @@ use std::fs;
 use std::path::Path;
 use std::rc::Rc;
 
-use super::blackbox::broker::BrokerHandle;
+use super::broker::BrokerHandle;
 use super::harness::Harness;
 use super::objective::dash::DashObjective;
 use super::objective::trace::TraceObjective;

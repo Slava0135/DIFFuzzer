@@ -17,7 +17,7 @@ use crate::{
     supervisor::launch_cmdi_and_supervisor,
 };
 
-use super::{blackbox::broker::BrokerHandle, outcome::DiffCompleted, runner::Runner};
+use super::{broker::BrokerHandle, outcome::DiffCompleted, runner::Runner};
 
 pub struct Reducer {
     runner: Runner,

@@ -14,7 +14,7 @@ use log::info;
 use crate::{
     abstract_fs::workload::Workload,
     config::Config,
-    fuzzing::{blackbox::broker::BrokerHandle, harness::Harness, outcome::Outcome},
+    fuzzing::{broker::BrokerHandle, harness::Harness, outcome::Outcome},
     mount::FileSystemMount,
     path::{LocalPath, RemotePath},
     reason::Reason,

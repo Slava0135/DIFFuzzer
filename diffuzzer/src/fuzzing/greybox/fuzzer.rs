@@ -15,7 +15,7 @@ use rand::{SeedableRng, rngs::StdRng};
 use walkdir::WalkDir;
 
 use crate::abstract_fs::operation::OperationKind;
-use crate::fuzzing::blackbox::broker::BrokerHandle;
+use crate::fuzzing::broker::BrokerHandle;
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::observer::ObserverList;
 use crate::fuzzing::observer::lcov::LCovObserver;

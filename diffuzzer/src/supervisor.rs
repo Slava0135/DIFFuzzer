@@ -18,7 +18,7 @@ use crate::{
         fresh_tcp_port, launch_cmdi,
     },
     config::Config,
-    fuzzing::blackbox::broker::BrokerHandle,
+    fuzzing::broker::BrokerHandle,
     path::LocalPath,
 };
 use anyhow::{Context, anyhow, bail};

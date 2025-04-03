@@ -11,6 +11,7 @@ use crate::abstract_fs::generator::generate_new;
 use crate::command::CommandInterface;
 use crate::config::Config;
 
+use crate::fuzzing::broker::BrokerHandle;
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::outcome::DiffOutcome;
 use crate::fuzzing::runner::Runner;
@@ -18,8 +19,6 @@ use crate::mount::FileSystemMount;
 use crate::path::LocalPath;
 use crate::reason::Reason;
 use crate::supervisor::Supervisor;
-
-use super::broker::BrokerHandle;
 
 pub struct BlackBoxFuzzer {
     runner: Runner,
