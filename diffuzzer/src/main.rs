@@ -10,7 +10,7 @@ use args::Args;
 use clap::Parser;
 use config::Config;
 use fuzzing::{
-    blackbox::broker::BlackBoxBroker, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
+    blackbox::broker::BlackBoxBroker, fuzzer::Fuzzer, greybox::broker::GreyBoxBroker,
     reducer::Reducer, solo_single,
 };
 use log::{error, info};
@@ -55,18 +55,20 @@ fn run() -> anyhow::Result<()> {
             second_filesystem,
             test_count,
             corpus_path,
+            instances,
         } => {
             info!(
                 "start greybox fuzzing ('{}' + '{}')",
                 first_filesystem, second_filesystem
             );
-            GreyBoxFuzzer::create(
+            GreyBoxBroker::create(
                 config,
                 first_filesystem.into(),
                 second_filesystem.into(),
                 LocalPath::new(Path::new("./crashes")),
                 corpus_path,
                 args.no_qemu,
+                instances,
             )?
             .run(test_count)?;
         }

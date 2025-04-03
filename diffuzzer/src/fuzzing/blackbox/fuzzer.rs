@@ -11,7 +11,7 @@ use crate::abstract_fs::generator::generate_new;
 use crate::command::CommandInterface;
 use crate::config::Config;
 
-use crate::fuzzing::broker::BrokerHandle;
+use crate::fuzzing::broker::{BlackBoxStats, BrokerHandle};
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::outcome::DiffOutcome;
 use crate::fuzzing::runner::Runner;
@@ -122,7 +122,10 @@ impl Fuzzer for BlackBoxFuzzer {
         {
             self.last_time_stats_sent = Instant::now();
             self.broker
-                .stats(self.runner.crashes, self.runner.executions)
+                .black_box_stats(BlackBoxStats {
+                    executions: self.runner.executions,
+                    crashes: self.runner.crashes,
+                })
                 .unwrap();
         }
         Ok(())

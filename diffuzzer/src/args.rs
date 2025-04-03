@@ -40,6 +40,9 @@ pub enum Mode {
         /// Load corpus from directory
         #[arg(short, long)]
         corpus_path: Option<String>,
+        /// Number of fuzzer instances running in parallel
+        #[arg(short, long, default_value_t = 1)]
+        instances: u8,
     },
     /// Run blackbox fuzzing
     Blackbox {

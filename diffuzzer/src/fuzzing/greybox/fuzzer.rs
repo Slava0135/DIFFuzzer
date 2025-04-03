@@ -15,7 +15,8 @@ use rand::{SeedableRng, rngs::StdRng};
 use walkdir::WalkDir;
 
 use crate::abstract_fs::operation::OperationKind;
-use crate::fuzzing::broker::BrokerHandle;
+use crate::command::CommandInterface;
+use crate::fuzzing::broker::{BlackBoxStats, BrokerHandle};
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::observer::ObserverList;
 use crate::fuzzing::observer::lcov::LCovObserver;
@@ -24,7 +25,7 @@ use crate::fuzzing::runner::Runner;
 use crate::path::{LocalPath, RemotePath};
 use crate::reason::Reason;
 use crate::save::{TEST_FILE_NAME, save_completed, save_testcase};
-use crate::supervisor::launch_cmdi_and_supervisor;
+use crate::supervisor::Supervisor;
 use crate::{abstract_fs::workload::Workload, config::Config, mount::FileSystemMount};
 
 use super::feedback::kcov::KCovCoverageFeedback;
@@ -50,9 +51,9 @@ pub struct GreyBoxFuzzer {
 
     corpus_path: Option<LocalPath>,
 
-    start: Instant,
     last_time_stats_sent: Instant,
     heartbeat_interval: u16,
+    broker: BrokerHandle,
 }
 
 impl GreyBoxFuzzer {
@@ -62,16 +63,11 @@ impl GreyBoxFuzzer {
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
         corpus_path: Option<String>,
-        no_qemu: bool,
+        cmdi: Box<dyn CommandInterface>,
+        supervisor: Box<dyn Supervisor>,
+        local_tmp_dir: LocalPath,
+        broker: BrokerHandle,
     ) -> anyhow::Result<Self> {
-        let local_tmp_dir = LocalPath::create_new_tmp("greybox")?;
-
-        let broker = BrokerHandle::Stub {
-            start: Instant::now(),
-        };
-        let (cmdi, supervisor) =
-            launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir, broker.clone())?;
-
         let mutator = Mutator::new(
             StdRng::seed_from_u64(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64),
             config.operation_weights.clone(),
@@ -174,7 +170,7 @@ impl GreyBoxFuzzer {
             cmdi,
             supervisor,
             local_tmp_dir,
-            broker,
+            broker.clone(),
             observers,
         )
         .with_context(|| "failed to create runner")?;
@@ -195,9 +191,9 @@ impl GreyBoxFuzzer {
 
             corpus_path,
 
-            start: Instant::now(),
             last_time_stats_sent: Instant::now(),
             heartbeat_interval: config.heartbeat_interval,
+            broker,
         })
     }
 
@@ -335,21 +331,12 @@ impl Fuzzer for GreyBoxFuzzer {
         if !lazy || self.last_time_stats_sent.elapsed().as_secs() >= self.heartbeat_interval as u64
         {
             self.last_time_stats_sent = Instant::now();
-            let secs = self.start.elapsed().as_secs();
-            info!(
-                "corpus: {}, coverage: {} ({}) + {} ({}), crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
-                self.corpus.len(),
-                self.fst_coverage_feedback.map().len(),
-                self.fst_coverage_feedback.coverage_type(),
-                self.snd_coverage_feedback.map().len(),
-                self.snd_coverage_feedback.coverage_type(),
-                self.runner.crashes,
-                self.runner.executions,
-                (self.runner.executions as f64) / (secs as f64),
-                secs / (60 * 60),
-                (secs / (60)) % 60,
-                secs % 60,
-            );
+            self.broker
+                .black_box_stats(BlackBoxStats {
+                    executions: self.runner.executions,
+                    crashes: self.runner.crashes,
+                })
+                .unwrap();
         }
         Ok(())
     }

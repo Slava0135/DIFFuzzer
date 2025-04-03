@@ -22,7 +22,7 @@ use crate::{
     supervisor::launch_cmdi_and_supervisor,
 };
 
-use super::fuzzer::BlackBoxFuzzer;
+use super::fuzzer::GreyBoxFuzzer;
 
 struct Instance {
     _handle: JoinHandle<()>,
@@ -30,18 +30,19 @@ struct Instance {
     stats: BlackBoxStats,
 }
 
-pub struct BlackBoxBroker {
+pub struct GreyBoxBroker {
     instances: Vec<Instance>,
     rx: Receiver<BrokerMessage>,
     start: Instant,
 }
 
-impl BlackBoxBroker {
+impl GreyBoxBroker {
     pub fn create(
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
+        corpus_path: Option<String>,
         no_qemu: bool,
         instances_n: u8,
     ) -> anyhow::Result<Self> {
@@ -58,6 +59,7 @@ impl BlackBoxBroker {
             let (instance_tx, instance_rx) = mpsc::channel();
             let config = config.clone();
             let crashes_path = crashes_path.clone();
+            let corpus_path = corpus_path.clone();
 
             let builder = thread::Builder::new();
             let name = format!("instance-{}", id);
@@ -75,11 +77,12 @@ impl BlackBoxBroker {
                             ) {
                                 Err(err) => broker.error(err).unwrap(),
                                 Ok((cmdi, supervisor)) => {
-                                    match BlackBoxFuzzer::create(
+                                    match GreyBoxFuzzer::create(
                                         config.clone(),
                                         fst_mount,
                                         snd_mount,
                                         crashes_path.clone(),
+                                        corpus_path,
                                         cmdi,
                                         supervisor,
                                         local_tmp_dir,
@@ -111,8 +114,8 @@ impl BlackBoxBroker {
                 _handle: handle,
                 tx: instance_tx,
                 stats: BlackBoxStats {
-                    executions: 0,
                     crashes: 0,
+                    executions: 0,
                 },
             });
         }

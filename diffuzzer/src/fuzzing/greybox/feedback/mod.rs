@@ -12,6 +12,7 @@ use crate::fuzzing::outcome::Completed;
 pub mod kcov;
 pub mod lcov;
 
+#[derive(Clone)]
 pub enum CoverageType {
     /// No coverage.
     None,
