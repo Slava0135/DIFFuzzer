@@ -51,7 +51,7 @@ impl BlackBoxBroker {
         let mut instances = Vec::new();
         let (broker_tx, broker_rx) = mpsc::channel();
         for id in 0..instances_n {
-            let broker = BrokerHandle::Full {
+            let broker = BrokerHandle::Real {
                 id,
                 tx: broker_tx.clone(),
             };

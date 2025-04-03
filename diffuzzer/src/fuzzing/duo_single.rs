@@ -37,7 +37,7 @@ impl DuoSingleFuzzer {
     ) -> anyhow::Result<Self> {
         let local_tmp_dir = LocalPath::create_new_tmp("duo-single")?;
 
-        let broker = BrokerHandle::Stub {
+        let broker = BrokerHandle::Fake {
             start: Instant::now(),
         };
         let (cmdi, supervisor) =

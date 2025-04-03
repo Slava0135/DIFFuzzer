@@ -101,64 +101,64 @@ pub enum InstanceMessage {
 
 #[derive(Clone)]
 pub enum BrokerHandle {
-    Stub { start: Instant },
-    Full { id: u8, tx: Sender<BrokerMessage> },
+    Fake { start: Instant },
+    Real { id: u8, tx: Sender<BrokerMessage> },
 }
 
 impl BrokerHandle {
     pub fn error(&self, err: anyhow::Error) -> anyhow::Result<()> {
         match self {
-            Self::Stub { .. } => {
+            Self::Fake { .. } => {
                 error!("{:?}", err);
                 Ok(())
             }
-            Self::Full { id, tx } => tx
+            Self::Real { id, tx } => tx
                 .send(BrokerMessage::Error { id: *id, err })
                 .with_context(|| "failed to send broker message"),
         }
     }
     pub fn info(&self, msg: String) -> anyhow::Result<()> {
         match self {
-            Self::Stub { .. } => {
+            Self::Fake { .. } => {
                 info!("{}", msg);
                 Ok(())
             }
-            Self::Full { id, tx } => tx
+            Self::Real { id, tx } => tx
                 .send(BrokerMessage::Info { id: *id, msg })
                 .with_context(|| "failed to send broker message"),
         }
     }
     pub fn warn(&self, msg: String) -> anyhow::Result<()> {
         match self {
-            Self::Stub { .. } => {
+            Self::Fake { .. } => {
                 warn!("{}", msg);
                 Ok(())
             }
-            Self::Full { id, tx } => tx
+            Self::Real { id, tx } => tx
                 .send(BrokerMessage::Warn { id: *id, msg })
                 .with_context(|| "failed to send broker message"),
         }
     }
     pub fn black_box_stats(&self, stats: BlackBoxStats) -> anyhow::Result<()> {
         match self {
-            Self::Stub { start } => Ok(info!("{}", stats.display(start))),
-            Self::Full { id, tx } => tx
+            Self::Fake { start } => Ok(info!("{}", stats.display(start))),
+            Self::Real { id, tx } => tx
                 .send(BrokerMessage::BlackBoxStats { id: *id, stats })
                 .with_context(|| "failed to send broker message"),
         }
     }
     pub fn grey_box_stats(&self, stats: GreyBoxStats) -> anyhow::Result<()> {
         match self {
-            Self::Stub { start } => Ok(info!("{}", stats.display(start))),
-            Self::Full { id, tx } => tx
+            Self::Fake { start } => Ok(info!("{}", stats.display(start))),
+            Self::Real { id, tx } => tx
                 .send(BrokerMessage::GreyBoxStats { id: *id, stats })
                 .with_context(|| "failed to send broker message"),
         }
     }
     pub fn id(&self) -> u8 {
         match self {
-            Self::Stub { .. } => 0,
-            Self::Full { id, .. } => *id,
+            Self::Fake { .. } => 0,
+            Self::Real { id, .. } => *id,
         }
     }
 }

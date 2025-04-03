@@ -37,7 +37,7 @@ impl BlackBoxFuzzer {
         no_qemu: bool,
     ) -> anyhow::Result<Self> {
         let local_tmp_dir = LocalPath::create_new_tmp("blackbox")?;
-        let broker = BrokerHandle::Stub {
+        let broker = BrokerHandle::Fake {
             start: Instant::now(),
         };
         let (cmdi, supervisor) =

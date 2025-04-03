@@ -32,7 +32,7 @@ pub fn run(
 ) -> anyhow::Result<()> {
     let local_tmp_dir = LocalPath::create_new_tmp("solo-single")?;
 
-    let broker = BrokerHandle::Stub {
+    let broker = BrokerHandle::Fake {
         start: Instant::now(),
     };
     let (cmdi, mut supervisor) =
