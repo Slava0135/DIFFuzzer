@@ -16,7 +16,7 @@ use walkdir::WalkDir;
 
 use crate::abstract_fs::operation::OperationKind;
 use crate::command::CommandInterface;
-use crate::fuzzing::broker::{BlackBoxStats, BrokerHandle};
+use crate::fuzzing::broker::{BrokerHandle, GreyBoxStats};
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::observer::ObserverList;
 use crate::fuzzing::observer::lcov::LCovObserver;
@@ -332,7 +332,12 @@ impl Fuzzer for GreyBoxFuzzer {
         {
             self.last_time_stats_sent = Instant::now();
             self.broker
-                .black_box_stats(BlackBoxStats {
+                .grey_box_stats(GreyBoxStats {
+                    corpus_size: self.corpus.len() as u64,
+                    fst_coverage_size: self.fst_coverage_feedback.map().len() as u64,
+                    fst_coverage_type: self.fst_coverage_feedback.coverage_type(),
+                    snd_coverage_size: self.snd_coverage_feedback.map().len() as u64,
+                    snd_coverage_type: self.snd_coverage_feedback.coverage_type(),
                     executions: self.runner.executions,
                     crashes: self.runner.crashes,
                 })
