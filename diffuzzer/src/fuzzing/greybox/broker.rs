@@ -9,12 +9,12 @@ use std::{
 };
 
 use anyhow::{Context, bail};
-use log::info;
+use log::{info, warn};
 
 use crate::{
     config::Config,
     fuzzing::{
-        broker::{BlackBoxStats, BrokerHandle, BrokerMessage, InstanceMessage},
+        broker::{BrokerHandle, BrokerMessage, GreyBoxStats, InstanceMessage},
         fuzzer::Fuzzer,
     },
     mount::FileSystemMount,
@@ -24,14 +24,14 @@ use crate::{
 
 use super::fuzzer::GreyBoxFuzzer;
 
-struct Instance {
+struct GreyBoxInstance {
     _handle: JoinHandle<()>,
     tx: Sender<InstanceMessage>,
-    stats: BlackBoxStats,
+    stats: GreyBoxStats,
 }
 
 pub struct GreyBoxBroker {
-    instances: Vec<Instance>,
+    instances: Vec<GreyBoxInstance>,
     rx: Receiver<BrokerMessage>,
     start: Instant,
 }
@@ -110,13 +110,10 @@ impl GreyBoxBroker {
                     };
                 })
                 .with_context(|| format!("failed to create instance {}", id))?;
-            instances.push(Instance {
+            instances.push(GreyBoxInstance {
                 _handle: handle,
                 tx: instance_tx,
-                stats: BlackBoxStats {
-                    crashes: 0,
-                    executions: 0,
-                },
+                stats: Default::default(),
             });
         }
         Ok(Self {
@@ -141,33 +138,27 @@ impl GreyBoxBroker {
                 BrokerMessage::Error { id, err } => {
                     return Err(err.context(format!("error inside instance {}", id)));
                 }
-                BrokerMessage::BlackBoxStats { id, stats } => {
+                BrokerMessage::BlackBoxStats { .. } => {
+                    panic!("grey box broker received black box stats")
+                }
+                BrokerMessage::GreyBoxStats { id, stats } => {
                     let instance = self
                         .instances
                         .get_mut(id as usize)
                         .with_context(|| format!("failed to get instance {}", id))?;
                     instance.stats = stats.clone();
+                    let aggregated =
+                        GreyBoxStats::aggregate(self.instances.iter().map(|i| &i.stats).collect());
 
-                    let global_executions = self
-                        .instances
-                        .iter()
-                        .fold(0, |acc, i| acc + i.stats.executions);
-                    let global_crashes = self
-                        .instances
-                        .iter()
-                        .fold(0, |acc, i| acc + i.stats.crashes);
-                    let global_stats = BlackBoxStats {
-                        executions: global_executions,
-                        crashes: global_crashes,
-                    };
-
-                    info!("{}", global_stats.display(&self.start));
+                    info!("{}", aggregated.display(&self.start));
                     info!("{} (instance {})", stats.display(&self.start), id);
                 }
                 BrokerMessage::Info { id, msg } => {
                     info!("{} (instance {})", msg, id);
                 }
-                BrokerMessage::GreyBoxStats { id, stats } => todo!(),
+                BrokerMessage::Warn { id, msg } => {
+                    warn!("{} (instance {})", msg, id);
+                }
             }
         }
     }

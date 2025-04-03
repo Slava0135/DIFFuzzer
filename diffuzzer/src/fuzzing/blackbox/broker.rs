@@ -9,7 +9,7 @@ use std::{
 };
 
 use anyhow::{Context, bail};
-use log::info;
+use log::{info, warn};
 
 use crate::{
     config::Config,
@@ -24,14 +24,14 @@ use crate::{
 
 use super::fuzzer::BlackBoxFuzzer;
 
-struct Instance {
+struct BlackBoxInstance {
     _handle: JoinHandle<()>,
     tx: Sender<InstanceMessage>,
     stats: BlackBoxStats,
 }
 
 pub struct BlackBoxBroker {
-    instances: Vec<Instance>,
+    instances: Vec<BlackBoxInstance>,
     rx: Receiver<BrokerMessage>,
     start: Instant,
 }
@@ -107,7 +107,7 @@ impl BlackBoxBroker {
                     };
                 })
                 .with_context(|| format!("failed to create instance {}", id))?;
-            instances.push(Instance {
+            instances.push(BlackBoxInstance {
                 _handle: handle,
                 tx: instance_tx,
                 stats: BlackBoxStats {
@@ -144,27 +144,21 @@ impl BlackBoxBroker {
                         .get_mut(id as usize)
                         .with_context(|| format!("failed to get instance {}", id))?;
                     instance.stats = stats.clone();
+                    let aggregated =
+                        BlackBoxStats::aggregate(self.instances.iter().map(|i| &i.stats).collect());
 
-                    let global_executions = self
-                        .instances
-                        .iter()
-                        .fold(0, |acc, i| acc + i.stats.executions);
-                    let global_crashes = self
-                        .instances
-                        .iter()
-                        .fold(0, |acc, i| acc + i.stats.crashes);
-                    let global_stats = BlackBoxStats {
-                        executions: global_executions,
-                        crashes: global_crashes,
-                    };
-
-                    info!("{}", global_stats.display(&self.start));
+                    info!("{}", aggregated.display(&self.start));
                     info!("{} (instance {})", stats.display(&self.start), id);
+                }
+                BrokerMessage::GreyBoxStats { .. } => {
+                    panic!("black box broker received grey box stats")
                 }
                 BrokerMessage::Info { id, msg } => {
                     info!("{} (instance {})", msg, id);
                 }
-                BrokerMessage::GreyBoxStats { id, stats } => todo!(),
+                BrokerMessage::Warn { id, msg } => {
+                    warn!("{} (instance {})", msg, id);
+                }
             }
         }
     }

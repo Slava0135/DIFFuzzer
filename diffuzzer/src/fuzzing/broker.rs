@@ -5,7 +5,7 @@
 use std::{sync::mpsc::Sender, time::Instant};
 
 use anyhow::Context;
-use log::{error, info};
+use log::{error, info, warn};
 
 use super::greybox::feedback::CoverageType;
 
@@ -14,9 +14,10 @@ pub enum BrokerMessage {
     BlackBoxStats { id: u8, stats: BlackBoxStats },
     GreyBoxStats { id: u8, stats: GreyBoxStats },
     Info { id: u8, msg: String },
+    Warn { id: u8, msg: String },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct BlackBoxStats {
     pub crashes: u64,
     pub executions: u64,
@@ -35,9 +36,17 @@ impl BlackBoxStats {
             secs % 60,
         )
     }
+    pub fn aggregate(stats: Vec<&Self>) -> Self {
+        let executions = stats.iter().fold(0, |acc, s| acc + s.executions);
+        let crashes = stats.iter().fold(0, |acc, s| acc + s.crashes);
+        BlackBoxStats {
+            executions,
+            crashes,
+        }
+    }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct GreyBoxStats {
     pub corpus_size: u64,
     pub fst_coverage_size: u64,
@@ -65,6 +74,24 @@ impl GreyBoxStats {
             (secs / (60)) % 60,
             secs % 60,
         )
+    }
+    pub fn aggregate(stats: Vec<&Self>) -> Self {
+        let corpus_size = stats.iter().map(|s| s.corpus_size).max().unwrap();
+        let fst_coverage_size = stats.iter().map(|s| s.fst_coverage_size).max().unwrap();
+        let fst_coverage_type = stats.first().unwrap().fst_coverage_type.clone();
+        let snd_coverage_size = stats.iter().map(|s| s.snd_coverage_size).max().unwrap();
+        let snd_coverage_type = stats.first().unwrap().snd_coverage_type.clone();
+        let executions = stats.iter().fold(0, |acc, s| acc + s.executions);
+        let crashes = stats.iter().fold(0, |acc, s| acc + s.crashes);
+        GreyBoxStats {
+            corpus_size,
+            fst_coverage_size,
+            fst_coverage_type,
+            snd_coverage_size,
+            snd_coverage_type,
+            crashes,
+            executions,
+        }
     }
 }
 
@@ -98,6 +125,17 @@ impl BrokerHandle {
             }
             Self::Full { id, tx } => tx
                 .send(BrokerMessage::Info { id: *id, msg })
+                .with_context(|| "failed to send broker message"),
+        }
+    }
+    pub fn warn(&self, msg: String) -> anyhow::Result<()> {
+        match self {
+            Self::Stub { .. } => {
+                warn!("{}", msg);
+                Ok(())
+            }
+            Self::Full { id, tx } => tx
+                .send(BrokerMessage::Warn { id: *id, msg })
                 .with_context(|| "failed to send broker message"),
         }
     }

@@ -10,7 +10,6 @@ use std::rc::Rc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
-use log::{info, warn};
 use rand::{SeedableRng, rngs::StdRng};
 use walkdir::WalkDir;
 
@@ -97,26 +96,24 @@ impl GreyBoxFuzzer {
                                 initial_corpus.push(workload)
                             }
                         }
-                        Err(err) => {
-                            warn!(
-                                "failed to parse seed at '{}':\n{}",
-                                entry.path().display(),
-                                err
-                            )
-                        }
+                        Err(err) => broker.warn(format!(
+                            "failed to parse seed at '{}':\n{}",
+                            entry.path().display(),
+                            err
+                        ))?,
                     },
-                    Err(err) => warn!(
+                    Err(err) => broker.warn(format!(
                         "failed to read seed data at '{}':\n{}",
                         entry.path().display(),
                         err
-                    ),
+                    ))?,
                 }
             }
-            info!(
+            broker.info(format!(
                 "added {} seeds from '{}'",
                 initial_corpus.len(),
                 &corpus_path
-            )
+            ))?;
         };
 
         let corpus_path = if config.greybox.save_corpus {
