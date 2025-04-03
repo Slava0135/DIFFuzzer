@@ -33,6 +33,8 @@ pub struct FileInfo {
     nlink: u64,
     /// Rights applied to file
     mode: u32,
+
+    is_dir: bool,
 }
 
 impl FileInfo {
@@ -43,7 +45,7 @@ impl FileInfo {
         if hasher_options.size {
             hasher.write_u64(self.size);
         }
-        if hasher_options.nlink {
+        if self.is_dir && hasher_options.dir_nlink || !self.is_dir && hasher_options.file_nlink {
             hasher.write_u64(self.nlink);
         }
         if hasher_options.mode {
@@ -62,7 +64,8 @@ pub enum FileDiff {
 #[derive(Default)]
 pub struct HasherOptions {
     pub size: bool,
-    pub nlink: bool,
+    pub file_nlink: bool,
+    pub dir_nlink: bool,
     pub mode: bool,
 }
 
@@ -104,6 +107,7 @@ pub fn calc_dir_hash(
             size: metadata.size(),
             nlink: metadata.nlink(),
             mode: metadata.mode(),
+            is_dir: metadata.is_dir()
         };
         file_info.add_to_hasher(&mut hasher, hasher_options);
         res.push(file_info);

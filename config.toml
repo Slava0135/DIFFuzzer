@@ -25,6 +25,10 @@ m_constant = 10000
 enabled = true
 debug_binary_path = "./target/debug/dash"
 release_binary_path = "./target/release/dash"
+size = false
+file_hardlink = false
+dir_hardlink = false
+mode = false
 
 [operation_weights]
 weights = [

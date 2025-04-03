@@ -67,4 +67,12 @@ pub struct DashConfig {
     pub enabled: bool,
     pub debug_binary_path: String,
     pub release_binary_path: String,
+    /// Consider size when comparing
+    pub size: bool,
+    /// Consider hardlinks for files when comparing
+    pub file_hardlink: bool,
+    /// Consider hardlinks for directories when comparing
+    pub dir_hardlink: bool,
+    /// Consider mode when comparing
+    pub mode: bool
 }
