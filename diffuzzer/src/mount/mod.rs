@@ -12,7 +12,6 @@ pub mod xfs;
 use std::fmt::Display;
 
 use anyhow::Context;
-use log::debug;
 use regex::RegexSet;
 
 use crate::{
@@ -24,10 +23,8 @@ use crate::{
 const RAM_DISK_SIZE: usize = 1_000_000;
 const DEVICE: &str = "/dev/ram0";
 
-pub trait FileSystemMount: Display {
+pub trait FileSystemMount: Display + Sync {
     fn setup(&self, cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<()> {
-        debug!("setup '{}' filesystem at '{}'", self, path);
-
         cmdi.create_dir_all(path)
             .with_context(|| "failed to create mountpoint")?;
 
@@ -56,8 +53,6 @@ pub trait FileSystemMount: Display {
     }
 
     fn teardown(&self, cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<()> {
-        debug!("teardown '{}' filesystem at '{}'", self, path);
-
         let mut umount = CommandWrapper::new("umount");
         umount.arg("-fl").arg(path.base.as_ref());
         cmdi.exec(umount, None)

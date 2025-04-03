@@ -13,13 +13,12 @@ use crate::reason::Reason;
 use crate::save::{save_completed, save_reason, save_testcase};
 use crate::supervisor::Supervisor;
 use anyhow::{Context, Ok};
-use log::{debug, info};
 use std::cell::RefCell;
 use std::fs;
 use std::path::Path;
 use std::rc::Rc;
-use std::time::Instant;
 
+use super::broker::BrokerHandle;
 use super::harness::Harness;
 use super::objective::dash::DashObjective;
 use super::objective::trace::TraceObjective;
@@ -50,7 +49,10 @@ pub struct Runner {
     pub fst_harness: Harness,
     pub snd_harness: Harness,
 
-    pub stats: Stats,
+    pub executions: u64,
+    pub crashes: u64,
+
+    pub broker: BrokerHandle,
 }
 
 impl Runner {
@@ -62,15 +64,16 @@ impl Runner {
         keep_fs: bool,
         cmdi: Box<dyn CommandInterface>,
         supervisor: Box<dyn Supervisor>,
+        local_tmp_dir: LocalPath,
+        broker: BrokerHandle,
         mut observers: (ObserverList, ObserverList),
     ) -> anyhow::Result<Self> {
-        let temp_dir = cmdi
+        let remote_tmp_dir = cmdi
             .setup_remote_dir()
-            .with_context(|| "failed to setup temp dir")?;
+            .with_context(|| "failed to setup remote temporary dir")?;
 
-        info!("init runner components");
-        let test_dir = temp_dir.clone();
-        let exec_dir = temp_dir.join("exec");
+        let test_dir = remote_tmp_dir.clone();
+        let exec_dir = remote_tmp_dir.join("exec");
 
         fs::create_dir_all(&crashes_path)?;
 
@@ -115,7 +118,7 @@ impl Runner {
             fst_mount,
             fst_fs_dir.clone(),
             exec_dir.clone(),
-            LocalPath::new_tmp("outcome-1"),
+            local_tmp_dir.join("outcome-1"),
             config.timeout,
             observers.0,
         );
@@ -123,7 +126,7 @@ impl Runner {
             snd_mount,
             snd_fs_dir.clone(),
             exec_dir.clone(),
-            LocalPath::new_tmp("outcome-2"),
+            local_tmp_dir.join("outcome-2"),
             config.timeout,
             observers.1,
         );
@@ -147,7 +150,10 @@ impl Runner {
             fst_harness,
             snd_harness,
 
-            stats: Stats::new(),
+            executions: 0,
+            crashes: 0,
+
+            broker,
         };
 
         runner
@@ -159,7 +165,6 @@ impl Runner {
     }
 
     pub fn compile_test(&mut self, input: &Workload) -> anyhow::Result<RemotePath> {
-        debug!("compile test at '{}'", self.test_dir);
         let binary_path = input
             .compile(self.cmdi.as_ref(), &self.test_dir)
             .with_context(|| "failed to compile test")?;
@@ -167,8 +172,6 @@ impl Runner {
     }
 
     pub fn run_harness(&mut self, binary_path: &RemotePath) -> anyhow::Result<DiffOutcome> {
-        debug!("run harness at '{}'", binary_path);
-
         let fst_outcome = self
             .fst_harness
             .run(
@@ -238,8 +241,6 @@ impl Runner {
         diff: &DiffCompleted,
         reason: Reason,
     ) -> anyhow::Result<()> {
-        debug!("report diff '{}'", dir_name);
-
         let crash_dir = crash_dir.join(dir_name);
         fs::create_dir_all(&crash_dir)
             .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
@@ -253,7 +254,7 @@ impl Runner {
 
         save_reason(&crash_dir, reason).with_context(|| "failed to save reason")?;
 
-        info!("diff saved at '{}'", crash_dir);
+        self.broker.info(format!("diff saved at '{}'", crash_dir))?;
 
         Ok(())
     }
@@ -265,8 +266,6 @@ impl Runner {
         crash_dir: LocalPath,
         reason: Reason,
     ) -> anyhow::Result<()> {
-        debug!("report panic '{}'", dir_name);
-
         let crash_dir = crash_dir.join(dir_name);
         fs::create_dir_all(&crash_dir)
             .with_context(|| format!("failed to create crash directory at '{}'", crash_dir))?;
@@ -275,7 +274,8 @@ impl Runner {
             .with_context(|| "failed to save testcase")?;
         save_reason(&crash_dir, reason).with_context(|| "failed to save reason")?;
 
-        info!("crash saved at '{}'", crash_dir);
+        self.broker
+            .info(format!("crash saved at '{}'", crash_dir))?;
 
         Ok(())
     }
@@ -311,24 +311,6 @@ impl Runner {
             fst_trace,
             snd_trace,
         })
-    }
-}
-
-pub struct Stats {
-    pub executions: usize,
-    pub crashes: usize,
-    pub start: Instant,
-    pub last_time_showed: Instant,
-}
-
-impl Stats {
-    fn new() -> Self {
-        Stats {
-            executions: 0,
-            crashes: 0,
-            start: Instant::now(),
-            last_time_showed: Instant::now(),
-        }
     }
 }
 

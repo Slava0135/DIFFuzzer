@@ -2,7 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::{ffi::OsStr, fmt::Display, path::Path};
+use std::{ffi::OsStr, fmt::Display, fs, path::Path};
+
+use anyhow::Context;
 
 /// Prefix for temporary files to use
 const TMP_DIR_PREFIX: &str = "diffuzzer";
@@ -19,12 +21,16 @@ impl LocalPath {
             base: path.to_path_buf().into_boxed_path(),
         }
     }
-    /// Create new temporary path with prefix added
-    pub fn new_tmp(name: &str) -> Self {
+    /// Make new temporary path with prefix added and create directory
+    pub fn create_new_tmp(name: &str) -> anyhow::Result<Self> {
         let base = Path::new("/tmp")
             .join(format!("{}-{}", TMP_DIR_PREFIX, name))
             .into_boxed_path();
-        Self { base }
+        let dir = Self { base };
+        fs::remove_dir(dir.as_ref()).unwrap_or(());
+        fs::create_dir_all(dir.as_ref())
+            .with_context(|| format!("failed to create local temporary directory at '{}'", dir))?;
+        Ok(dir)
     }
     pub fn join<P: AsRef<Path>>(&self, path: P) -> Self {
         Self {

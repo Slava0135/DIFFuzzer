@@ -7,3 +7,4 @@ pub mod fuzzer;
 pub mod mutator;
 pub mod schedule;
 pub mod seed;
+pub mod broker;

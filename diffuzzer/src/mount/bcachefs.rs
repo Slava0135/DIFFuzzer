@@ -5,7 +5,6 @@
 use std::fmt::Display;
 
 use anyhow::Context;
-use log::debug;
 use regex::RegexSet;
 
 use crate::{
@@ -30,8 +29,6 @@ impl FileSystemMount for BcacheFS {
         cmdi: &dyn crate::command::CommandInterface,
         path: &crate::path::RemotePath,
     ) -> anyhow::Result<()> {
-        debug!("setup '{}' filesystem at '{}'", self, path);
-
         cmdi.create_dir_all(path)
             .with_context(|| "failed to create mountpoint")?;
 

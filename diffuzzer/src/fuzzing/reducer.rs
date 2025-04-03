@@ -2,23 +2,22 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::fs::read_to_string;
+use std::{fs::read_to_string, time::Instant};
 
 use anyhow::{Context, Ok};
 use log::{info, warn};
 
 use crate::{
     abstract_fs::{mutator::remove, trace::TraceDiff, workload::Workload},
-    command::CommandInterface,
     config::Config,
     fuzzing::outcome::DiffOutcome,
     mount::FileSystemMount,
     path::LocalPath,
     reason::Reason,
-    supervisor::Supervisor,
+    supervisor::launch_cmdi_and_supervisor,
 };
 
-use super::{outcome::DiffCompleted, runner::Runner};
+use super::{broker::BrokerHandle, outcome::DiffCompleted, runner::Runner};
 
 pub struct Reducer {
     runner: Runner,
@@ -30,9 +29,16 @@ impl Reducer {
         fst_mount: &'static dyn FileSystemMount,
         snd_mount: &'static dyn FileSystemMount,
         crashes_path: LocalPath,
-        cmdi: Box<dyn CommandInterface>,
-        supervisor: Box<dyn Supervisor>,
+        no_qemu: bool,
     ) -> anyhow::Result<Self> {
+        let local_tmp_dir = LocalPath::create_new_tmp("reducer")?;
+
+        let broker = BrokerHandle::Fake {
+            start: Instant::now(),
+        };
+        let (cmdi, supervisor) =
+            launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir, broker.clone())?;
+
         let runner = Runner::create(
             fst_mount,
             snd_mount,
@@ -41,6 +47,8 @@ impl Reducer {
             false,
             cmdi,
             supervisor,
+            local_tmp_dir,
+            broker,
             (vec![], vec![]),
         )
         .with_context(|| "failed to create runner")?;

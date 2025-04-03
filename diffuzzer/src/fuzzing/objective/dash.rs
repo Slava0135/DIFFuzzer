@@ -4,8 +4,6 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use log::debug;
-
 use crate::{config::Config, fuzzing::observer::dash::DashObserver};
 
 use dash::{FileDiff, HasherOptions, get_diff};
@@ -32,7 +30,6 @@ impl DashObjective {
     }
 
     pub fn is_interesting(&self) -> anyhow::Result<bool> {
-        debug!("do hash objective");
         if !self.enabled {
             return Ok(false);
         }

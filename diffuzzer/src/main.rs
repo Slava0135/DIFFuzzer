@@ -8,15 +8,16 @@ use crate::fuzzing::duo_single::DuoSingleFuzzer;
 use anyhow::{Context, Ok};
 use args::Args;
 use clap::Parser;
-use command::{CommandInterface, LocalCommandInterface, RemoteCommandInterface};
 use config::Config;
 use fuzzing::{
-    blackbox::fuzzer::BlackBoxFuzzer, fuzzer::Fuzzer, greybox::fuzzer::GreyBoxFuzzer,
-    reducer::Reducer, solo_single,
+    blackbox::{broker::BlackBoxBroker, fuzzer::BlackBoxFuzzer},
+    fuzzer::Fuzzer,
+    greybox::{broker::GreyBoxBroker, fuzzer::GreyBoxFuzzer},
+    reducer::Reducer,
+    solo_single,
 };
 use log::{error, info};
 use path::LocalPath;
-use supervisor::{NativeSupervisor, QemuSupervisor, Supervisor};
 
 mod abstract_fs;
 mod args;
@@ -25,12 +26,12 @@ mod compile;
 mod config;
 mod filesystems;
 mod fuzzing;
+mod markdown;
 mod mount;
 mod path;
+mod reason;
 mod save;
 mod supervisor;
-mod markdown;
-mod reason;
 
 fn main() {
     let status = run();
@@ -51,58 +52,71 @@ fn run() -> anyhow::Result<()> {
     let config: Config =
         toml::from_str(&config).with_context(|| "failed to parse configuration")?;
 
-    let supervisor: Box<dyn Supervisor> = if args.no_qemu {
-        Box::new(NativeSupervisor::new())
-    } else {
-        Box::new(QemuSupervisor::launch(&config.qemu).unwrap())
-    };
-
-    let cmdi: Box<dyn CommandInterface> = if args.no_qemu {
-        Box::new(LocalCommandInterface::new())
-    } else {
-        Box::new(RemoteCommandInterface::new(&config.qemu))
-    };
-
     match args.mode {
         args::Mode::Greybox {
             first_filesystem,
             second_filesystem,
             test_count,
             corpus_path,
+            instances,
         } => {
             info!(
                 "start greybox fuzzing ('{}' + '{}')",
                 first_filesystem, second_filesystem
             );
-            GreyBoxFuzzer::create(
-                config,
-                first_filesystem.into(),
-                second_filesystem.into(),
-                LocalPath::new(Path::new("./crashes")),
-                corpus_path,
-                cmdi,
-                supervisor,
-            )?
-            .run(test_count);
+            if instances > 1 {
+                GreyBoxBroker::create(
+                    config,
+                    first_filesystem.into(),
+                    second_filesystem.into(),
+                    LocalPath::new(Path::new("./crashes")),
+                    corpus_path,
+                    args.no_qemu,
+                    instances,
+                )?
+                .run(test_count)?;
+            } else {
+                GreyBoxFuzzer::create_without_broker(
+                    config,
+                    first_filesystem.into(),
+                    second_filesystem.into(),
+                    LocalPath::new(Path::new("./crashes")),
+                    corpus_path,
+                    args.no_qemu,
+                )?
+                .run(test_count)?;
+            }
         }
         args::Mode::Blackbox {
             first_filesystem,
             second_filesystem,
             test_count,
+            instances,
         } => {
             info!(
                 "start blackbox fuzzing ('{}' + '{}')",
                 first_filesystem, second_filesystem
             );
-            BlackBoxFuzzer::create(
-                config,
-                first_filesystem.into(),
-                second_filesystem.into(),
-                LocalPath::new(Path::new("./crashes")),
-                cmdi,
-                supervisor,
-            )?
-            .run(test_count);
+            if instances > 1 {
+                BlackBoxBroker::create(
+                    config,
+                    first_filesystem.into(),
+                    second_filesystem.into(),
+                    LocalPath::new(Path::new("./crashes")),
+                    args.no_qemu,
+                    instances,
+                )?
+                .run(test_count)?;
+            } else {
+                BlackBoxFuzzer::create_without_broker(
+                    config,
+                    first_filesystem.into(),
+                    second_filesystem.into(),
+                    LocalPath::new(Path::new("./crashes")),
+                    args.no_qemu,
+                )?
+                .run(test_count)?;
+            }
         }
         args::Mode::SoloSingle {
             output_dir,
@@ -117,8 +131,7 @@ fn run() -> anyhow::Result<()> {
                 keep_fs,
                 filesystem.into(),
                 config,
-                cmdi,
-                supervisor,
+                args.no_qemu,
             )?
         }
         args::Mode::DuoSingle {
@@ -139,10 +152,9 @@ fn run() -> anyhow::Result<()> {
                 LocalPath::new(Path::new(&output_dir)),
                 LocalPath::new(Path::new(&path_to_test)),
                 keep_fs,
-                cmdi,
-                supervisor,
+                args.no_qemu,
             )?
-            .run(Some(1u64));
+            .run(Some(1u64))?;
         }
         args::Mode::Reduce {
             output_dir,
@@ -159,8 +171,7 @@ fn run() -> anyhow::Result<()> {
                 first_filesystem.into(),
                 second_filesystem.into(),
                 LocalPath::new(Path::new(&output_dir)),
-                cmdi,
-                supervisor,
+                args.no_qemu,
             )?
             .run(
                 &LocalPath::new(Path::new(&path_to_test)),

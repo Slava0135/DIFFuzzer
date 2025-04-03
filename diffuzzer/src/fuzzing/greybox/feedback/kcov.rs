@@ -5,7 +5,6 @@
 use std::{collections::HashMap, fs};
 
 use anyhow::Context;
-use log::debug;
 
 use crate::{fuzzing::outcome::Completed, path::LocalPath};
 
@@ -33,7 +32,6 @@ impl CoverageFeedback for KCovCoverageFeedback {
         &self.map
     }
     fn opinion(&mut self, outcome: &Completed) -> anyhow::Result<FeedbackOpinion> {
-        debug!("do kcov feedback");
         let new_coverage = parse_kcov(&outcome.dir)?;
         let mut is_interesting = false;
         for addr in new_coverage.keys() {

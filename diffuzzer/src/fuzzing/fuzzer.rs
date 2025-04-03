@@ -2,51 +2,33 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::time::Instant;
-
 use anyhow::Context;
-use log::{debug, error, info, warn};
+use log::warn;
 
 use crate::{abstract_fs::workload::Workload, path::RemotePath, reason::Reason};
 
 use super::{outcome::DiffCompleted, runner::Runner};
 
 pub trait Fuzzer {
-    fn run(&mut self, test_count: Option<u64>) {
-        info!("start fuzzing loop");
-        self.runner().stats.start = Instant::now();
+    fn run(&mut self, test_count: Option<u64>) -> anyhow::Result<()> {
         match test_count {
             None => loop {
-                if self.runs() {
-                    return;
-                }
+                self.runs()?
             },
             Some(count) => {
                 for _ in 0..count {
-                    if self.runs() {
-                        return;
-                    }
+                    self.runs()?;
                 }
             }
         }
+        Ok(())
     }
 
-    fn runs(&mut self) -> bool {
-        match self.fuzz_one() {
-            Err(err) => {
-                error!("{:?}", err);
-                return true;
-            }
-            _ => self.runner().stats.executions += 1,
-        }
-        if Instant::now()
-            .duration_since(self.runner().stats.last_time_showed)
-            .as_secs()
-            > self.runner().config.heartbeat_interval.into()
-        {
-            self.show_stats();
-        }
-        false
+    fn runs(&mut self) -> anyhow::Result<()> {
+        self.fuzz_one()?;
+        self.runner().executions += 1;
+        self.send_stats(true)?;
+        Ok(())
     }
 
     fn fuzz_one(&mut self) -> anyhow::Result<()>;
@@ -58,7 +40,6 @@ pub trait Fuzzer {
         diff: &DiffCompleted,
     ) -> anyhow::Result<bool> {
         let runner = self.runner();
-        debug!("do objectives");
         if diff.any_interesting() {
             let mut reason = Reason::new();
             if diff.trace_interesting() {
@@ -80,8 +61,8 @@ pub trait Fuzzer {
                     reason,
                 )
                 .with_context(|| "failed to report crash")?;
-            self.runner().stats.crashes += 1;
-            self.show_stats();
+            self.runner().crashes += 1;
+            self.send_stats(false)?;
             Ok(true)
         } else {
             Ok(false)
@@ -94,8 +75,6 @@ pub trait Fuzzer {
         binary_path: &RemotePath,
         diff: &DiffCompleted,
     ) -> anyhow::Result<bool> {
-        debug!("detect errors");
-
         let fst_errors = diff.fst_trace.errors();
         let snd_errors = diff.snd_trace.errors();
 
@@ -123,12 +102,12 @@ pub trait Fuzzer {
         self.runner()
             .report_crash(input, dir_name, crashes_dir, reason)
             .with_context(|| "failed to report panic")?;
-        self.runner().stats.crashes += 1;
-        self.show_stats();
+        self.runner().crashes += 1;
+        self.send_stats(false)?;
         Ok(())
     }
 
-    fn show_stats(&mut self);
+    fn send_stats(&mut self, lazy: bool) -> anyhow::Result<()>;
 
     fn runner(&mut self) -> &mut Runner;
 }

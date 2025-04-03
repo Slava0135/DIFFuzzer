@@ -10,12 +10,12 @@ use std::rc::Rc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
-use log::{debug, info, warn};
 use rand::{SeedableRng, rngs::StdRng};
 use walkdir::WalkDir;
 
 use crate::abstract_fs::operation::OperationKind;
 use crate::command::CommandInterface;
+use crate::fuzzing::broker::{BrokerHandle, GreyBoxStats};
 use crate::fuzzing::fuzzer::Fuzzer;
 use crate::fuzzing::observer::ObserverList;
 use crate::fuzzing::observer::lcov::LCovObserver;
@@ -24,7 +24,7 @@ use crate::fuzzing::runner::Runner;
 use crate::path::{LocalPath, RemotePath};
 use crate::reason::Reason;
 use crate::save::{TEST_FILE_NAME, save_completed, save_testcase};
-use crate::supervisor::Supervisor;
+use crate::supervisor::{Supervisor, launch_cmdi_and_supervisor};
 use crate::{abstract_fs::workload::Workload, config::Config, mount::FileSystemMount};
 
 use super::feedback::kcov::KCovCoverageFeedback;
@@ -49,9 +49,40 @@ pub struct GreyBoxFuzzer {
     mutator: Mutator,
 
     corpus_path: Option<LocalPath>,
+
+    last_time_stats_sent: Instant,
+    heartbeat_interval: u16,
+    broker: BrokerHandle,
 }
 
 impl GreyBoxFuzzer {
+    pub fn create_without_broker(
+        config: Config,
+        fst_mount: &'static dyn FileSystemMount,
+        snd_mount: &'static dyn FileSystemMount,
+        crashes_path: LocalPath,
+        corpus_path: Option<String>,
+        no_qemu: bool,
+    ) -> anyhow::Result<Self> {
+        let local_tmp_dir = LocalPath::create_new_tmp("greybox")?;
+        let broker = BrokerHandle::Fake {
+            start: Instant::now(),
+        };
+        let (cmdi, supervisor) =
+            launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir, broker.clone())?;
+        Self::create(
+            config,
+            fst_mount,
+            snd_mount,
+            crashes_path,
+            corpus_path,
+            cmdi,
+            supervisor,
+            local_tmp_dir,
+            broker,
+        )
+    }
+
     pub fn create(
         config: Config,
         fst_mount: &'static dyn FileSystemMount,
@@ -60,6 +91,8 @@ impl GreyBoxFuzzer {
         corpus_path: Option<String>,
         cmdi: Box<dyn CommandInterface>,
         supervisor: Box<dyn Supervisor>,
+        local_tmp_dir: LocalPath,
+        broker: BrokerHandle,
     ) -> anyhow::Result<Self> {
         let mutator = Mutator::new(
             StdRng::seed_from_u64(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64),
@@ -90,26 +123,24 @@ impl GreyBoxFuzzer {
                                 initial_corpus.push(workload)
                             }
                         }
-                        Err(err) => {
-                            warn!(
-                                "failed to parse seed at '{}':\n{}",
-                                entry.path().display(),
-                                err
-                            )
-                        }
+                        Err(err) => broker.warn(format!(
+                            "failed to parse seed at '{}':\n{}",
+                            entry.path().display(),
+                            err
+                        ))?,
                     },
-                    Err(err) => warn!(
+                    Err(err) => broker.warn(format!(
                         "failed to read seed data at '{}':\n{}",
                         entry.path().display(),
                         err
-                    ),
+                    ))?,
                 }
             }
-            info!(
+            broker.info(format!(
                 "added {} seeds from '{}'",
                 initial_corpus.len(),
                 &corpus_path
-            )
+            ))?;
         };
 
         let corpus_path = if config.greybox.save_corpus {
@@ -158,10 +189,12 @@ impl GreyBoxFuzzer {
             fst_mount,
             snd_mount,
             crashes_path,
-            config,
+            config.clone(),
             false,
             cmdi,
             supervisor,
+            local_tmp_dir,
+            broker.clone(),
             observers,
         )
         .with_context(|| "failed to create runner")?;
@@ -181,6 +214,10 @@ impl GreyBoxFuzzer {
             mutator,
 
             corpus_path,
+
+            last_time_stats_sent: Instant::now(),
+            heartbeat_interval: config.heartbeat_interval,
+            broker,
         })
     }
 
@@ -209,7 +246,6 @@ impl GreyBoxFuzzer {
         fst_coverage: InputCoverage,
         snd_coverage: InputCoverage,
     ) {
-        debug!("add new input to corpus");
         let seed = Seed::new(input, fst_coverage, snd_coverage);
         self.corpus.push(seed);
     }
@@ -222,7 +258,6 @@ impl GreyBoxFuzzer {
         snd_outcome: &Completed,
     ) -> anyhow::Result<()> {
         let name = input.generate_name();
-        debug!("save corpus input '{}'", name);
 
         let corpus_dir = self.corpus_path.clone().unwrap().join(name);
         fs::create_dir_all(&corpus_dir)
@@ -244,7 +279,6 @@ impl GreyBoxFuzzer {
 
 impl Fuzzer for GreyBoxFuzzer {
     fn fuzz_one(&mut self) -> anyhow::Result<()> {
-        debug!("pick input");
         let input = self.pick_input()?;
 
         let binary_path = self.runner().compile_test(&input)?;
@@ -259,7 +293,6 @@ impl Fuzzer for GreyBoxFuzzer {
                     return Ok(());
                 }
 
-                debug!("get feedback");
                 let fst_opinion = self
                     .fst_coverage_feedback
                     .opinion(&diff.fst_outcome)
@@ -275,7 +308,7 @@ impl Fuzzer for GreyBoxFuzzer {
                         fst_opinion.coverage(),
                         snd_opinion.coverage(),
                     );
-                    self.show_stats();
+                    self.send_stats(false)?;
                     if self.corpus_path.is_some() {
                         self.save_input(input, &binary_path, &diff.fst_outcome, &diff.snd_outcome)
                             .with_context(|| "failed to save input")?;
@@ -318,24 +351,23 @@ impl Fuzzer for GreyBoxFuzzer {
         Ok(())
     }
 
-    fn show_stats(&mut self) {
-        self.runner.stats.last_time_showed = Instant::now();
-        let since_start = Instant::now().duration_since(self.runner.stats.start);
-        let secs = since_start.as_secs();
-        info!(
-            "corpus: {}, coverage: {} ({}) + {} ({}), crashes: {}, executions: {}, exec/s: {:.2}, time: {:02}h:{:02}m:{:02}s",
-            self.corpus.len(),
-            self.fst_coverage_feedback.map().len(),
-            self.fst_coverage_feedback.coverage_type(),
-            self.snd_coverage_feedback.map().len(),
-            self.snd_coverage_feedback.coverage_type(),
-            self.runner.stats.crashes,
-            self.runner.stats.executions,
-            (self.runner.stats.executions as f64) / (secs as f64),
-            secs / (60 * 60),
-            (secs / (60)) % 60,
-            secs % 60,
-        );
+    fn send_stats(&mut self, lazy: bool) -> anyhow::Result<()> {
+        if !lazy || self.last_time_stats_sent.elapsed().as_secs() >= self.heartbeat_interval as u64
+        {
+            self.last_time_stats_sent = Instant::now();
+            self.broker
+                .grey_box_stats(GreyBoxStats {
+                    corpus_size: self.corpus.len() as u64,
+                    fst_coverage_size: self.fst_coverage_feedback.map().len() as u64,
+                    fst_coverage_type: self.fst_coverage_feedback.coverage_type(),
+                    snd_coverage_size: self.snd_coverage_feedback.map().len() as u64,
+                    snd_coverage_type: self.snd_coverage_feedback.coverage_type(),
+                    executions: self.runner.executions,
+                    crashes: self.runner.crashes,
+                })
+                .unwrap();
+        }
+        Ok(())
     }
 
     fn runner(&mut self) -> &mut Runner {

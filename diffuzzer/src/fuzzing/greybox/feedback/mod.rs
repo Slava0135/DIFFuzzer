@@ -12,8 +12,10 @@ use crate::fuzzing::outcome::Completed;
 pub mod kcov;
 pub mod lcov;
 
+#[derive(Clone, Default)]
 pub enum CoverageType {
     /// No coverage.
+    #[default]
     None,
     /// Linux kernel coverage (use for kernel file systems).
     KCov,

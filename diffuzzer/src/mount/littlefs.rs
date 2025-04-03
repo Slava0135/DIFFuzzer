@@ -5,7 +5,6 @@
 use std::{fmt::Display, path::Path};
 
 use anyhow::Context;
-use log::debug;
 
 use crate::{
     command::{CommandInterface, CommandWrapper},
@@ -26,8 +25,6 @@ impl Display for LittleFS {
 
 impl FileSystemMount for LittleFS {
     fn setup(&self, cmdi: &dyn CommandInterface, path: &RemotePath) -> anyhow::Result<()> {
-        debug!("setup '{}' filesystem at '{}'", self, path);
-
         cmdi.create_dir_all(path)
             .with_context(|| "failed to create mountpoint")?;
 
