@@ -28,7 +28,7 @@ release_binary_path = "./target/release/dash"
 size = false
 file_hardlink = false
 dir_hardlink = false
-permission = false
+mode = false
 
 [operation_weights]
 weights = [

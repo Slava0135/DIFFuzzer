@@ -21,10 +21,10 @@ pub struct Args {
     pub size: bool,
     /// Include number of hard links pointing to files when calculating hash (for files)
     #[arg(short, long, default_value_t = false)]
-    pub f_nlink: bool,
+    pub file_nlink: bool,
     /// Include number of hard links pointing to files when calculating hash (for dirs)
     #[arg(short, long, default_value_t = false)]
-    pub d_nlink: bool,
+    pub dir_nlink: bool,
     /// Include rights applied to files when calculating hash
     #[arg(short, long, default_value_t = false)]
     pub mode: bool,

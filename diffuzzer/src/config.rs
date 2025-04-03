@@ -73,6 +73,6 @@ pub struct DashConfig {
     pub file_hardlink: bool,
     /// Consider hardlinks for directories when comparing
     pub dir_hardlink: bool,
-    /// Consider permissions for directories when comparing
-    pub permission: bool
+    /// Consider mode when comparing
+    pub mode: bool
 }

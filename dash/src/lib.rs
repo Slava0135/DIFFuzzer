@@ -45,7 +45,7 @@ impl FileInfo {
         if hasher_options.size {
             hasher.write_u64(self.size);
         }
-        if self.is_dir && hasher_options.d_nlink || !self.is_dir && hasher_options.f_nlink {
+        if self.is_dir && hasher_options.dir_nlink || !self.is_dir && hasher_options.file_nlink {
             hasher.write_u64(self.nlink);
         }
         if hasher_options.mode {
@@ -64,8 +64,8 @@ pub enum FileDiff {
 #[derive(Default)]
 pub struct HasherOptions {
     pub size: bool,
-    pub f_nlink: bool,
-    pub d_nlink: bool,
+    pub file_nlink: bool,
+    pub dir_nlink: bool,
     pub mode: bool,
 }
 

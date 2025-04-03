@@ -85,7 +85,7 @@ impl DashObserver {
         };
 
         let mut flags = vec![];
-        if config.dash.permission { flags.push("-m".to_string()) }
+        if config.dash.mode { flags.push("-m".to_string()) }
         if config.dash.size { flags.push("-s".to_string()) }
         if config.dash.dir_hardlink { flags.push("-d".to_string()) }
         if config.dash.file_hardlink { flags.push("-f".to_string()) }
