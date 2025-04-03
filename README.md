@@ -99,6 +99,12 @@ DIFFuzzer comes with many modes:
 ./target/release/diffuzzer greybox -f ext4 -s btrfs
 ```
 
+To run multiple instances in parallel:
+
+```sh
+./target/release/diffuzzer greybox -f ext4 -s btrfs -i 4
+```
+
 There is also an option to run without QEMU (*not recommended*):
 
 ```sh
