@@ -10,8 +10,11 @@ use args::Args;
 use clap::Parser;
 use config::Config;
 use fuzzing::{
-    blackbox::broker::BlackBoxBroker, fuzzer::Fuzzer, greybox::broker::GreyBoxBroker,
-    reducer::Reducer, solo_single,
+    blackbox::{broker::BlackBoxBroker, fuzzer::BlackBoxFuzzer},
+    fuzzer::Fuzzer,
+    greybox::{broker::GreyBoxBroker, fuzzer::GreyBoxFuzzer},
+    reducer::Reducer,
+    solo_single,
 };
 use log::{error, info};
 use path::LocalPath;
@@ -61,16 +64,28 @@ fn run() -> anyhow::Result<()> {
                 "start greybox fuzzing ('{}' + '{}')",
                 first_filesystem, second_filesystem
             );
-            GreyBoxBroker::create(
-                config,
-                first_filesystem.into(),
-                second_filesystem.into(),
-                LocalPath::new(Path::new("./crashes")),
-                corpus_path,
-                args.no_qemu,
-                instances,
-            )?
-            .run(test_count)?;
+            if instances > 1 {
+                GreyBoxBroker::create(
+                    config,
+                    first_filesystem.into(),
+                    second_filesystem.into(),
+                    LocalPath::new(Path::new("./crashes")),
+                    corpus_path,
+                    args.no_qemu,
+                    instances,
+                )?
+                .run(test_count)?;
+            } else {
+                GreyBoxFuzzer::create_without_broker(
+                    config,
+                    first_filesystem.into(),
+                    second_filesystem.into(),
+                    LocalPath::new(Path::new("./crashes")),
+                    corpus_path,
+                    args.no_qemu,
+                )?
+                .run(test_count)?;
+            }
         }
         args::Mode::Blackbox {
             first_filesystem,
@@ -82,15 +97,26 @@ fn run() -> anyhow::Result<()> {
                 "start blackbox fuzzing ('{}' + '{}')",
                 first_filesystem, second_filesystem
             );
-            BlackBoxBroker::create(
-                config,
-                first_filesystem.into(),
-                second_filesystem.into(),
-                LocalPath::new(Path::new("./crashes")),
-                args.no_qemu,
-                instances,
-            )?
-            .run(test_count)?;
+            if instances > 1 {
+                BlackBoxBroker::create(
+                    config,
+                    first_filesystem.into(),
+                    second_filesystem.into(),
+                    LocalPath::new(Path::new("./crashes")),
+                    args.no_qemu,
+                    instances,
+                )?
+                .run(test_count)?;
+            } else {
+                BlackBoxFuzzer::create_without_broker(
+                    config,
+                    first_filesystem.into(),
+                    second_filesystem.into(),
+                    LocalPath::new(Path::new("./crashes")),
+                    args.no_qemu,
+                )?
+                .run(test_count)?;
+            }
         }
         args::Mode::SoloSingle {
             output_dir,

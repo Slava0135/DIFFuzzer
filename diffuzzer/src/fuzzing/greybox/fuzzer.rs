@@ -24,7 +24,7 @@ use crate::fuzzing::runner::Runner;
 use crate::path::{LocalPath, RemotePath};
 use crate::reason::Reason;
 use crate::save::{TEST_FILE_NAME, save_completed, save_testcase};
-use crate::supervisor::Supervisor;
+use crate::supervisor::{Supervisor, launch_cmdi_and_supervisor};
 use crate::{abstract_fs::workload::Workload, config::Config, mount::FileSystemMount};
 
 use super::feedback::kcov::KCovCoverageFeedback;
@@ -56,6 +56,33 @@ pub struct GreyBoxFuzzer {
 }
 
 impl GreyBoxFuzzer {
+    pub fn create_without_broker(
+        config: Config,
+        fst_mount: &'static dyn FileSystemMount,
+        snd_mount: &'static dyn FileSystemMount,
+        crashes_path: LocalPath,
+        corpus_path: Option<String>,
+        no_qemu: bool,
+    ) -> anyhow::Result<Self> {
+        let local_tmp_dir = LocalPath::create_new_tmp("greybox")?;
+        let broker = BrokerHandle::Stub {
+            start: Instant::now(),
+        };
+        let (cmdi, supervisor) =
+            launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir, broker.clone())?;
+        Self::create(
+            config,
+            fst_mount,
+            snd_mount,
+            crashes_path,
+            corpus_path,
+            cmdi,
+            supervisor,
+            local_tmp_dir,
+            broker,
+        )
+    }
+
     pub fn create(
         config: Config,
         fst_mount: &'static dyn FileSystemMount,

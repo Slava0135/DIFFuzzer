@@ -45,7 +45,7 @@ impl BlackBoxBroker {
         no_qemu: bool,
         instances_n: u8,
     ) -> anyhow::Result<Self> {
-        if instances_n == 0 || no_qemu && instances_n > 1 {
+        if instances_n <= 1 || no_qemu && instances_n > 1 {
             bail!("invalid number of instances ({})", instances_n);
         }
         let mut instances = Vec::new();
