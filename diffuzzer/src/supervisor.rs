@@ -140,7 +140,7 @@ impl QemuSupervisor {
         broker.info(format!("wait for VM to init ({}s)", config.boot_wait_time))?;
         sleep(Duration::from_secs(config.boot_wait_time.into()));
 
-        let event_handler = EventHandler::launch(&options.qmp_socket_path)
+        let event_handler = EventHandler::launch(&options.qmp_socket_path, broker.clone())
             .with_context(|| "failed to launch event handler")?;
 
         let process_id = rx.try_recv()?;
@@ -219,7 +219,7 @@ struct ReturnMessage {
 }
 
 impl EventHandler {
-    fn launch(socket_path: &LocalPath) -> anyhow::Result<Self> {
+    fn launch(socket_path: &LocalPath, broker: BrokerHandle) -> anyhow::Result<Self> {
         let mut stream = UnixStream::connect(socket_path)
             .with_context(|| format!("failed to connect to unix socket at '{}'", &socket_path))?;
         let mut de = Deserializer::from_reader(stream.try_clone()?);
@@ -230,18 +230,22 @@ impl EventHandler {
 
         let (tx, rx): (Sender<()>, Receiver<()>) = mpsc::channel();
 
-        thread::spawn(move || {
-            loop {
-                let value = Value::deserialize(&mut de)
-                    .with_context(|| "failed to deserialize response")
-                    .unwrap();
-                if let Value::Object(map) = value {
-                    if map.contains_key("event") {
-                        tx.send(()).unwrap();
+        let builder =
+            thread::Builder::new().name(format!("event-handler-instance-{}", broker.id()));
+        builder
+            .spawn(move || {
+                loop {
+                    let value = Value::deserialize(&mut de)
+                        .with_context(|| "failed to deserialize response")
+                        .unwrap();
+                    if let Value::Object(map) = value {
+                        if map.contains_key("event") {
+                            tx.send(()).unwrap();
+                        }
                     }
                 }
-            }
-        });
+            })
+            .with_context(|| "failed to spawn event handler thread")?;
 
         Ok(Self { rx })
     }
