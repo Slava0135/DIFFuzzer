@@ -56,6 +56,23 @@ impl DiffCompleted {
     pub fn trace_interesting(&self) -> bool {
         !self.trace_diff.is_empty()
     }
+
+    pub fn get_last_diff_trace_row(&self) -> Option<u32> {
+        let mut res: Option<u32> = None;
+        for bug in &self.trace_diff {
+            match bug {
+                TraceDiff::TraceRowIsDifferent { fst: f, snd: _ } => {
+                    if res.is_none_or(|max| f.index > max) {
+                        res = Some(f.index)
+                    }
+                }
+                TraceDiff::DifferentLength => {
+                    return None;
+                }
+            }
+        }
+        res
+    }
 }
 
 pub enum DiffOutcome {

@@ -14,7 +14,7 @@ pub struct Trace {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct TraceRow {
-    index: u32,
+    pub index: u32,
     command: String,
     return_code: i32,
     errno: Errno,

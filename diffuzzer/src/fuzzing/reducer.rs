@@ -51,14 +51,14 @@ impl Reducer {
             broker,
             (vec![], vec![]),
         )
-        .with_context(|| "failed to create runner")?;
+            .with_context(|| "failed to create runner")?;
         Ok(Self { runner })
     }
 
     pub fn run(&mut self, test_path: &LocalPath, output_dir: &LocalPath) -> anyhow::Result<()> {
         info!("read testcase at '{}'", test_path);
         let input = read_to_string(test_path).with_context(|| "failed to read testcase")?;
-        let input: Workload =
+        let mut input: Workload =
             serde_json::from_str(&input).with_context(|| "failed to parse json")?;
 
         let binary_path = self.runner.compile_test(&input)?;
@@ -66,6 +66,12 @@ impl Reducer {
         match self.runner.run_harness(&binary_path)? {
             DiffOutcome::DiffCompleted(diff) => {
                 if diff.any_interesting() {
+                    if diff.trace_interesting() && !diff.dash_interesting() {
+                        diff.get_last_diff_trace_row().and_then(|index| {
+                            input.cut(index);
+                            Some(())
+                        });
+                    }
                     self.reduce_by_diff(input, output_dir, diff)?;
                 } else {
                     warn!("no diff found");

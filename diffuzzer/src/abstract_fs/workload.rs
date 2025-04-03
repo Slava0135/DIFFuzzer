@@ -28,4 +28,7 @@ impl Workload {
         let hash = hasher.finish_128();
         BASE64_URL_SAFE.encode(hash.to_le_bytes())
     }
+    pub fn cut(&mut self, index: u32) {
+        self.ops.truncate(index as usize + 1);
+    }
 }
