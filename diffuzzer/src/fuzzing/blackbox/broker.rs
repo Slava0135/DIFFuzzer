@@ -149,6 +149,7 @@ fn run_instance(
     let local_tmp_dir = LocalPath::create_new_tmp(&name)?;
     let (cmdi, supervisor) =
         launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir, broker.clone())?;
+
     let mut instance = BlackBoxFuzzer::create(
         config.clone(),
         fst_mount,

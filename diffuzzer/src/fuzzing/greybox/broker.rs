@@ -66,48 +66,21 @@ impl GreyBoxBroker {
             let handle = builder
                 .name(name.clone())
                 .spawn(move || {
-                    match LocalPath::create_new_tmp(&name) {
+                    match run_instance(
+                        config,
+                        fst_mount,
+                        snd_mount,
+                        crashes_path,
+                        corpus_path,
+                        no_qemu,
+                        name,
+                        broker.clone(),
+                        id,
+                        instance_rx,
+                    ) {
                         Err(err) => broker.error(err).unwrap(),
-                        Ok(local_tmp_dir) => {
-                            match launch_cmdi_and_supervisor(
-                                no_qemu,
-                                &config,
-                                &local_tmp_dir,
-                                broker.clone(),
-                            ) {
-                                Err(err) => broker.error(err).unwrap(),
-                                Ok((cmdi, supervisor)) => {
-                                    match GreyBoxFuzzer::create(
-                                        config.clone(),
-                                        fst_mount,
-                                        snd_mount,
-                                        crashes_path.clone(),
-                                        corpus_path,
-                                        cmdi,
-                                        supervisor,
-                                        local_tmp_dir,
-                                        broker.clone(),
-                                    )
-                                    .with_context(|| {
-                                        format!("failed to launch fuzzer instance {}", id)
-                                    }) {
-                                        Err(err) => broker.error(err).unwrap(),
-                                        Ok(mut instance) => {
-                                            broker.info("fuzzer is ready".into()).unwrap();
-                                            let InstanceMessage::Run { test_count } = instance_rx
-                                                .recv()
-                                                .expect("failed to receive instance message");
-                                            broker.info("run fuzzer".into()).unwrap();
-                                            match instance.run(test_count) {
-                                                Ok(_) => {}
-                                                Err(err) => broker.error(err).unwrap(),
-                                            };
-                                        }
-                                    };
-                                }
-                            };
-                        }
-                    };
+                        _ => {}
+                    }
                 })
                 .with_context(|| format!("failed to create instance {}", id))?;
             instances.push(GreyBoxInstance {
@@ -162,4 +135,44 @@ impl GreyBoxBroker {
             }
         }
     }
+}
+
+fn run_instance(
+    config: Config,
+    fst_mount: &'static dyn FileSystemMount,
+    snd_mount: &'static dyn FileSystemMount,
+    crashes_path: LocalPath,
+    corpus_path: Option<String>,
+    no_qemu: bool,
+    name: String,
+    broker: BrokerHandle,
+    id: u8,
+    instance_rx: Receiver<InstanceMessage>,
+) -> anyhow::Result<()> {
+    let local_tmp_dir = LocalPath::create_new_tmp(&name)?;
+    let (cmdi, supervisor) =
+        launch_cmdi_and_supervisor(no_qemu, &config, &local_tmp_dir, broker.clone())?;
+
+    let mut instance = GreyBoxFuzzer::create(
+        config.clone(),
+        fst_mount,
+        snd_mount,
+        crashes_path.clone(),
+        corpus_path,
+        cmdi,
+        supervisor,
+        local_tmp_dir,
+        broker.clone(),
+    )
+    .with_context(|| format!("failed to launch fuzzer instance {}", id))?;
+
+    broker.info("fuzzer is ready".into()).unwrap();
+    let InstanceMessage::Run { test_count } = instance_rx
+        .recv()
+        .expect("failed to receive instance message");
+
+    broker.info("run fuzzer".into()).unwrap();
+    instance.run(test_count)?;
+
+    Ok(())
 }
